@@ -161,3 +161,21 @@ def test_conflicting_hypothesis_verdicts_are_rejected():
         ProtocolDecisionDecoder(prompt, extraction)(
             StrategyId.S2, run(out(0, "participant-1", "draft", payload)),
         )
+
+
+def test_edge_support_counts_use_decomposition_edge_ids_for_algorithm1_repair():
+    prompt, extraction, _, raw = fixture()
+    raw["subproblems"].append({
+        "id": "s2", "question": "Publish service", "inputs": ["Service plan"],
+        "output": "Published service", "local_constraints": [],
+        "covered_requirements": [],
+    })
+    raw["dependencies"] = [{"source": "s1", "target": "s2"}]
+    raw["kappa"] = {"Service plan": ["s2"]}
+    payload = {"candidate": raw}
+    result = ProtocolDecisionDecoder(prompt, extraction)(
+        StrategyId.S2,
+        run(out(0, "participant-1", "draft", payload),
+            out(1, "participant-2", "draft", payload)),
+    )
+    assert result.candidate_support_counts == ((("s1", "s2"), 2),)
