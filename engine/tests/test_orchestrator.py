@@ -165,7 +165,7 @@ def test_strategy_result_is_not_selected_when_it_has_more_failures():
     result = run_adaptive(
         prompt, extract=lambda _: extraction,
         draft=lambda p, e, i: good, execute_strategy=execute,
-        budget=30, high_stakes=False, model_families=1, open_prompt=True,
+        budget=14, high_stakes=False, model_families=1, open_prompt=True,
     )
     assert result.best == result.initial_union
     assert result.best_failures == ()
