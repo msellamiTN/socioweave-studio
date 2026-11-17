@@ -51,17 +51,33 @@ Each Core must contain:
 7. Publish the test report and mark PASS or BLOCKED.
 8. Only then begin the next dependent Core.
 
-## 5. Current baseline
+## 5. Current acceptance baseline
 
-Core 01 — Prompt & Requirement Model: previously committed tests exist; a separate full acceptance run still needs to be recorded against its final integrated commit.
-
-Core 02 — Requirement Extraction:
-- Commit tested: `72f965bb99b47972d72d89bb4da20b2a2b96ee98`
+### Core 01 — Prompt & Requirement Model
+- Status: **PASS**
+- Tested commit: `fe9b606e2c7fa013f86c6842fc2245d2cc414500`
 - Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
 - Command: `python -m pytest -q`
-- Result: **15 passed in 0.04s**
-- CI run: https://github.com/msellamiTN/socioweave-studio/actions/runs/44179656788
-- Scope: currently includes the prompt-model and extraction tests present at that commit.
-- Limitation: this is a passing automated test baseline, not yet a full semantic evaluation of LLM extraction accuracy, source-span entailment, extractor independence or benchmark performance.
+- Result: **39 passed in 0.06s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44180942457
+- Scope limitation: software model acceptance only; no semantic requirement-entailment claim.
 
-Core 02 is therefore **unit-test green**, but its broader scientific evaluation remains pending. Future Core work is gated by the complete test suite defined above.
+### Core 02 — Requirement Extraction
+- Status: **PASS — software acceptance; scientific quality evaluation pending**
+- Tested commit: `4b4d0b29eb1f6b963662e9f115e67a4db65fd851`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **55 passed in 0.07s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44181085215
+- Scope limitation: no benchmark precision/recall/F1, span entailment, hypothesis quality, extractor correlation or T4 profiling has been established.
+
+### Core 03 — Decomposition Model
+- Status: **PASS — software model acceptance**
+- Tested commit: `d8160ed2f2211c964d51a4ef5ec08beecac7bd0a`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **75 passed in 0.12s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44185214955
+- Scope limitation: representation and reference integrity only; V1/V2/V5 validity and V3/V4 execution-dependent correctness belong to Core 04 and later evaluation.
+
+The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
