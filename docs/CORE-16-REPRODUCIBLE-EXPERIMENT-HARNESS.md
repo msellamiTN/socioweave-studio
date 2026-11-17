@@ -1,6 +1,6 @@
 # Core 16 — Reproducible Experiment Harness
 
-**Status:** IN PROGRESS — software acceptance pending.  
+**Status:** PASS — software harness acceptance; scientific campaign execution pending.  
 **Scientific basis:** Section 8 experimental protocol and E1–E9; supplementary engineering telemetry is recorded separately from paper metrics.
 
 ## Objective
@@ -11,6 +11,7 @@ Provide a reproducible campaign substrate without downloading data or invoking m
 
 - `sociodec.experiments`: typed experiment configuration, canonical SHA-256 config/prompt fingerprints, stable per-example/per-repeat seeds, trial contexts/outcomes/records, failure capture and JSONL export.
 - `sociodec.datasets`: registry for BREAK, StrategyQA, TaskBench, TravelPlanner and the author-curated smart-administration set; strict local JSONL loader with version, split, count and duplicate checks.
+- `CampaignManifest`: records config hash, exact dataset snapshot SHA-256, code commit, Python version and dependency-lock SHA-256.
 - `tests/test_experiments.py`, `tests/test_datasets.py`: validation, determinism, provenance, failure isolation and export contracts.
 
 ## Paper defaults represented
