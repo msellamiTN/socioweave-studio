@@ -58,7 +58,7 @@ def _make(
         for agent in agent_ids
     )
     visibility = tuple(
-        VisibilityRound(round_number, visibility_by_round[round_number])
+        VisibilityRound(round_number, tuple(dict.fromkeys(visibility_by_round[round_number])))
         for round_number in range(1, rounds + 1)
     )
     strategy = SocialStrategy(
