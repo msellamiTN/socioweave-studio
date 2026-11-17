@@ -31,6 +31,6 @@ def test_jsonl_loader_rejects_unknown_dataset_duplicate_and_bad_rows(tmp_path):
     )
     with pytest.raises(ValueError, match="duplicate"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
-    path.write_text('{"example_id":"y","prompt_text":"A"}\\n', encoding="utf-8")
+    path.write_text(json.dumps({"example_id": "y", "prompt_text": "A"}) + chr(10), encoding="utf-8")
     with pytest.raises(ValueError, match="expected"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1", expected_count=3)
