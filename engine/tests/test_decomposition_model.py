@@ -174,10 +174,10 @@ def test_validate_against_rejects_coverage_outside_explicit_requirement_set():
 
 
 def test_validate_against_rejects_undeclared_deliverable_key():
-    prompt, _, _, _, s1, _ = fixtures()
+    prompt, _, r1, _, s1, _ = fixtures()
     d = Decomposition((s1,), (), (DeliverableComposition("Unknown", ("s1",)),))
     with pytest.raises(ValueError, match="undeclared deliverable"):
-        d.validate_against(prompt, ())
+        d.validate_against(prompt, (r1,))
 
 
 def test_validate_against_does_not_enforce_v1_v2_or_v5():
