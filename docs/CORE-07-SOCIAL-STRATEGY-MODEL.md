@@ -1,6 +1,6 @@
 # Core 07 — Social Strategy Model
 
-**Status:** Implementation and full-suite acceptance pending.  
+**Status:** PASS — formal strategy model software acceptance on commit `610c372a3e9d147c9f6a60c4afd376c1d16e4c10`.  
 **Scientific source:** Definitions 9 and 10 and the accompanying strategy measures.
 
 ## 1. Paper contract
@@ -27,17 +27,22 @@ The paper defines calls(sigma) as the number of protocol steps that invoke a mod
 
 The model records stable agent identifiers, model identity, context and optional memory; role assignments for every agent and round; visibility relations; protocol action/input/stage; model-call accounting; anonymity; and decision rule.
 
-The explicit `stage` and `invokes_model` fields are software representation choices that make the paper's calls/depth quantities computable. They are not extra social-theory claims.
+The explicit `stage` and `invokes_model` fields are software representation choices that make the paper's calls/depth quantities computable. They are not extra social-theory claims. Role assignments are required to be total over agents × rounds, and every agent must see its own outputs in every round.
 
 ## 3. Scope boundary
 
-This Core models a strategy specification. It does not execute agents, implement decision rules, select a strategy for a prompt or assert that a social procedure improves quality. Strategy execution and adaptive selection are later units.
+This Core models a strategy specification. It does not execute agents, enforce visibility at runtime, implement decision rules, select a strategy for a prompt or assert that a social procedure improves quality. Strategy execution and adaptive selection are later units.
 
-## 4. Acceptance
+## 4. Acceptance evidence
 
 From `engine/`:
 
     python -m pip install -e '.[dev]'
     python -m pytest -q
 
-Acceptance requires the complete integrated suite, including model invariants and boundary tests, to pass on the exact final commit.
+**Result:** 123 passed in 0.17s; 0 failed; 0 skipped.  
+**Exact tested commit:** `610c372a3e9d147c9f6a60c4afd376c1d16e4c10`.  
+**CI:** [Workflow run 44187108609](https://github.com/msellamiTN/socioweave-studio/actions/runs/44187108609).  
+See [CORE-07-TEST-REPORT.md](CORE-07-TEST-REPORT.md) for detailed scope and limitations.
+
+This acceptance is software-level strategy-model validation only; it is not evidence of strategy execution quality or adaptive selection performance.
