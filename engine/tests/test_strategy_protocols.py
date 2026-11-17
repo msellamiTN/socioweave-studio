@@ -97,7 +97,7 @@ def test_peer_review_reviewers_are_isolated_and_editor_sees_all_reviews():
 
 def test_adversarial_judge_sees_both_defences_but_parties_do_not_see_each_other():
     blueprint = build_strategy_blueprint("S7")
-    pairs = set(blueprint.strategy.visibility[1].visible_pairs)
+    pairs = set(blueprint.strategy.visibility[2].visible_pairs)
     assert ("judge", "party-1") in pairs and ("judge", "party-2") in pairs
     assert ("party-1", "party-2") not in pairs
     assert [step.action for step in blueprint.strategy.protocol] == [
