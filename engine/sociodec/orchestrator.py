@@ -260,12 +260,13 @@ def run_adaptive(
             emit("budget_stop", f"Strategy {item.value} and remaining chain not run")
             break
 
-        outcome = execute_strategy(item, prompt, extraction, (draft_a, draft_b), seed, budget - calls)
+        available_strategy_calls = budget - calls - 1
+        outcome = execute_strategy(item, prompt, extraction, (draft_a, draft_b), seed, available_strategy_calls)
         if not isinstance(outcome, StrategyOutcome):
             raise TypeError("execute_strategy must return StrategyOutcome")
+        if outcome.calls_made > available_strategy_calls:
+            raise RuntimeError("Strategy adapter exceeded the remaining call budget reserved before repair")
         calls += outcome.calls_made
-        if calls > budget:
-            raise RuntimeError("Strategy adapter exceeded the remaining call budget")
         repaired = repair_decomposition(
             prompt, extraction.requirements, outcome.decomposition,
             dict(outcome.candidate_support_counts),
