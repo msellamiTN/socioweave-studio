@@ -180,9 +180,14 @@ The next dependent unit may start only after the current Core's exact tested com
 
 
 ### Core 13 — Typed Protocol Output Decoding
-- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Status: **PASS — software decoding acceptance**
 - Implementation: `engine/sociodec/protocol_decoding.py`
 - Tests: `engine/tests/test_protocol_decoding.py`
 - Specification: `docs/CORE-13-TYPED-PROTOCOL-DECODING.md`
 - Scope: strict JSON decoding for candidate decompositions, requirement/constraint references, dependencies, kappa, objections, rankings, ballots, judge outputs, summaries, partitions and hypothesis verdicts.
-- Acceptance gate: full integrated suite, zero skipped tests, exact-commit CI. Decision application remains separate; this parser does not claim structural or execution validity by itself.
+- Exact tested code commit: `64c6cd323d95c6f2d9506469536c1e1c0fb7f3b5`
+- Environment: GitHub Actions, Ubuntu latest runner, CPython 3.11
+- Command: `python -m pytest -q`
+- Result: **241 passed in 0.43s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44194445943
+- Boundary: decision application, structural validity and execution evidence remain separate gates.
