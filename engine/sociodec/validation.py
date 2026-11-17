@@ -137,8 +137,6 @@ def validate_decomposition(
     This function does not execute subproblems or compose an answer. V3 and
     V4 are consequently NOT_EVALUATED, never silently treated as passing.
     """
-    decomposition.validate_against(prompt, requirements)
-
     verdict_by_hypothesis: dict[Hypothesis, HypothesisVerdictValue] = {}
     verdict_findings: list[ValidationFinding] = []
     for item in verdicts:
@@ -178,6 +176,7 @@ def validate_decomposition(
         if verdict_by_hypothesis.get(h) is HypothesisVerdictValue.CONFIRMED
     )
     effective = tuple(dict.fromkeys((*requirements, *confirmed)))
+    decomposition.validate_against(prompt, effective)
 
     covered = decomposition.cov
     required = frozenset(effective)
