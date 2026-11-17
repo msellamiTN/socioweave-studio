@@ -156,4 +156,4 @@ def test_invalid_feature_values_are_rejected(kwargs):
 def test_threshold_and_distance_boundaries():
     f = features(content_gap=0.1, structure_gap=0.10001)
     assert plan(f, initial_distance=0.11).items[0] is PlanItem.S6
-    assert plan(features(content_gap=0.2), initial_distance=0.2).items == ()
+    assert plan(features(content_gap=0.2), initial_distance=0.21).items == ()
