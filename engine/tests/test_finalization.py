@@ -22,9 +22,13 @@ def _case():
 
 def test_finalizer_keeps_v3_v4_not_evaluated_without_executor_evidence():
     prompt, extraction, _, decomposition = _case()
+    initial = Decomposition(
+        (Subproblem("s1", "Prepare plan", (), "Plan output", (), decomposition.subproblems[0].covered_requirements[:1]),),
+        (), (DeliverableComposition("Plan", ("s1",)),),
+    )
     result = run_adaptive(
         prompt, extract=lambda _: extraction,
-        draft=lambda p, e, i: decomposition,
+        draft=lambda p, e, i: initial,
         execute_strategy=lambda *args: StrategyOutcome(decomposition, 10),
         budget=20, high_stakes=False, model_families=1, open_prompt=True,
     )
@@ -50,13 +54,13 @@ def test_finalizer_uses_winning_hypothesis_verdict_and_execution_evidence():
             strategy_run_id="confirmed-run",
         )
 
+    initial = Decomposition(
+        (Subproblem("s1", "Prepare plan", (), "Plan output", (), (extraction.requirements[0],)),),
+        (), (DeliverableComposition("Plan", ("s1",)),),
+    )
     result = run_adaptive(
         prompt, extract=lambda _: extraction,
-        draft=lambda p, e, i: Decomposition(
-            decomposition.subproblems[:1],
-            (),
-            decomposition.composition,
-        ),
+        draft=lambda p, e, i: initial,
         execute_strategy=execute,
         budget=20, high_stakes=False, model_families=1, open_prompt=True,
     )
