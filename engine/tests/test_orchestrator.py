@@ -200,3 +200,8 @@ def test_strategy_chain_passes_previous_decomposition_as_next_seed():
     assert observed[0][1] is None
     assert observed[1][1] == d
     assert result.strategy_records[1].seed_supplied is True
+
+
+def test_c1_full_pipeline_uses_composed_phase_cost_not_sum_of_full_strategies():
+    from sociodec.orchestrator import _item_cost
+    assert _item_cost(PlanItem.COMBO_FULL_PIPELINE, n=3, k=3, T=2) == 9
