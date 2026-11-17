@@ -186,6 +186,14 @@ class SocialStrategy:
         stages = {step.stage for step in self.protocol}
         if stages != set(range(1, max(stages) + 1)):
             raise ValueError("Protocol stages must be contiguous from 1")
+        ordered_pairs = [(step.round, step.stage) for step in self.protocol]
+        if ordered_pairs != sorted(ordered_pairs):
+            raise ValueError("Protocol steps must be ordered by round and stage")
+        stage_rounds: dict[int, int] = {}
+        for step in self.protocol:
+            previous_round = stage_rounds.setdefault(step.stage, step.round)
+            if previous_round != step.round:
+                raise ValueError("A protocol stage cannot span multiple rounds")
         for step in self.protocol:
             if step.agent_id not in known_agents:
                 raise ValueError(f"Protocol step references unknown agent: {step.agent_id}")
