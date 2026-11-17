@@ -40,7 +40,7 @@ The orchestrator owns ordering, budget checks, seeding metadata, validation, esc
 
 ## 4. Budget accounting
 
-The orchestrator counts q extraction calls, two initial draft calls, actual calls reported by strategy adapters, and any repair callback call. Before a strategy, it reserves the catalogue cost plus one possible repair call. The adapter receives the actual remaining budget and its reported call count is checked. A strategy or repair that exceeds the budget fails closed with an error; the orchestrator cannot undo external calls already made by a misbehaving adapter.
+The orchestrator counts q extraction calls, two initial draft calls, actual calls reported by strategy adapters, and any repair callback call. Before a strategy, it reserves the catalogue cost plus one possible repair call. The adapter receives the strategy-specific catalogue call allowance (bounded by the remaining budget after reserving one repair call), and its reported call count is checked. A strategy or repair that exceeds the budget fails closed with an error; the orchestrator cannot undo external calls already made by a misbehaving adapter.
 
 Catalogue reservation uses the full paper Table 4 call formula, so it is conservative when initial drafts are adopted as seeds and skip calls. C1 uses the Section 7.5 phase-composition cost (2n + 3 for one revision), not the sum of four full strategy costs. Reservations are bounds, not claims that every seeded run consumes that many calls.
 
