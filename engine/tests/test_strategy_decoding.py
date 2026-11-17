@@ -99,7 +99,8 @@ def test_strategy_decision_assembly_applies_paper_operator(sid, outputs, expecte
     decoder = ProtocolDecisionDecoder(prompt, extraction)
     result = decoder(sid, run(*outputs))
     assert result.decision.rule == expected
-    assert result.decision.decomposition.kappa == {"Service plan": frozenset({"s1"})}
+    assert len(result.decision.decomposition.kappa["Service plan"]) == 1
+    assert result.decision.decomposition.subproblems[0].question == "Create service"
 
 
 def test_s11_compromise_requires_explicit_negotiated_result():
