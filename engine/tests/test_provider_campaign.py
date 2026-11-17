@@ -26,7 +26,7 @@ PROMPT = Prompt(TEXT, Interpretation("Create a report", (HARD,), (), ("Report",)
 
 def _decomp():
     return Decomposition(
-        (Subproblem("s1", "Create report", (), "Report", (), (REQ,)),),
+        (Subproblem("s1", "Create report", (), "Report", (HARD,), (REQ,)),),
         (), (DeliverableComposition("Report", ("s1",)),),
     )
 
@@ -89,7 +89,7 @@ class FakeExecutor:
     def execute(self, prompt, decomposition, *, seed):
         return ExecutionRun(
             self.executor_id,
-            (SubproblemExecution("s1", ExecutionStatus.SOLVED, "Report"),),
+            tuple(SubproblemExecution(item.identifier, ExecutionStatus.SOLVED, "Report") for item in decomposition.subproblems),
             "Accessible report",
             (ConstraintAssessment(HARD, True, "Verified"),),
         )
