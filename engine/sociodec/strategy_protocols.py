@@ -43,10 +43,12 @@ def _make(
     rounds: int,
     visibility_by_round: Mapping[int, tuple[tuple[str, str], ...]],
     prompt_views: Mapping[str, str] | None,
+    agent_contexts: Mapping[str, str] | None,
 ) -> StrategyBlueprint:
+    contexts = dict(agent_contexts or {})
     agents = tuple(
         Agent(identifier, model_ids.get(identifier, "default-model"),
-              f"Social strategy agent {identifier}")
+              contexts.get(identifier, f"Social strategy agent {identifier}"))
         for identifier in agent_ids
     )
     roles = tuple(dict.fromkeys(roles_by_round.values()))
@@ -78,6 +80,7 @@ def build_strategy_blueprint(
     *,
     model_ids: Mapping[str, str] | None = None,
     prompt_views: Mapping[str, str] | None = None,
+    agent_contexts: Mapping[str, str] | None = None,
     n: int = 3,
     k: int = 3,
     T: int = 2,
@@ -274,7 +277,7 @@ def build_strategy_blueprint(
         sid, tuple(ids), models, roles, tuple(p),
         DecisionRule(get_strategy(sid).decision_rule),
         (3 if sid is StrategyId.S1 else T if sid in {StrategyId.S4, StrategyId.S10} else 2 if sid is StrategyId.S13 else 1),
-        visibility, views,
+        visibility, views, agent_contexts,
     )
     expected_calls = get_strategy(sid).calls(n=n, k=k, T=T)
     if sid not in {StrategyId.S11} and blueprint.strategy.calls != expected_calls:
