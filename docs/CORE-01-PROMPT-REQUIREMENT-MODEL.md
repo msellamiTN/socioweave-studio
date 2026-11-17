@@ -1,6 +1,6 @@
 # Core 01 — Prompt & Requirement Model
 
-**Status:** Implemented as the first domain-model increment  
+**Status:** PASS — automated acceptance suite green on 2026-11-17 (see `CORE-01-TEST-REPORT.md`)  
 **Engine package:** `engine/sociodec/models/prompt.py`  
 **Scientific source:** *Societies of Decomposers: Social and Organisational Strategies for LLM-Based Multi-Agent Prompt Decomposition*, Section 3.2, Definitions 1–2 and Table 2.
 
