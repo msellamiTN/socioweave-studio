@@ -74,9 +74,8 @@ def _support_counts(candidates: tuple[Candidate, ...]) -> tuple[tuple[tuple[str,
     counts: dict[tuple[str, str], int] = {}
     for candidate in candidates:
         d = candidate.decomposition
-        by_id = {item.identifier: subproblem_signature(item) for item in d.subproblems}
         for source, target in d.E:
-            edge = (repr(by_id[source]), repr(by_id[target]))
+            edge = (source, target)
             counts[edge] = counts.get(edge, 0) + 1
     return tuple(sorted(counts.items()))
 
