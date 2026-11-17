@@ -77,6 +77,7 @@ class StrategyExecutionRecord:
 
 @dataclass(frozen=True, slots=True)
 class AdaptiveResult:
+    prompt: Prompt
     best: Decomposition
     best_validation: ValidationReport
     best_failures: tuple[ValidationFinding, ...]
@@ -317,7 +318,7 @@ def run_adaptive(
         terminated_reason = "maximum three escalations reached"
 
     return AdaptiveResult(
-        best=best, best_validation=best_validation, best_failures=best_findings,
+        prompt=prompt, best=best, best_validation=best_validation, best_failures=best_findings,
         extraction=extraction, diagnosis=diagnosis, initial_union=initial,
         initial_validation=initial_validation, strategy_records=tuple(records),
         strategies_not_run=tuple(dict.fromkeys(not_run)), calls_made=calls,
