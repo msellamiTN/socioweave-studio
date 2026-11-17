@@ -47,7 +47,9 @@ class InitialDrafter(Protocol):
 class StrategyExecutor(Protocol):
     def __call__(
         self, item: PlanItem, prompt: Prompt, extraction: AggregatedExtraction,
-        seed: Decomposition | None,
+        initial_drafts: tuple[Decomposition, Decomposition],
+        chain_seed: Decomposition | None,
+        available_calls: int,
     ) -> StrategyOutcome: ...
 
 
@@ -238,6 +240,12 @@ def run_adaptive(
     already_run: set[PlanItem] = set()
     seed: Decomposition | None = None
     escalation_count = 0
+    if not queue:
+        initial_target = _escalation_target(best_findings, high_stakes, already_run)
+        if initial_target is not None:
+            queue = [initial_target]
+            escalation_count += 1
+            emit("escalation", f"Scheduled {initial_target.value} after initial union check")
     terminated_reason = "strategy chain completed"
 
     while queue:
@@ -252,10 +260,12 @@ def run_adaptive(
             emit("budget_stop", f"Strategy {item.value} and remaining chain not run")
             break
 
-        outcome = execute_strategy(item, prompt, extraction, seed)
+        outcome = execute_strategy(item, prompt, extraction, (draft_a, draft_b), seed, budget - calls)
         if not isinstance(outcome, StrategyOutcome):
             raise TypeError("execute_strategy must return StrategyOutcome")
         calls += outcome.calls_made
+        if calls > budget:
+            raise RuntimeError("Strategy adapter exceeded the remaining call budget")
         repaired = repair_decomposition(
             prompt, extraction.requirements, outcome.decomposition,
             dict(outcome.candidate_support_counts),
