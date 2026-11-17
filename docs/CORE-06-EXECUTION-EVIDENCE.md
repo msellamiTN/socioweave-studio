@@ -1,6 +1,6 @@
 # Core 06 — Execution Evidence for V3 and V4
 
-**Status:** Implementation and full-suite acceptance pending.  
+**Status:** PASS — execution evidence contract acceptance on commit `0194fb0efc7d696de99527c6d61b41bd098a70a0`.  
 **Scientific source:** Definition 6, V3 and V4; experimental protocol describing a fixed executor (M_E).
 
 ## 1. Paper contract
@@ -25,11 +25,16 @@ This is a software evidence contract, not a new theorem in the paper. The code c
 
 V4 PASS means the supplied verifier evidence is complete and affirmative. It must be backed by a trusted evaluator, test, measurement or human assessment appropriate to the constraint. The evaluator provenance and raw evidence should be persisted by the experiment runner.
 
-## 4. Acceptance
+## 4. Acceptance evidence
 
 From `engine/`:
 
     python -m pip install -e '.[dev]'
     python -m pytest -q
 
-Acceptance requires the complete integrated suite, including V3/V4 positive and negative cases, to pass on the exact final commit.
+**Result:** 108 passed in 0.14s; 0 failed; 0 skipped.  
+**Exact tested commit:** `0194fb0efc7d696de99527c6d61b41bd098a70a0`.  
+**CI:** [Workflow run 44186672952](https://github.com/msellamiTN/socioweave-studio/actions/runs/44186672952).  
+See [CORE-06-TEST-REPORT.md](CORE-06-TEST-REPORT.md) for detailed scope and limitations.
+
+This acceptance is software-level evidence-contract validation only; it is not empirical executor or benchmark validation.
