@@ -1,6 +1,6 @@
 # Core 11 — End-to-End Adaptive Orchestrator
 
-**Status:** IMPLEMENTED — acceptance pending full CI.  
+**Status:** PASS — software orchestration acceptance. See CORE-11-TEST-REPORT.md.  
 **Scientific source:** Section 6.1, Algorithm 1; Section 7.3, Algorithm 2; Table 8 and the escalation rules in Section 7.3.
 
 ## 1. Purpose
