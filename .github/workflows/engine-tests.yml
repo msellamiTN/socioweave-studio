@@ -19,12 +19,17 @@ on:
       - "docs/CORE-13-*.md"
       - "docs/CORE-14-*.md"
       - "docs/CORE-15-*.md"
+      - "docs/CORE-16-*.md"
+      - "docs/CORE-17-*.md"
+      - "docs/CORE-18-*.md"
       - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
   pull_request:
     paths:
       - "engine/**"
+      - "docs/CORE-16-*.md"
       - "docs/CORE-17-*.md"
+      - "docs/CORE-18-*.md"
       - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
 
