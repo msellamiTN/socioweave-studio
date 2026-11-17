@@ -83,7 +83,7 @@ class ExtractionFormatError(ValueError):
 
 def _normalise(text: str) -> str:
     value = unicodedata.normalize("NFKC", text).casefold()
-    return re.sub(r"\\s+", " ", re.sub(r"[^\\w\\s]", " ", value)).strip()
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", value)).strip()
 
 
 def _json_payload(text: str) -> dict:
