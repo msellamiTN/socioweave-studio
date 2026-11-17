@@ -125,4 +125,13 @@ Each Core must contain:
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44187520064
 - Scope limitation: serial protocol dispatch with stage visibility snapshots; no parallel latency claim, decision-rule implementation or strategy effectiveness result.
 
+### Core 09 — Decision Operators and Strategy Catalogue
+- Status: **PASS — decision operators and catalogue software acceptance**
+- Tested commit: `724ab490169c453f09e18765e814014ae386f950`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **148 passed in 0.21s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44188545307
+- Scope limitation: pure operators/catalogue; LLM-mediated synthesis, compromise and authority are explicit injected outcomes; no end-to-end strategy effectiveness claim.
+
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
