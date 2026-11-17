@@ -275,3 +275,15 @@ The next dependent unit may start only after the current Core's exact tested com
 - [ ] Successes and failures are checkpointed; resume does not silently retry failed trials.
 - [ ] Full engine suite passes on the exact implementation commit.
 - [ ] Live provider pilot, fixed executor and V3/V4 verifier evidence are separately reported; software CI is not scientific validation.
+
+
+## Core 20 — Fixed-executor evaluation and trial adapter
+
+- [ ] Executor identity matches the predeclared fixed executor before and after execution.
+- [ ] V3/V4 are assessed only from a supplied ExecutionRun and propagated through Core 15 finalization.
+- [ ] Coverage, redundancy, coupling, depth and structural validity are computed from the selected decomposition.
+- [ ] Utility is omitted unless an independent scorer is supplied; it is never inferred from validity.
+- [ ] Cyclic decomposition depth fails closed.
+- [ ] Raw composed answers are not persisted in default metadata; answer hash and evidence references are traceable.
+- [ ] Full engine suite passes on the exact implementation commit.
+- [ ] Real executor and verifier validity are separately demonstrated; software CI is not scientific validation.
