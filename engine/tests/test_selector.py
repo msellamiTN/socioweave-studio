@@ -108,18 +108,18 @@ def test_stage_three_justified_plan_requires_two_families():
 
 def test_escalation_uncovered_requirement_selects_jigsaw_then_critic():
     result = plan(features(), failures=("uncovered_requirements",))
-    assert result.items == (PlanItem.COMBO_JIGSAW_THEN_CRITIC,)
+    assert result.items == (PlanItem.S5, PlanItem.COMBO_JIGSAW_THEN_CRITIC)
     assert result.reason == "Algorithm 2 escalation"
 
 
 def test_escalation_cycle_or_composition_failure_selects_peer_review():
     result = plan(features(), failures=("dependency_cycle",))
-    assert result.items == (PlanItem.S8,)
+    assert result.items == (PlanItem.S5, PlanItem.S8)
 
 
 def test_escalation_other_failure_selects_full_pipeline():
     result = plan(features(), failures=("some_other_failure",))
-    assert result.items == (PlanItem.COMBO_FULL_PIPELINE,)
+    assert result.items == (PlanItem.S5, PlanItem.COMBO_FULL_PIPELINE)
 
 
 def test_escalation_high_stakes_after_peer_review_adds_full_pipeline():
