@@ -43,7 +43,7 @@ The first matching rule in each stage fires. The same strategy is not repeated i
 
 - Uncovered requirement or unresolved hypothesis: Jigsaw followed by Devil's Advocate (a paper-described combination).
 - Cycle or composition failure: S8 Peer Review.
-- Other failures, or high stakes without a remaining failure: the paper's full pipeline combination (Nominal Group → Dialectical Inquiry → Delphi → Adversarial Procedure).
+- Other failures, or high stakes without a remaining failure: C1 full pipeline (Nominal Group → Dialectical Inquiry → Delphi → Adversarial Procedure), composed by Algorithm 3 rather than four complete sequential strategy runs; for three agents and one revision it costs nine calls.
 - The paper's combination labels C1/C2 are kept distinct from the five candidate design-space cells C1–C5 in the software model. They are not the same identifiers.
 
 ## 4. Software boundary and engineering conventions
