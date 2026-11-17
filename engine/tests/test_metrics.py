@@ -25,7 +25,7 @@ def test_table_nine_decomposition_metrics():
 def test_validity_needs_coverage_acyclicity_and_composition():
     m=decomposition_metrics(requirements={"r"},covered_requirements=set(),
         subproblem_signatures=["s"],edges=[("s","s")],acyclic=True,composition_complete=False)
-    assert not m.valid and m.coverage==0
+    assert not m.validity and m.coverage==0
 
 def test_execution_metrics_are_undefined_without_evidence():
     m=decomposition_metrics(requirements={"r"},covered_requirements={"r"},
