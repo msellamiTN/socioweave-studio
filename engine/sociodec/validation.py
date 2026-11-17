@@ -32,6 +32,10 @@ class HypothesisVerdict:
     hypothesis: Hypothesis
     verdict: HypothesisVerdictValue
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.verdict, HypothesisVerdictValue):
+            raise ValueError("Hypothesis verdict must be confirmed or rejected")
+
 
 @dataclass(frozen=True, slots=True)
 class ValidationFinding:
