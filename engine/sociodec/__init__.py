@@ -1,35 +1,20 @@
-"""SocioDec Engine: formal core for SOCIOWEAVE.
-
-Exports the paper-aligned prompt, requirement and decomposition models.
-"""
+"""SocioDec Engine: paper-aligned models for SOCIOWEAVE."""
 from .models.decomposition import (
-    Decomposition,
-    DeliverableComposition,
-    Dependency,
-    Subproblem,
+    Decomposition, DeliverableComposition, Dependency, Subproblem,
 )
 from .models.prompt import (
-    Constraint,
-    ConstraintKind,
-    Entity,
-    Interpretation,
-    Prompt,
-    Requirement,
-    RequirementType,
-    SourceSpan,
+    Constraint, ConstraintKind, Entity, Interpretation, Prompt,
+    Requirement, RequirementType, SourceSpan,
+)
+from .models.strategy import (
+    Action, Agent, DecisionRule, ProtocolStep, Role, RoleAssignment,
+    SocialStrategy, VisibilityRound,
 )
 
 __all__ = [
-    "Constraint",
-    "ConstraintKind",
-    "Decomposition",
-    "DeliverableComposition",
-    "Dependency",
-    "Entity",
-    "Interpretation",
-    "Prompt",
-    "Requirement",
-    "RequirementType",
-    "SourceSpan",
-    "Subproblem",
+    "Action", "Agent", "Constraint", "ConstraintKind", "DecisionRule",
+    "Decomposition", "DeliverableComposition", "Dependency", "Entity",
+    "Interpretation", "Prompt", "ProtocolStep", "Requirement",
+    "RequirementType", "Role", "RoleAssignment", "SocialStrategy",
+    "SourceSpan", "Subproblem", "VisibilityRound",
 ]
