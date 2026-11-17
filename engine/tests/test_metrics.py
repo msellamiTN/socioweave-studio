@@ -18,7 +18,7 @@ def test_table_nine_decomposition_metrics():
     m=decomposition_metrics(requirements={"r1","r2"},covered_requirements={"r1","r2"},
         subproblem_signatures=["a","a","b"],edges=[("s1","s2"),("s2","s3")],
         acyclic=True,composition_complete=True,subproblem_solved=[True,False,True],utility=.8,depth=2)
-    assert m.valid and m.coverage==1
+    assert m.validity and m.coverage==1
     assert m.redundancy==pytest.approx(2/3) and m.coupling==pytest.approx(2/3)
     assert m.solvability==pytest.approx(2/3) and m.utility==.8
 
