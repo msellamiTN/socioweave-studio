@@ -48,7 +48,7 @@ def test_aggregation_unions_and_deduplicates_with_provenance():
     b = parse_extraction(json.dumps(data), PROMPT, "b")
     result = aggregate_extractions([a, b])
     assert len(result.requirements) == 1
-    assert set(result.requirement_sources["response within 20 days"]) == {"a", "b"}
+    assert set(result.requirement_sources["target|service|response within 20 days"]) == {"a", "b"}
     assert len(result.hypotheses) == 1
     assert len(result.entities) == 1
     assert len(result.ambiguities) == 1
