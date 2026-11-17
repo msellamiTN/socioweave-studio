@@ -45,7 +45,7 @@ def finalize_adaptive_result(
     genuine ExecutionRun from the executor to evaluate V3 and V4.
     """
     structural = validate_decomposition(
-        result.diagnosis.prompt if hasattr(result.diagnosis, "prompt") else result._prompt,
+        result.prompt,
         result.extraction.requirements,
         result.best,
         hypotheses=result.extraction.hypotheses,
@@ -57,7 +57,7 @@ def finalize_adaptive_result(
             result.calls_made, result.budget,
         )
     execution = assess_execution(
-        result._prompt, result.best, execution_run,
+        result.prompt, result.best, execution_run,
     )
     return FinalAdaptiveEvaluation(
         structural, execution, combine_validity(structural, execution),
