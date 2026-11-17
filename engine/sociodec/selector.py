@@ -153,8 +153,9 @@ def _cost(item: PlanItem, *, n: int, k: int, T: int) -> int:
     if item is PlanItem.COMBO_JIGSAW_THEN_CRITIC:
         return get_strategy(StrategyId.S12).calls(n=n, k=k, T=T) + get_strategy(StrategyId.S5).calls(n=n, k=k, T=T)
     if item is PlanItem.COMBO_FULL_PIPELINE:
-        return sum(get_strategy(s).calls(n=n, k=k, T=T) for s in
-                   (StrategyId.S3, StrategyId.S6, StrategyId.S4, StrategyId.S7))
+        # Section 7.5 / Algorithm 3: phase composition, not four full runs.
+        # With one accepted revision round, C1 costs 2n + 3 calls.
+        return 2 * n + 3
     return get_strategy(StrategyId(item.value)).calls(n=n, k=k, T=T)
 
 
