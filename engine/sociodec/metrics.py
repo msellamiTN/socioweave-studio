@@ -32,7 +32,7 @@ class DecompositionMetrics:
     coverage: float
     redundancy: float
     coupling: float
-    depth: int
+    depth: int | None
     solvability: float | None
     utility: float | None
 
@@ -64,7 +64,7 @@ def decomposition_metrics(*, requirements: Iterable[Hashable], covered_requireme
         raise ValueError("utility must be finite and in [0,1]")
     coverage = len(req & covered) / len(req)
     return DecompositionMetrics(acyclic and req.issubset(covered) and composition_complete,
-        coverage, redundancy, coupling, depth or 0, solvability, float(utility) if utility is not None else None)
+        coverage, redundancy, coupling, depth, solvability, float(utility) if utility is not None else None)
 
 def process_gain(strategy_utility: float, baseline_utility: float) -> float:
     for name,v in (("strategy_utility",strategy_utility),("baseline_utility",baseline_utility)):
