@@ -263,7 +263,7 @@ def run_adaptive(
             emit("budget_stop", f"Strategy {item.value} and remaining chain not run")
             break
 
-        available_strategy_calls = budget - calls - 1
+        available_strategy_calls = _item_cost(item, n=n, k=k, T=T)
         outcome = execute_strategy(item, prompt, extraction, (draft_a, draft_b), seed, available_strategy_calls)
         if not isinstance(outcome, StrategyOutcome):
             raise TypeError("execute_strategy must return StrategyOutcome")
