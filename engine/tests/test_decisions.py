@@ -110,7 +110,7 @@ def test_majority_uses_strictly_more_than_half_and_rejects_unknown_items():
     sig = subproblem_signature(a.decomposition.subproblems[0])
     result = majority([a], {"v1": frozenset(), "v2": frozenset({sig})})
     assert result.decomposition.subproblems == ()
-    with pytest.raises(ValueError, match="absent from pooled"):
+    with pytest.raises(ValueError, match="absent from the pooled"):
         majority([a], {"v1": frozenset({("unknown",)})})
 
 
