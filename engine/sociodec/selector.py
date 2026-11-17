@@ -64,8 +64,8 @@ class PromptFeatures:
             raise ValueError("model_families must be an integer >= 1")
         for name in ("content_gap", "structure_gap", "mean_coupling"):
             value = getattr(self, name)
-            if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 1:
-                raise ValueError(f"{name} must be in [0, 1]")
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value:
+                raise ValueError(f"{name} must be non-negative")
         for name in ("ambiguity", "conflict", "open_prompt", "stakeholder_values", "justified_plan", "high_stakes"):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be boolean")
