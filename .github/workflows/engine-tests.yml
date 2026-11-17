@@ -8,6 +8,7 @@ on:
       - "docs/CORE-02-*.md"
       - "docs/CORE-03-*.md"
       - "docs/CORE-04-*.md"
+      - "docs/CORE-05-*.md"
       - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
   pull_request:
