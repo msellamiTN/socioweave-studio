@@ -180,7 +180,7 @@ def build_strategy_blueprint(
             ProtocolStep("author", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("critic", Action.CRITIQUE, "step:0", 1, 2),
             ProtocolStep("author", Action.REVISE, "step:1", 1, 3),
-            ProtocolStep("judge", Action.JUDGE, "draft_and_objections", 1, 4),
+            ProtocolStep("judge", Action.JUDGE, "all_previous_outputs", 1, 4),
         ))
         visibility[1] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
@@ -190,7 +190,7 @@ def build_strategy_blueprint(
         add_roles(ids, 1, {"decomposer-1": Role.DECOMPOSER, "decomposer-2": Role.DECOMPOSER, "synthesizer": Role.AGGREGATOR})
         p.extend((
             ProtocolStep("decomposer-1", Action.DRAFT, "prompt", 1, 1),
-            ProtocolStep("decomposer-2", Action.DRAFT, "counter-assumptions_and_step:0", 1, 2),
+            ProtocolStep("decomposer-2", Action.DRAFT, "step:0", 1, 2),
             ProtocolStep("synthesizer", Action.MERGE, "all_previous_outputs", 1, 3),
         ))
         visibility[1] = _pairs(ids, full=True)
@@ -273,7 +273,7 @@ def build_strategy_blueprint(
     blueprint = _make(
         sid, tuple(ids), models, roles, tuple(p),
         DecisionRule(get_strategy(sid).decision_rule),
-        (T if sid in {StrategyId.S4, StrategyId.S10} else 2 if sid is StrategyId.S13 else 1),
+        (3 if sid is StrategyId.S1 else T if sid in {StrategyId.S4, StrategyId.S10} else 2 if sid is StrategyId.S13 else 1),
         visibility, views,
     )
     expected_calls = get_strategy(sid).calls(n=n, k=k, T=T)
