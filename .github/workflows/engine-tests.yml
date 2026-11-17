@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - "engine/**"
+      - "docs/CORE-01-*.md"
+      - "docs/CORE-02-*.md"
+      - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
   pull_request:
     paths:
