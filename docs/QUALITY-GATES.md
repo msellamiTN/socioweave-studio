@@ -300,3 +300,14 @@ The next dependent unit may start only after the current Core's exact tested com
 - [x] Trial metadata and provider traces are compatible with Core 19 checkpoint persistence.
 - [x] Full engine suite passes on the exact implementation commit (320 passed, 0 failed, 0 skipped; CI run 44203533011).
 - [ ] Real provider smoke test and small Colab pilot pass before any scientific campaign.
+
+
+## Core 22 — Domain partitioning and sequential composition
+
+- [ ] S1/S12 domain partitions are explicit, total over extracted domains, disjoint and validated.
+- [ ] Domain-specific prompt views exclude unrelated extracted requirements/hypotheses.
+- [ ] C2 and C8 follow Definition 12 sequential chaining and seed one author only.
+- [ ] Call accounting stays within the supplied allowance.
+- [ ] Conflicting hypothesis verdicts fail closed.
+- [ ] Full engine suite passes on the exact implementation commit.
+- [ ] Real provider and model-family independence checks remain a separate pilot gate.
