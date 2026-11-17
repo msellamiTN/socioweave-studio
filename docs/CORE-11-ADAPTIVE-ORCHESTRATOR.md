@@ -33,7 +33,7 @@ The orchestrator owns ordering, budget checks, seeding metadata, validation, esc
 - The initial union receives the paper's rule-only cycle removal and check. It is not sent through the model repair callback; Algorithm 2 lines 5–6 specify a checked union, while Algorithm 1 repair applies to strategy executions.
 - Strategy outputs use Algorithm 1: cycle removal by least candidate support, one optional repair callback for remaining non-cycle failures, and final recheck.
 - Escalation priority: uncovered requirement or unresolved hypothesis → C2 (Jigsaw then Devil's Advocate); cycle or composition failure → Peer Review; other failures or high stakes without failure → C1 full pipeline. A target already run is not repeated.
-- C1 and C2 here refer to the two escalation combinations in Section 7.3, not to the five candidate design-space cells C1–C5.
+- C1 and C2 here refer to the two escalation combinations in Section 7.3, not to the five candidate design-space cells C1–C5. C1 is Algorithm 3 phase composition, not four complete sequential strategy runs; with three agents and one revision it costs nine calls (2n + 3).
 - The best-result order is fewest failures, highest coverage, lowest redundancy, lowest coupling.
 - The event log records the stage, decision and cumulative call count. It is an execution trace, not a proof of semantic correctness.
 - V3 and V4 remain NOT_EVALUATED unless an execution-evidence workflow is separately supplied. This Core does not falsely treat structural validation as execution validation.
@@ -42,7 +42,7 @@ The orchestrator owns ordering, budget checks, seeding metadata, validation, esc
 
 The orchestrator counts q extraction calls, two initial draft calls, actual calls reported by strategy adapters, and any repair callback call. Before a strategy, it reserves the catalogue cost plus one possible repair call. The adapter receives the actual remaining budget and its reported call count is checked. A strategy or repair that exceeds the budget fails closed with an error; the orchestrator cannot undo external calls already made by a misbehaving adapter.
 
-Catalogue reservation uses the full paper Table 4 call formula, so it is conservative when initial drafts are adopted as seeds and skip calls. It is a reservation bound, not a claim that every seeded run consumes that many calls.
+Catalogue reservation uses the full paper Table 4 call formula, so it is conservative when initial drafts are adopted as seeds and skip calls. C1 uses the Section 7.5 phase-composition cost (2n + 3 for one revision), not the sum of four full strategy costs. Reservations are bounds, not claims that every seeded run consumes that many calls.
 
 ## 5. Tests and acceptance
 
