@@ -11,6 +11,9 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+api = ["openai>=1.40"]
+local = ["torch>=2.3", "transformers>=4.45", "accelerate>=0.34", "bitsandbytes>=0.44"]
+all = ["openai>=1.40", "torch>=2.3", "transformers>=4.45", "accelerate>=0.34", "bitsandbytes>=0.44", "pytest>=8.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
