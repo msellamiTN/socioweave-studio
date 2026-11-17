@@ -124,7 +124,7 @@ def test_end_to_end_trial_adapter_runs_orchestrator_and_fixed_executor():
     assert outcome.metrics["orchestration_calls"] > 0
     assert outcome.metadata["executor_id"] == "executor-v1"
     assert outcome.metadata["trace_count"] == 1
-    assert outcome.metadata["selected_strategy_run_id"] is not None
+    assert outcome.metadata["strategies_executed"]
 
 
 def test_prompt_factory_must_preserve_benchmark_text():
