@@ -196,3 +196,24 @@ def test_strategy_rejects_empty_agents_roles_or_protocol():
 def test_protocol_step_rejects_non_boolean_call_accounting():
     with pytest.raises(ValueError, match="invokes_model must be a boolean"):
         ProtocolStep("a", Action.DRAFT, "prompt", 1, 1, "yes")
+
+
+def test_protocol_must_follow_round_and_stage_order_and_stage_has_one_round():
+    strategy = make_strategy()
+    reversed_protocol = tuple(reversed(strategy.protocol))
+    with pytest.raises(ValueError, match="ordered by round and stage"):
+        SocialStrategy(
+            strategy.agents, strategy.roles, strategy.assignments,
+            strategy.visibility, reversed_protocol, strategy.decision_rule,
+            strategy.rounds,
+        )
+    mixed_round_stage = (
+        ProtocolStep("a1", Action.DRAFT, "prompt", 1, 1),
+        ProtocolStep("a2", Action.DRAFT, "prompt", 2, 1),
+    )
+    with pytest.raises(ValueError, match="cannot span multiple rounds"):
+        SocialStrategy(
+            strategy.agents, strategy.roles, strategy.assignments,
+            strategy.visibility, mixed_round_stage, strategy.decision_rule,
+            strategy.rounds,
+        )
