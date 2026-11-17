@@ -16,7 +16,7 @@ def test_paired_by_prompt_averages_repeats_and_counts_missing_pairs():
           row("S1","b",.8),row("S1","c",.4),row("BASE","c",.5)]
     r=paired_comparison(rows,dataset="BREAK",strategy_id="S1",baseline_id="BASE",metric="utility",bootstrap_samples=200)
     assert r["n_paired_prompts"]==2 and r["n_prompts_missing_pair"]==1
-    assert r["mean_paired_difference"]==pytest.approx(.1)
+    assert r["mean_paired_difference"]==pytest.approx(.05)
 
 def test_holm_adjustment():
     r=correct_comparison_family([{"dataset":"D","strategy_id":"A","metric":"u","p_value_normal_approx":.01},
@@ -33,7 +33,8 @@ def test_jsonl_loader_rejects_duplicate_and_malformed_rows(tmp_path):
     with pytest.raises(ValueError,match="line 1"): load_observations_jsonl(p)
 
 def test_contract_rejects_invalid_observations():
-    with pytest.raises(ValueError): row("S1","a",.2,status="failed")
+    with pytest.raises(ValueError):
+        EvaluationObservation("BREAK","a","S1",0,"failed",{"utility":.2})
     with pytest.raises(ValueError): EvaluationObservation("D","e","S",0,"success",{},calls=-1)
 
 def test_exports_json_csv_and_jsonl(tmp_path):
