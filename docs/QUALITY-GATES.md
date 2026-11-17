@@ -251,11 +251,16 @@ The next dependent unit may start only after the current Core's exact tested com
 
 
 ### Core 18 — Campaign Evaluation & Google Colab Runtime
-- Status: **PENDING — full-suite CI acceptance**
+- Status: **PASS — evaluation/reporting software acceptance only**
 - Implementation: `engine/sociodec/evaluation.py`
 - Tests: `engine/tests/test_evaluation.py`
 - Notebook: `notebooks/colab/SOCIOWEAVE_Core18_Experiment_Runtime.ipynb`
 - Specification: `docs/CORE-18-CAMPAIGN-EVALUATION-COLAB.md`
 - Scope: observation validation, failure/missingness accounting, strategy summaries, prompt-paired comparisons, Holm correction, machine-readable exports and Colab analysis/plotting workflow.
+- Exact tested commit: `21672ffd4f809041962bf061977368c7a5885d6b`
+- Environment: GitHub Actions, Ubuntu latest, CPython 3.11.18, pytest 9.2.0
+- Command: `python -m pytest -q`
+- Result: **301 passed in 0.54s; 0 failed; 0 skipped.**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44201353152
 - Scientific boundary: the Colab notebook deliberately blocks real execution until a provider-backed strategy/executor adapter is supplied. Synthetic values are isolated plotting smoke tests only. No E1–E9 results are claimed.
 - Statistical boundary: paired p-values inherit Core 17's tie-corrected normal approximation; report this limitation.
