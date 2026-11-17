@@ -71,7 +71,7 @@ def test_stage_two_near_agreement_requires_two_families():
 
 def test_stage_two_constraint_threshold_is_inclusive():
     assert plan(features(constraint_count=5)).items[0] is PlanItem.S12
-    assert plan(features(constraint_count=4)).items == ()
+    assert plan(features(constraint_count=4)).items == (PlanItem.S5,)
 
 
 def test_stage_two_hypothesis_selects_jigsaw():
@@ -80,12 +80,12 @@ def test_stage_two_hypothesis_selects_jigsaw():
 
 def test_stage_two_domains_and_coupling_select_division_of_labour():
     assert plan(features(domain_count=3, mean_coupling=1.0)).items[0] is PlanItem.S1
-    assert plan(features(domain_count=3, mean_coupling=1.01)).items == ()
+    assert plan(features(domain_count=3, mean_coupling=1.01)).items == (PlanItem.S5,)
 
 
 def test_stage_two_content_gap_requires_two_families():
     assert plan(features(content_gap=0.21)).items[0] is PlanItem.S3
-    assert plan(features(content_gap=0.21, model_families=1)).items == ()
+    assert plan(features(content_gap=0.21, model_families=1)).items == (PlanItem.S5,)
 
 
 def test_stage_three_conflict_precedes_high_stakes():
@@ -103,7 +103,7 @@ def test_stage_three_high_stakes_selects_peer_review():
 
 def test_stage_three_justified_plan_requires_two_families():
     assert plan(features(justified_plan=True)).items[0] is PlanItem.S13
-    assert plan(features(justified_plan=True, model_families=1)).items == ()
+    assert plan(features(justified_plan=True, model_families=1)).items == (PlanItem.S5,)
 
 
 def test_escalation_uncovered_requirement_selects_jigsaw_then_critic():
@@ -156,4 +156,4 @@ def test_invalid_feature_values_are_rejected(kwargs):
 def test_threshold_and_distance_boundaries():
     f = features(content_gap=0.1, structure_gap=0.10001)
     assert plan(f, initial_distance=0.11).items[0] is PlanItem.S6
-    assert plan(features(content_gap=0.2), initial_distance=0.21).items == ()
+    assert plan(features(content_gap=0.2), initial_distance=0.21).items == (PlanItem.S5,)
