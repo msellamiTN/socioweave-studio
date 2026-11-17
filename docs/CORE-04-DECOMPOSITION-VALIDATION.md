@@ -1,6 +1,6 @@
 # Core 04 — Decomposition Validity Checks
 
-**Status:** PASS — structural validation software acceptance on commit `227df9591d4b1ca5df77e723f351fc51cff1272e`.  
+**Status:** PASS — structural validation software acceptance on commit `346946bdee8bad31bbddbc23f82df36dc00900f6`.  
 **Scientific source:** Definition 6 and the final check/repair phase of Algorithm 1.
 
 ## 1. Paper contract
@@ -40,9 +40,9 @@ From `engine/`:
     python -m pip install -e '.[dev]'
     python -m pytest -q
 
-**Result:** 85 passed in 0.09s; 0 failed; 0 skipped.  
-**Exact tested commit:** `227df9591d4b1ca5df77e723f351fc51cff1272e`.  
-**CI:** [Workflow run 44185641067](https://github.com/msellamiTN/socioweave-studio/actions/runs/44185641067).  
+**Result:** 86 passed in 0.12s; 0 failed; 0 skipped.  
+**Exact tested commit:** `346946bdee8bad31bbddbc23f82df36dc00900f6`.  
+**CI:** [Workflow run 44185812190](https://github.com/msellamiTN/socioweave-studio/actions/runs/44185812190).  
 See [CORE-04-TEST-REPORT.md](CORE-04-TEST-REPORT.md) for detailed scope and limitations.
 
 This acceptance is software-level structural validation only; it is not evidence of executor solvability, answer faithfulness, LLM decomposition quality or production readiness.
