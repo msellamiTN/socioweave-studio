@@ -194,9 +194,14 @@ The next dependent unit may start only after the current Core's exact tested com
 
 
 ### Core 14 — Strategy Decision Assembly
-- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Status: **PASS — software decision-assembly acceptance**
 - Implementation: `engine/sociodec/strategy_decoding.py`; default-wired in `engine/sociodec/strategy_adapter.py`
 - Tests: `engine/tests/test_strategy_decoding.py`
 - Specification: `docs/CORE-14-STRATEGY-DECISION-ASSEMBLY.md`
 - Scope: typed decision resolution for all established strategies; S11 and S13 require explicit adjudication because the current protocol outputs do not encode a negotiated decomposition or final authority selection.
-- Acceptance gate: full integrated suite, zero skipped tests, exact-commit CI. No semantic correctness claim follows from software conformance.
+- Exact tested code commit: `db3b9f963a82680c3a4ef93283fdc2e9b57b087f`
+- Environment: GitHub Actions, Ubuntu latest runner, CPython 3.11
+- Command: `python -m pytest -q`
+- Result: **257 passed in 0.25s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44195876842
+- Boundary: S11/S13 require explicit adjudication; semantic correctness and E1–E9 effectiveness remain unverified.
