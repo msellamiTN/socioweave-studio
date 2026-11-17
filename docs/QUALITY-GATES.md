@@ -135,3 +135,11 @@ Each Core must contain:
 - Scope limitation: pure operators/catalogue; LLM-mediated synthesis, compromise and authority are explicit injected outcomes; no end-to-end strategy effectiveness claim.
 
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
+
+### Core 10 — Adaptive Strategy Selector
+- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Implementation: `engine/sociodec/selector.py`
+- Tests: `engine/tests/test_selector.py`
+- Specification: `docs/CORE-10-ADAPTIVE-STRATEGY-SELECTOR.md`
+- Scope: Table 8 decision list, feature diagnosis from extraction and two supplied drafts, budget-aware chain planning and failure-based escalation planning.
+- Acceptance gate: full engine test suite must pass on the final commit; semantic flags not derivable from current extraction, seeded-call budget precision and dynamic execution-loop integration remain documented limitations.
