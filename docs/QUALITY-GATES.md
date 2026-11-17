@@ -151,9 +151,14 @@ The next dependent unit may start only after the current Core's exact tested com
 
 
 ### Core 11 — End-to-End Adaptive Orchestrator
-- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Status: **PASS — software orchestration acceptance**
 - Implementation: `engine/sociodec/orchestrator.py`
 - Tests: `engine/tests/test_orchestrator.py`
 - Specification: `docs/CORE-11-ADAPTIVE-ORCHESTRATOR.md`
 - Scope: extraction-once, two initial drafts, feature diagnosis, checked union, sequential strategy adapters, initial/chain seeds, Algorithm 1 repair, budget checks, escalation, best-result comparison and trace.
-- Acceptance gate: full integrated suite on final commit; strategy/provider adapters must obey isolation and remaining-call contracts. V3/V4 execution evidence remains a separate gate.
+- Exact tested code commit: `87ef835854c11bdc5574bcb54cd88091b321fd61`
+- Environment: GitHub Actions, Ubuntu latest runner, CPython 3.11
+- Command: `python -m pytest -q`
+- Result: **186 passed in 0.36s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44192309216
+- Scope limitation: adapter-backed orchestration is accepted; provider-backed concrete strategy adapters and executor-backed V3/V4 evidence remain separate integration and scientific-validation gates.
