@@ -78,6 +78,15 @@ Each Core must contain:
 - Command: `python -m pytest -q`
 - Result: **75 passed in 0.12s; 0 failed; 0 skipped**
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44185214955
-- Scope limitation: representation and reference integrity only; V1/V2/V5 validity and V3/V4 execution-dependent correctness belong to Core 04 and later evaluation.
+- Scope limitation: representation and reference integrity only; V1/V2/V5 validity and V3/V4 execution-dependent correctness are handled by Core 04.
+
+### Core 04 — Decomposition Validity Checks
+- Status: **PASS — structural validation software acceptance**
+- Tested commit: `227df9591d4b1ca5df77e723f351fc51cff1272e`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **85 passed in 0.09s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44185641067
+- Scope limitation: V1/V2/V5 and hypothesis verdict checks are structural; V3/V4 remain NOT_EVALUATED without executor evidence.
 
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
