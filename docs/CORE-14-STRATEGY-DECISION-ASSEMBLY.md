@@ -1,6 +1,6 @@
 # Core 14 — Strategy Decision Assembly
 
-**Status:** IMPLEMENTED — full acceptance pending exact-commit CI.  
+**Status:** PASS — software decision-assembly acceptance. See CORE-14-TEST-REPORT.md.  
 **Scientific basis:** paper Definitions 9–10, Table 4, Sections 5–7 and Algorithms 1–3. The code applies the paper's decision rules to typed protocol evidence; it does not infer missing adjudications.
 
 ## Scope
