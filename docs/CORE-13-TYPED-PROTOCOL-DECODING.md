@@ -1,6 +1,6 @@
 # Core 13 — Typed Protocol Output Decoding
 
-**Status:** IMPLEMENTED — full acceptance pending CI.  
+**Status:** PASS — software decoding acceptance. See CORE-13-TEST-REPORT.md.  
 **Source basis:** Definitions 4–6, Algorithm 1, Section 5.3.1 and Table 4 of the source paper.
 
 ## Scope
