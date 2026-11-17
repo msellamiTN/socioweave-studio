@@ -8,6 +8,7 @@ Decomposition.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Callable, Mapping, Protocol
 
 from sociodec.catalogue import StrategyId
@@ -212,13 +213,37 @@ class ConcreteStrategyAdapter:
 
 
 def _decomposition_seed_text(decomposition: Decomposition) -> str:
-    """Stable, explicit text serialization for an adopted decomposition seed."""
-    return (
-        "ADOPTED DECOMPOSITION SEED\n"
-        + "\n".join(
-            f"- [{item.identifier}] {item.question} => {item.output}"
+    """Serialize a seed using the same strict candidate JSON contract as model outputs."""
+    payload = {
+        "candidate_id": "adopted-seed",
+        "subproblems": [
+            {
+                "id": item.identifier,
+                "question": item.question,
+                "inputs": list(item.inputs),
+                "output": item.output,
+                "local_constraints": [
+                    {"kind": constraint.kind.value, "statement": constraint.statement}
+                    for constraint in item.local_constraints
+                ],
+                "covered_requirements": [
+                    {
+                        "type": requirement.type.value,
+                        "domain": requirement.domain,
+                        "statement": requirement.statement,
+                    }
+                    for requirement in item.covered_requirements
+                ],
+            }
             for item in decomposition.subproblems
-        )
-        + "\nDEPENDENCIES\n"
-        + "\n".join(f"- {source} -> {target}" for source, target in sorted(decomposition.E))
-    )
+        ],
+        "dependencies": [
+            {"source": source, "target": target}
+            for source, target in sorted(decomposition.E)
+        ],
+        "kappa": {
+            deliverable: sorted(contributors)
+            for deliverable, contributors in decomposition.kappa.items()
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
