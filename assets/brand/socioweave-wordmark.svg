@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 150" role="img" aria-labelledby="title desc">
+  <title id="title">SOCIOWEAVE wordmark</title>
+  <desc id="desc">SocioWeave brand wordmark with an interconnected network symbol.</desc>
+  <g transform="translate(8 8) scale(.52)">
+    <rect x="8" y="8" width="240" height="240" rx="58" fill="#111827"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M72 78 128 54 184 78 184 166 128 202 72 166Z" stroke="#7568D6" stroke-width="12"/>
+      <path d="M72 78 128 128 184 78M72 166 128 128 184 166M128 54V128M128 128V202" stroke="#F5F7FB" stroke-width="8"/>
+      <path d="M72 78 72 166M184 78 184 166" stroke="#18A999" stroke-width="8"/>
+    </g>
+    <g fill="#F5F7FB" stroke="#111827" stroke-width="5">
+      <circle cx="72" cy="78" r="15"/><circle cx="184" cy="78" r="15"/>
+      <circle cx="72" cy="166" r="15"/><circle cx="184" cy="166" r="15"/>
+      <circle cx="128" cy="54" r="15"/><circle cx="128" cy="202" r="15"/>
+    </g>
+    <circle cx="128" cy="128" r="20" fill="#18A999" stroke="#F5F7FB" stroke-width="7"/>
+  </g>
+  <text x="150" y="91" fill="#111827" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="62" font-weight="800" letter-spacing="1.5">SOCIO<tspan fill="#6257C5">WEAVE</tspan></text>
+  <text x="154" y="123" fill="#64748B" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="600" letter-spacing="4">COLLABORATIVE INTELLIGENCE</text>
+</svg>
