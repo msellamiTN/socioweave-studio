@@ -51,7 +51,7 @@ def test_provider_invoker_maps_protocol_context_and_records_trace():
 def test_protocol_messages_only_include_context_visible_history():
     provider = FakeProvider()
     invoker = ProviderProtocolInvoker(provider)
-    agent = Agent("a1", "fake-model", "")
+    agent = Agent("a1", "fake-model", "analyst")
     step = ProtocolStep("a1", Action.CRITIQUE, "prompt", 1, 1, True)
     context = _context()
     invoker.invoke(agent, step, context)
