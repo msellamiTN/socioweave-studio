@@ -128,7 +128,7 @@ def test_strategy_adapter_receives_remaining_budget_and_cannot_exceed_it():
     prompt, extraction, _, d = fixture()
 
     def execute(item, prompt, extracted, initial_drafts, chain_seed, available_calls):
-        assert available_calls == 14
+        assert available_calls == 11
         return StrategyOutcome(d, calls_made=12)
 
     with pytest.raises(RuntimeError, match="exceeded the remaining call budget"):
