@@ -112,6 +112,7 @@ def _first_cycle(
         return None
 
     for node in identifiers:
+        graph[node].sort()
         if state[node] == 0:
             found = visit(node)
             if found:
