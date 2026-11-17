@@ -1,6 +1,6 @@
 # Core 05 — Algorithm 1 Structural Repair
 
-**Status:** Implementation and full-suite acceptance pending.  
+**Status:** PASS — structural repair software acceptance on commit `b9efe9d40d85ed44d356a6bc312283ddf82d3aa7`.  
 **Scientific source:** The final check/repair phase of Algorithm 1 in Section 6.1.
 
 ## 1. Paper contract
@@ -22,15 +22,20 @@ After the decision rule returns D*, Algorithm 1 checks V1, V2, V5 and hypothesis
 
 ## 3. Scope boundary
 
-The repair callback may return a still-invalid decomposition. It is invoked at most once. A new cycle introduced by the callback is reported by the final validation and is not silently repaired in a second pass, matching Algorithm 1's single post-repair check.
+The repair callback may return a still-invalid decomposition. It is invoked at most once. A new cycle introduced by the callback is reported by the final check and is not silently repaired in a second pass, matching Algorithm 1's single post-repair check.
 
 V3 solvability and V4 faithfulness remain NOT_EVALUATED without executor evidence. This core performs no model call itself and does not establish scientific repair effectiveness.
 
-## 4. Acceptance
+## 4. Acceptance evidence
 
 From `engine/`:
 
     python -m pip install -e '.[dev]'
     python -m pytest -q
 
-Acceptance requires the complete integrated suite, including repair policy, negative, regression and contract tests, to pass on the exact final commit.
+**Result:** 96 passed in 0.09s; 0 failed; 0 skipped.  
+**Exact tested commit:** `b9efe9d40d85ed44d356a6bc312283ddf82d3aa7`.  
+**CI:** [Workflow run 44186324292](https://github.com/msellamiTN/socioweave-studio/actions/runs/44186324292).  
+See [CORE-05-TEST-REPORT.md](CORE-05-TEST-REPORT.md) for detailed scope and limitations.
+
+This acceptance is software-level repair-policy validation only; it is not evidence of empirical repair effectiveness, executor solvability or answer faithfulness.
