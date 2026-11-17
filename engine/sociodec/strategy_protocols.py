@@ -111,7 +111,7 @@ def build_strategy_blueprint(
         p.extend([
             ProtocolStep("coordinator", Action.SPLIT, "prompt", 1, 1),
             *(ProtocolStep(a, Action.DRAFT, "step:0", 2, 2) for a in specialists),
-            ProtocolStep("coordinator", Action.CHECK, "specialist_outputs", 3, 3),
+            ProtocolStep("coordinator", Action.CHECK, "all_previous_outputs", 3, 3),
         ])
         for r in (1, 2, 3):
             visibility[r] = _pairs(ids, full=(r == 3))
@@ -125,8 +125,8 @@ def build_strategy_blueprint(
         add_roles(ids, 1, {"integrator": Role.AGGREGATOR})
         roles.update({(a, 2): Role.AGGREGATOR if a == "integrator" else Role.DECOMPOSER for a in ids})
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in experts)
-        p.append(ProtocolStep("integrator", Action.MERGE, "facet_outputs", 1, 2))
-        visibility[1] = _pairs(ids, full=False)
+        p.append(ProtocolStep("integrator", Action.MERGE, "all_previous_outputs", 1, 2))
+        visibility[1] = tuple((a, a) for a in experts) + tuple(("integrator", a) for a in experts) + (("integrator", "integrator"),)
         views = prompt_views
         if views is None:
             raise ValueError("S12 requires explicit prompt_views: one facet per expert and full view for integrator")
@@ -136,8 +136,8 @@ def build_strategy_blueprint(
         ids = (*participants, "aggregator")
         add_roles(ids, 1, {"aggregator": Role.AGGREGATOR})
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in participants)
-        p.append(ProtocolStep("aggregator", Action.MERGE, "candidate_lists", 1, 2))
-        visibility[1] = _pairs(ids, full=False)
+        p.append(ProtocolStep("aggregator", Action.MERGE, "all_previous_outputs", 1, 2))
+        visibility[1] = tuple((a, a) for a in participants) + tuple(("aggregator", a) for a in participants) + (("aggregator", "aggregator"),)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S3:
@@ -145,8 +145,8 @@ def build_strategy_blueprint(
         ids = members
         add_roles(ids, 1)
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in members)
-        p.extend(ProtocolStep(a, Action.RANK, "pooled_drafts", 1, 2) for a in members)
-        visibility[1] = _pairs(ids, full=False)
+        p.extend(ProtocolStep(a, Action.RANK, "all_previous_outputs", 1, 2) for a in members)
+        visibility[1] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S4:
@@ -156,9 +156,9 @@ def build_strategy_blueprint(
         for t in range(1, T + 1):
             draft_stage, summary_stage = 2*t - 1, 2*t
             action = Action.DRAFT if t == 1 else Action.REVISE
-            input_ref = "prompt" if t == 1 else "previous_candidate_and_summary"
+            input_ref = "prompt" if t == 1 else "all_previous_outputs"
             p.extend(ProtocolStep(a, action, input_ref, t, draft_stage) for a in experts)
-            p.append(ProtocolStep("facilitator", Action.SUMMARISE, "round_candidates", t, summary_stage))
+            p.append(ProtocolStep("facilitator", Action.SUMMARISE, "all_previous_outputs", t, summary_stage))
             expert_pairs = tuple((a, a) for a in experts) + tuple((a, "facilitator") for a in experts)
             facilitator_pairs = tuple(("facilitator", a) for a in experts) + (("facilitator", "facilitator"),)
             visibility[t] = expert_pairs + facilitator_pairs
@@ -169,7 +169,7 @@ def build_strategy_blueprint(
         ids = voters
         add_roles(ids, 1)
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in voters)
-        p.extend(ProtocolStep(a, Action.VOTE, "pooled_subproblems", 1, 2) for a in voters)
+        p.extend(ProtocolStep(a, Action.VOTE, "all_previous_outputs", 1, 2) for a in voters)
         visibility[1] = _pairs(ids, full=False)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
@@ -191,7 +191,7 @@ def build_strategy_blueprint(
         p.extend((
             ProtocolStep("decomposer-1", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("decomposer-2", Action.DRAFT, "counter-assumptions_and_step:0", 1, 2),
-            ProtocolStep("synthesizer", Action.MERGE, "both_plans", 1, 3),
+            ProtocolStep("synthesizer", Action.MERGE, "all_previous_outputs", 1, 3),
         ))
         visibility[1] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
@@ -202,8 +202,8 @@ def build_strategy_blueprint(
         add_roles(ids, 1, {"author": Role.DECOMPOSER, "editor": Role.JUDGE, **{a: Role.CRITIC for a in reviewers}})
         p.append(ProtocolStep("author", Action.DRAFT, "prompt", 1, 1))
         p.extend(ProtocolStep(a, Action.CRITIQUE, "step:0", 1, 2) for a in reviewers)
-        p.append(ProtocolStep("editor", Action.JUDGE, "draft_and_reviews", 1, 3))
-        p.append(ProtocolStep("author", Action.REVISE, "editor_revision_decision", 1, 4))
+        p.append(ProtocolStep("editor", Action.JUDGE, "all_previous_outputs", 1, 3))
+        p.append(ProtocolStep("author", Action.REVISE, "all_previous_outputs", 1, 4))
         pairs = [("author", "author"), ("editor", "author"), ("editor", "editor")]
         for reviewer in reviewers:
             pairs.extend(((reviewer, "author"), (reviewer, reviewer)))
@@ -236,7 +236,7 @@ def build_strategy_blueprint(
             ProtocolStep("party-2", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("party-1", Action.DEFEND, "step:0", 1, 2),
             ProtocolStep("party-2", Action.DEFEND, "step:1", 1, 2),
-            ProtocolStep("judge", Action.JUDGE, "defended_cases", 1, 3),
+            ProtocolStep("judge", Action.JUDGE, "all_previous_outputs", 1, 3),
         ))
         visibility[1] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
@@ -247,9 +247,9 @@ def build_strategy_blueprint(
         p.extend((
             ProtocolStep("party-1", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("party-2", Action.DRAFT, "prompt", 1, 1),
-            ProtocolStep("mediator", Action.SUMMARISE, "both_drafts", 1, 2),
-            ProtocolStep("party-1", Action.REVISE, "draft_and_mediation_summary", 1, 3),
-            ProtocolStep("party-2", Action.REVISE, "draft_and_mediation_summary", 1, 3),
+            ProtocolStep("mediator", Action.SUMMARISE, "all_previous_outputs", 1, 2),
+            ProtocolStep("party-1", Action.REVISE, "all_previous_outputs", 1, 3),
+            ProtocolStep("party-2", Action.REVISE, "all_previous_outputs", 1, 3),
         ))
         visibility[1] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
@@ -261,9 +261,9 @@ def build_strategy_blueprint(
         stage = 1
         for t in range(1, T + 1):
             for participant in participants:
-                p.append(ProtocolStep(participant, Action.REVISE, "shared_decomposition", t, stage))
+                p.append(ProtocolStep(participant, Action.REVISE, "all_previous_outputs", t, stage))
                 stage += 1
-        p.append(ProtocolStep("moderator", Action.JUDGE, "shared_decomposition", T, stage))
+        p.append(ProtocolStep("moderator", Action.JUDGE, "all_previous_outputs", T, stage))
         visibility = {t: _pairs(ids, full=True) for t in range(1, T + 1)}
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
