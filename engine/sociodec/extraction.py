@@ -229,6 +229,14 @@ class AggregatedExtraction:
 EquivalenceMatcher = Callable[[object, object], bool]
 
 
+def _provenance_key(item: object) -> str:
+    """Stable key that preserves requirement type and domain identity."""
+    kind = getattr(getattr(item, "type", None), "value", "")
+    domain = getattr(item, "domain", "")
+    statement = _normalise(getattr(item, "statement", ""))
+    return f"{kind}|{domain}|{statement}"
+
+
 def aggregate_extractions(
     results: tuple[ExtractionResult, ...] | list[ExtractionResult],
     matcher: EquivalenceMatcher | None = None,
@@ -257,20 +265,20 @@ def aggregate_extractions(
     for result in results:
         for item in result.requirements:
             existing = next((x for x in reqs if equivalent(x, item)), None)
-            key = _normalise(item.statement)
+            key = _provenance_key(item)
             if existing is None:
                 reqs.append(item)
                 req_sources[key] = [result.extractor_id]
             else:
-                req_sources.setdefault(_normalise(existing.statement), []).append(result.extractor_id)
+                req_sources.setdefault(_provenance_key(existing), []).append(result.extractor_id)
         for item in result.hypotheses:
             existing = next((x for x in hyps if equivalent(x, item)), None)
-            key = _normalise(item.statement)
+            key = _provenance_key(item)
             if existing is None:
                 hyps.append(item)
                 hyp_sources[key] = [result.extractor_id]
             else:
-                hyp_sources.setdefault(_normalise(existing.statement), []).append(result.extractor_id)
+                hyp_sources.setdefault(_provenance_key(existing), []).append(result.extractor_id)
 
     entities_by_name: dict[str, Entity] = {}
     for result in results:
