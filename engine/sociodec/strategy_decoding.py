@@ -126,9 +126,8 @@ class ProtocolDecisionDecoder:
                                  selected_candidate_id="coordinator",
                                  rationale="Coordinator checked the specialist decomposition.")
         elif strategy_id is StrategyId.S12:
-            decision = union(_required_candidates(pool, tuple(
-                f"expert-{i}" for i in range(1, len([x for x in pool if x.startswith("expert-")]) + 1)
-            )))
+            expert_ids = tuple(sorted(x for x in pool if x.startswith("expert-")))
+            decision = union(_required_candidates(pool, expert_ids))
         elif strategy_id is StrategyId.S2:
             participant_ids = tuple(sorted(x for x in pool if x.startswith("participant-")))
             decision = union(_required_candidates(pool, participant_ids))
