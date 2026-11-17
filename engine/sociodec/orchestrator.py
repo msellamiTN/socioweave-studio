@@ -99,7 +99,8 @@ def _item_cost(item: PlanItem, *, n: int, k: int, T: int) -> int:
     elif item is PlanItem.COMBO_JIGSAW_THEN_CRITIC:
         ids = (StrategyId.S12, StrategyId.S5)
     elif item is PlanItem.COMBO_FULL_PIPELINE:
-        ids = (StrategyId.S3, StrategyId.S6, StrategyId.S4, StrategyId.S7)
+        # Section 7.5 / Algorithm 3: composed phases, not four full runs.
+        return 2 * n + 3  # one revision round
     else:
         ids = (StrategyId(item.value),)
     return sum(get_strategy(identifier).calls(n=n, k=k, T=T) for identifier in ids)
