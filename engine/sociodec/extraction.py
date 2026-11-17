@@ -89,7 +89,12 @@ def _normalise(text: str) -> str:
 def _json_payload(text: str) -> dict:
     candidate = text.strip()
     if candidate.startswith("```"):
-        candidate = re.sub(r"^\\`\\`\\`(?:json)?\\s*|\\s*\\`\\`\\`$", "", candidate, flags=re.I)
+        lines = candidate.splitlines()
+        if lines and lines[0].strip().lower() in {"```", "```json"}:
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        candidate = "\n".join(lines).strip()
     try:
         value = json.loads(candidate)
     except json.JSONDecodeError as exc:
@@ -97,7 +102,6 @@ def _json_payload(text: str) -> dict:
     if not isinstance(value, dict):
         raise ExtractionFormatError("Extractor JSON root must be an object")
     return value
-
 
 def parse_extraction(text: str, prompt_text: str, extractor_id: str) -> ExtractionResult:
     """Parse and structurally validate one extractor's JSON result."""
