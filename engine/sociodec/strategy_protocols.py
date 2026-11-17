@@ -209,7 +209,7 @@ def build_strategy_blueprint(
         p.append(ProtocolStep("author", Action.REVISE, "all_previous_outputs", 1, 4))
         pairs = [("author", "author"), ("author", "editor"), ("editor", "author"), ("editor", "editor")]
         for reviewer in reviewers:
-            pairs.extend(((reviewer, "author"), (reviewer, reviewer)))
+            pairs.extend(((reviewer, "author"), (reviewer, reviewer), ("author", reviewer)))
         pairs.extend(("editor", reviewer) for reviewer in reviewers)
         visibility[1] = tuple(pairs)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
