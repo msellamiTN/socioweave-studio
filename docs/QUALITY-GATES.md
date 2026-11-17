@@ -165,10 +165,15 @@ The next dependent unit may start only after the current Core's exact tested com
 
 
 ### Core 12 — Concrete Strategy Adapter Layer
-- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Status: **PASS — software protocol-adapter acceptance**
 - Protocol blueprints: `engine/sociodec/strategy_protocols.py` (all 13 established strategies; C1–C5 excluded)
 - Runtime bridge: `engine/sociodec/strategy_adapter.py`
 - Runtime visibility enforcement: `engine/sociodec/runtime.py`
 - Tests: `engine/tests/test_strategy_protocols.py`, `engine/tests/test_strategy_adapter.py`
 - Specification: `docs/CORE-12-STRATEGY-ADAPTERS.md`
-- Acceptance gate: full integrated suite, zero skipped tests, exact-commit CI. Structured model-output decoding, early stopping for iterative strategies and composite executors remain explicit integration boundaries.
+- Exact tested code commit: `3f846916f5074440961734b51ae47cb48b5d4f76`
+- Environment: GitHub Actions, Ubuntu latest runner, CPython 3.11
+- Command: `python -m pytest -q`
+- Result: **230 passed in 0.26s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44193875908
+- Boundaries: provider-specific structured decoding, bounded early stopping, composition executors and the scientific benchmark campaign remain separate gates.
