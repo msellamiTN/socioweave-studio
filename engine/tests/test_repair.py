@@ -19,7 +19,7 @@ def case():
     d = Decomposition(
         (a, b, c),
         (Dependency("a", "b"), Dependency("b", "c"), Dependency("c", "a")),
-        (DeliverableComposition("Service plan", ("c",)),),
+        (DeliverableComposition("Service plan", ("a", "b", "c")),),
     )
     return prompt, (r1,), a, b, c, d
 
@@ -88,7 +88,7 @@ def test_non_cycle_failures_trigger_exactly_one_repair_callback():
         return Decomposition(
             current.subproblems,
             current.dependencies,
-            (DeliverableComposition("Service plan", ("a", "c")),),
+            (DeliverableComposition("Service plan", ("a", "b", "c", "z")),),
         )
 
     # The fixture has a cycle; after removing one edge, V5 may still pass.
@@ -122,8 +122,8 @@ def test_repair_callback_is_not_retried_when_failures_remain():
         {("a", "b"): 3, ("b", "c"): 1, ("c", "a"): 2},
         repair_callback=no_op,
     )
-    assert len(calls) <= 1
-    assert result.repair_call_made is (len(calls) == 1)
+    assert len(calls) == 1
+    assert result.repair_call_made is True
 
 
 def test_repair_callback_return_type_is_enforced():
