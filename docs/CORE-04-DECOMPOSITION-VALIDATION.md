@@ -1,6 +1,6 @@
 # Core 04 — Decomposition Validity Checks
 
-**Status:** Implementation and full-suite acceptance pending.  
+**Status:** PASS — structural validation software acceptance on commit `227df9591d4b1ca5df77e723f351fc51cff1272e`.  
 **Scientific source:** Definition 6 and the final check/repair phase of Algorithm 1.
 
 ## 1. Paper contract
@@ -20,9 +20,9 @@ The paper explicitly distinguishes programmatically checkable V1, V2 and V5 from
 `validate_decomposition` returns a structured `ValidationReport` with independent results for V1–V5 and hypothesis-verdict completeness.
 
 - V1 compares the decomposition's union coverage with the explicit requirement set plus hypotheses whose verdict is confirmed. Rejected hypotheses are excluded; a missing verdict is a failure.
-- V2 finds a directed cycle, if one exists, and reports its node sequence.
+- V2 finds a directed cycle, if one exists, and reports its node sequence. Neighbour traversal is sorted to keep the witness deterministic.
 - V5 reports every deliverable with no contributors and every sink subproblem not referenced by any deliverable composition.
-- V3 and V4 are always `NOT_EVALUATED` in this structural validator. They must never be reported as passing without executor evidence.
+- V3 and V4 are `NOT_EVALUATED` in this structural validator. They must never be reported as passing without executor evidence.
 - Findings have stable machine-readable codes and affected subjects.
 
 The caller supplies the explicit requirement universe R(P). A confirmed hypothesis is converted to a spanless Requirement with the same statement, type, domain and entity names and joins the effective coverage universe, as specified by the paper.
@@ -31,13 +31,18 @@ The caller supplies the explicit requirement universe R(P). A confirmed hypothes
 
 This Core does not perform cycle repair, requirement repair, model calls, executor execution, answer composition or faithfulness adjudication. Algorithm 1 describes cycle removal and one-call repair after checks; those are orchestration/repair behavior and must be implemented separately from this pure validator.
 
-A structurally valid report is not a claim that the decomposition is solvable or that the final answer is faithful.
+A structurally valid report is not a claim that the decomposition is solvable or that the final answer is faithful. The `structural_valid` property covers V1, V2, V5 and hypothesis verdict completeness only. Full Definition 6 validity requires separate V3 and V4 execution evidence.
 
-## 4. Acceptance
+## 4. Acceptance evidence
 
 From `engine/`:
 
     python -m pip install -e '.[dev]'
     python -m pytest -q
 
-Acceptance requires the full integrated test suite, including negative and regression tests, to pass on the exact final commit. A test report must record the environment, command, count and limitations.
+**Result:** 85 passed in 0.09s; 0 failed; 0 skipped.  
+**Exact tested commit:** `227df9591d4b1ca5df77e723f351fc51cff1272e`.  
+**CI:** [Workflow run 44185641067](https://github.com/msellamiTN/socioweave-studio/actions/runs/44185641067).  
+See [CORE-04-TEST-REPORT.md](CORE-04-TEST-REPORT.md) for detailed scope and limitations.
+
+This acceptance is software-level structural validation only; it is not evidence of executor solvability, answer faithfulness, LLM decomposition quality or production readiness.
