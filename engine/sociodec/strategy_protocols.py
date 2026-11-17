@@ -125,11 +125,12 @@ def build_strategy_blueprint(
     elif sid is StrategyId.S12:
         experts = tuple(f"expert-{i+1}" for i in range(n))
         ids = (*experts, "integrator")
-        add_roles(ids, 1, {"integrator": Role.AGGREGATOR})
+        add_roles(ids, 2, {"integrator": Role.AGGREGATOR})
         roles.update({(a, 2): Role.AGGREGATOR if a == "integrator" else Role.DECOMPOSER for a in ids})
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in experts)
-        p.append(ProtocolStep("integrator", Action.MERGE, "all_previous_outputs", 1, 2))
-        visibility[1] = tuple((a, a) for a in experts) + tuple(("integrator", a) for a in experts) + (("integrator", "integrator"),)
+        p.append(ProtocolStep("integrator", Action.MERGE, "all_previous_outputs", 2, 2))
+        visibility[1] = _pairs(ids, full=False)
+        visibility[2] = tuple((a, a) for a in experts) + tuple(("integrator", a) for a in experts) + (("integrator", "integrator"),)
         views = prompt_views
         if views is None:
             raise ValueError("S12 requires explicit prompt_views: one facet per expert and full view for integrator")
@@ -137,19 +138,21 @@ def build_strategy_blueprint(
     elif sid is StrategyId.S2:
         participants = tuple(f"participant-{i+1}" for i in range(n))
         ids = (*participants, "aggregator")
-        add_roles(ids, 1, {"aggregator": Role.AGGREGATOR})
+        add_roles(ids, 2, {"aggregator": Role.AGGREGATOR})
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in participants)
-        p.append(ProtocolStep("aggregator", Action.MERGE, "all_previous_outputs", 1, 2))
-        visibility[1] = tuple((a, a) for a in participants) + tuple(("aggregator", a) for a in participants) + (("aggregator", "aggregator"),)
+        p.append(ProtocolStep("aggregator", Action.MERGE, "all_previous_outputs", 2, 2))
+        visibility[1] = _pairs(ids, full=False)
+        visibility[2] = tuple((a, a) for a in participants) + tuple(("aggregator", a) for a in participants) + (("aggregator", "aggregator"),)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S3:
         members = tuple(f"member-{i+1}" for i in range(n))
         ids = members
-        add_roles(ids, 1)
+        add_roles(ids, 2)
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in members)
-        p.extend(ProtocolStep(a, Action.RANK, "all_previous_outputs", 1, 2) for a in members)
-        visibility[1] = _pairs(ids, full=True)
+        p.extend(ProtocolStep(a, Action.RANK, "all_previous_outputs", 2, 2) for a in members)
+        visibility[1] = _pairs(ids, full=False)
+        visibility[2] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S4:
@@ -170,10 +173,11 @@ def build_strategy_blueprint(
     elif sid is StrategyId.S9:
         voters = tuple(f"voter-{i+1}" for i in range(n))
         ids = voters
-        add_roles(ids, 1)
+        add_roles(ids, 2)
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in voters)
-        p.extend(ProtocolStep(a, Action.VOTE, "all_previous_outputs", 1, 2) for a in voters)
-        visibility[1] = _pairs(ids, full=True)
+        p.extend(ProtocolStep(a, Action.VOTE, "all_previous_outputs", 2, 2) for a in voters)
+        visibility[1] = _pairs(ids, full=False)
+        visibility[2] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S5:
