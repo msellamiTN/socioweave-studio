@@ -219,3 +219,17 @@ The next dependent unit may start only after the current Core's exact tested com
 - Result: **259 passed in 0.25s; 0 failed; 0 skipped.**
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44197037514
 - Boundary: V3/V4 remain NOT_EVALUATED without executor evidence. A PASS validates the supplied trace contract, not the semantic truth of generated answers. E1–E9 strategy-effectiveness experiments remain unexecuted.
+
+
+### Core 16 — Reproducible Experiment Harness
+- Status: **PASS — experiment-harness software acceptance; no scientific campaign results claimed**
+- Implementation: `engine/sociodec/experiments.py`, `engine/sociodec/datasets.py`
+- Tests: `engine/tests/test_experiments.py`, `engine/tests/test_datasets.py`
+- Specification: `docs/CORE-16-REPRODUCIBLE-EXPERIMENT-HARNESS.md`
+- Scope: typed E1–E9 config identity; canonical config/prompt hashes; stable per-example/repeat seeds; versioned local dataset JSONL loading; dataset/license registry; campaign manifest with dataset and dependency-lock SHA-256, code commit and Python version; per-trial trace/metric/failure records; JSONL export.
+- Exact tested implementation commit: `deb34f2cb9fc0e99078b384352ddca149ece98e5`
+- Environment: GitHub Actions, Ubuntu latest runner, CPython 3.11.18, pytest 9.2.0
+- Command: `python -m pytest -q`
+- Result: **282 passed in 0.30s; 0 failed; 0 skipped.**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44198780523
+- Boundaries: no dataset content is bundled or downloaded; no provider/model calls, E1–E9 campaigns, annotation, metric aggregation or significance tests have been executed. Seeds do not guarantee deterministic hosted inference.
