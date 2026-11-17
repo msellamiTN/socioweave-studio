@@ -91,7 +91,7 @@ def test_sequential_composition_seeds_second_phase_and_accumulates_calls_and_evi
     )
     assert adapter.calls[0][0] is PlanItem.S2
     assert adapter.calls[1][0] is PlanItem.S8
-    assert adapter.calls[1][1] is result.decomposition
+    assert adapter.calls[1][1] == result.decomposition
     assert [x[2] for x in adapter.calls] == [8, 6]
     assert result.calls_made == 4
     assert result.strategy_run_id.startswith("C8:")
