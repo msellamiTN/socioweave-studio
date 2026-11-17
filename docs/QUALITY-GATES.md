@@ -148,3 +148,12 @@ The next dependent unit may start only after the current Core's exact tested com
 - Result: **176 passed in 0.27s; 0 failed; 0 skipped**
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44189680999
 - Scope limitation: deterministic planner acceptance only; semantic flags, seed-adjusted cost accounting and full dynamic Algorithm 2 orchestration remain documented limitations.
+
+
+### Core 11 — End-to-End Adaptive Orchestrator
+- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Implementation: `engine/sociodec/orchestrator.py`
+- Tests: `engine/tests/test_orchestrator.py`
+- Specification: `docs/CORE-11-ADAPTIVE-ORCHESTRATOR.md`
+- Scope: extraction-once, two initial drafts, feature diagnosis, checked union, sequential strategy adapters, initial/chain seeds, Algorithm 1 repair, budget checks, escalation, best-result comparison and trace.
+- Acceptance gate: full integrated suite on final commit; strategy/provider adapters must obey isolation and remaining-call contracts. V3/V4 execution evidence remains a separate gate.
