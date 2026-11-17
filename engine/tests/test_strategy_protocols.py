@@ -47,7 +47,7 @@ def test_jigsaw_integrator_can_see_all_expert_outputs_but_experts_are_isolated()
         prompt_views={"expert-1": "goals", "expert-2": "constraints",
                       "expert-3": "actors", "integrator": "full"},
     )
-    pairs = set(blueprint.strategy.visibility[0].visible_pairs)
+    pairs = set(blueprint.strategy.visibility[1].visible_pairs)
     assert ("integrator", "expert-1") in pairs
     assert ("integrator", "expert-2") in pairs
     assert ("expert-1", "expert-2") not in pairs
@@ -55,7 +55,7 @@ def test_jigsaw_integrator_can_see_all_expert_outputs_but_experts_are_isolated()
 
 def test_brainstorming_aggregator_sees_generated_lists_only_after_generation():
     blueprint = build_strategy_blueprint("S2")
-    pairs = set(blueprint.strategy.visibility[0].visible_pairs)
+    pairs = set(blueprint.strategy.visibility[1].visible_pairs)
     assert ("aggregator", "participant-1") in pairs
     assert ("participant-1", "participant-2") not in pairs
     assert blueprint.strategy.protocol[-1].input_ref == "all_previous_outputs"
@@ -87,16 +87,17 @@ def test_majority_voters_can_inspect_pooled_items_after_independent_drafts():
 
 def test_peer_review_reviewers_are_isolated_and_editor_sees_all_reviews():
     blueprint = build_strategy_blueprint("S8", k=3)
-    pairs = set(blueprint.strategy.visibility[0].visible_pairs)
+    pairs = set(blueprint.strategy.visibility[1].visible_pairs)
     assert ("reviewer-1", "author") in pairs
     assert ("reviewer-1", "reviewer-2") not in pairs
-    assert ("editor", "reviewer-1") in pairs
+    assert ("editor", "reviewer-1") in set(blueprint.strategy.visibility[2].visible_pairs)
+    assert ("author", "reviewer-1") in set(blueprint.strategy.visibility[3].visible_pairs)
     assert blueprint.strategy.calls == 6
 
 
 def test_adversarial_judge_sees_both_defences_but_parties_do_not_see_each_other():
     blueprint = build_strategy_blueprint("S7")
-    pairs = set(blueprint.strategy.visibility[0].visible_pairs)
+    pairs = set(blueprint.strategy.visibility[1].visible_pairs)
     assert ("judge", "party-1") in pairs and ("judge", "party-2") in pairs
     assert ("party-1", "party-2") not in pairs
     assert [step.action for step in blueprint.strategy.protocol] == [
