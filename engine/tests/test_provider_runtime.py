@@ -66,6 +66,6 @@ def test_invoker_rejects_empty_provider_completion():
             return GenerationResult(" ", "fake", "fake-model")
     invoker = ProviderProtocolInvoker(EmptyProvider())
     with pytest.raises(ValueError, match="empty completion"):
-        invoker.invoke(Agent("a1", "fake-model", ""), 
+        invoker.invoke(Agent("a1", "fake-model", "analyst"), 
                        ProtocolStep("a1", Action.DRAFT, "prompt", 1, 1, True),
                        _context())
