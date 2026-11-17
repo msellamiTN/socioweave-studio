@@ -76,7 +76,7 @@ def test_open_prompt_runs_c8_with_both_initial_seeds_and_trace():
     assert item is PlanItem.C8_BRAINSTORM_THEN_REVIEW
     assert seeds == (d, d)
     assert chain_seed is None
-    assert available == 27
+    assert available == 26
     assert result.strategy_records[0].seed_supplied is False
     assert result.strategy_records[0].outcome.strategy_run_id == "run-c8"
     assert result.calls_made == 13
