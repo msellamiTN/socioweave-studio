@@ -168,7 +168,7 @@ def run_strategy(
                 visibility_round = next(item for item in strategy.visibility if item.round == step.round)
                 visible_authors = {author for observer, author in visibility_round.visible_pairs if observer == step.agent_id}
                 input_content = "\\n\\n".join(
-                    f"[{("anonymous" if strategy.anonymous else item.agent_id)}:{item.action}]\\n{item.text}"
+                    f"[{('anonymous' if strategy.anonymous else item.agent_id)}:{item.action}]\\n{item.text}"
                     for item in stage_snapshot if item.agent_id in visible_authors
                 )
                 if not input_content:
