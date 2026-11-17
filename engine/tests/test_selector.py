@@ -122,10 +122,14 @@ def test_escalation_other_failure_selects_full_pipeline():
     assert result.items == (PlanItem.COMBO_FULL_PIPELINE,)
 
 
-def test_escalation_high_stakes_without_failure_selects_full_pipeline():
+def test_escalation_high_stakes_after_peer_review_adds_full_pipeline():
     result = plan(features(high_stakes=True), failures=())
-    assert result.items == (PlanItem.S8,)
-    # Stage 3 peer review already matches, so it is not escalated again.
+    assert result.items == (PlanItem.S8, PlanItem.COMBO_FULL_PIPELINE)
+
+
+def test_rule_zero_with_failed_union_still_escalates():
+    result = plan(features(), initial_distance=0.05, failures=("uncovered_requirements",))
+    assert result.items == (PlanItem.COMBO_JIGSAW_THEN_CRITIC,)
 
 
 def test_budget_truncation_reports_selected_strategy_as_not_run():
