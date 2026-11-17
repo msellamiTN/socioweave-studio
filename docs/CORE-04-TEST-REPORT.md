@@ -1,13 +1,13 @@
 # Core 04 — Decomposition Validity Test Report
 
 **Acceptance status:** PASS — structural validation software acceptance  
-**Exact tested commit:** `227df9591d4b1ca5df77e723f351fc51cff1272e`  
-**CI run:** [44185641067](https://github.com/msellamiTN/socioweave-studio/actions/runs/44185641067)  
+**Exact accepted commit:** `346946bdee8bad31bbddbc23f82df36dc00900f6`  
+**CI run:** [44185812190](https://github.com/msellamiTN/socioweave-studio/actions/runs/44185812190)  
 **Job:** `test` — completed successfully  
 **Environment:** GitHub Actions, Ubuntu 26.04 runner, CPython 3.11.18, pytest 9.2.0  
 **Install:** `python -m pip install -e ".[dev]"`  
 **Test command:** `python -m pytest -q`  
-**Result:** **85 passed in 0.09s; 0 failed; 0 skipped.**
+**Result:** **86 passed in 0.12s; 0 failed; 0 skipped.**
 
 ## Verified scope
 
