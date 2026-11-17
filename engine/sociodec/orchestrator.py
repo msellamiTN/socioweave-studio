@@ -90,6 +90,9 @@ class AdaptiveResult:
     budget: int
     events: tuple[OrchestrationEvent, ...]
     terminated_reason: str
+    best_hypothesis_verdicts: tuple[HypothesisVerdict, ...] = ()
+    best_candidate_support_counts: tuple[tuple[tuple[str, str], int], ...] = ()
+    best_strategy_run_id: str | None = None
 
 
 def _item_cost(item: PlanItem, *, n: int, k: int, T: int) -> int:
@@ -231,6 +234,9 @@ def run_adaptive(
     best_validation = initial_validation
     best_findings = initial_validation.failures
     effective_requirements = initial_validation.effective_requirements
+    best_hypothesis_verdicts: tuple[HypothesisVerdict, ...] = ()
+    best_candidate_support_counts: tuple[tuple[tuple[str, str], int], ...] = ()
+    best_strategy_run_id: str | None = None
     emit("initial_union", f"Union checked; removed {len(initial_repair.removed_edges)} cycle edge(s); failures={len(best_findings)}")
 
     plan = plan_strategy_chain(
@@ -289,10 +295,14 @@ def run_adaptive(
         already_run.add(item)
         emit("strategy", f"{item.value}: calls={outcome.calls_made}, repair_calls={repair_calls}, failures={len(findings)}")
 
-        if _quality_key(repaired.decomposition, findings, effective_requirements) > _quality_key(best, best_findings, effective_requirements):
+        candidate_requirements = repaired.final_report.effective_requirements
+        if _quality_key(repaired.decomposition, findings, candidate_requirements) > _quality_key(best, best_findings, effective_requirements):
             best = repaired.decomposition
             best_validation = repaired.final_report
             best_findings = findings
+            best_hypothesis_verdicts = outcome.hypothesis_verdicts
+            best_candidate_support_counts = outcome.candidate_support_counts
+            best_strategy_run_id = outcome.strategy_run_id or item.value
             emit("best_update", f"{item.value} became current best under paper lexicographic order")
 
         seed = repaired.decomposition
@@ -312,4 +322,7 @@ def run_adaptive(
         initial_validation=initial_validation, strategy_records=tuple(records),
         strategies_not_run=tuple(dict.fromkeys(not_run)), calls_made=calls,
         budget=budget, events=tuple(events), terminated_reason=terminated_reason,
+        best_hypothesis_verdicts=best_hypothesis_verdicts,
+        best_candidate_support_counts=best_candidate_support_counts,
+        best_strategy_run_id=best_strategy_run_id,
     )
