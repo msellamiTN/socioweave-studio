@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
@@ -193,3 +194,42 @@ def write_jsonl(records: Iterable[TrialRecord], path: str | Path) -> int:
             stream.write(_canonical(asdict(record)) + "\n")
             count += 1
     return count
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignManifest:
+    """Environment and immutable input fingerprints for a campaign."""
+    config_hash: str
+    dataset_sha256: str
+    code_commit: str
+    python_version: str
+    dependency_lock_sha256: str
+    seed_derivation: str = "sha256(base_seed, dataset, example_id, repeat_index)"
+
+    def __post_init__(self) -> None:
+        for name in ("config_hash", "dataset_sha256", "dependency_lock_sha256"):
+            value = getattr(self, name)
+            if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value.lower()):
+                raise ValueError(f"{name} must be a SHA-256 hex digest")
+        if not self.code_commit.strip() or not self.python_version.strip():
+            raise ValueError("code_commit and python_version must be non-empty")
+
+
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_campaign_manifest(config: ExperimentConfig, dataset_path: str | Path,
+                            *, code_commit: str, dependency_lock_path: str | Path) -> CampaignManifest:
+    """Fingerprint the exact local dataset and dependency lockfile bytes."""
+    return CampaignManifest(
+        config_hash=config.config_hash,
+        dataset_sha256=sha256_file(dataset_path),
+        code_commit=code_commit,
+        python_version=sys.version.split()[0],
+        dependency_lock_sha256=sha256_file(dependency_lock_path),
+    )
