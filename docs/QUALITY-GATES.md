@@ -89,4 +89,13 @@ Each Core must contain:
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44185812190
 - Scope limitation: V1/V2/V5 and hypothesis verdict checks are structural; V3/V4 remain NOT_EVALUATED without executor evidence.
 
+### Core 05 — Algorithm 1 Structural Repair
+- Status: **PASS — software repair-policy acceptance**
+- Tested commit: `b9efe9d40d85ed44d356a6bc312283ddf82d3aa7`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **96 passed in 0.09s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44186324292
+- Scope limitation: cycle repair and one injected repair callback only; no empirical effectiveness or execution-dependent V3/V4 validation.
+
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
