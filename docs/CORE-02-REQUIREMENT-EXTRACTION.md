@@ -1,7 +1,7 @@
 # Core 02 — Requirement Extraction
 
-**Status:** Initial implementation committed; automated verification pending.
-**Scientific source:** Section 3.2, Definition 3 and Equation (1) of *Societies of Decomposers: Social and Organisational Strategies for LLM-Based Multi-Agent Prompt Decomposition*.
+**Status:** PASS — software acceptance on commit `4b4d0b29eb1f6b963662e9f115e67a4db65fd851`; scientific extraction quality not yet evaluated.
+**Scientific source:** Section 3.2, Definition 3 and Equation (1) of *Societies of Decomposers: Social and Organisational Strategies for LLM-Based Prompt Decomposition*.
 
 ## 1. Paper contract
 
@@ -64,10 +64,19 @@ The two calls illustrate heterogeneous provider configuration. They do not estab
 Run from engine/:
 
     python -m pip install -e '.[dev]'
-    pytest -q
+    python -m pytest -q
 
-Tests cover parsing, span bounds, explicit/implicit separation, union, deduplication, provenance, type-sensitive matching and basic ambiguity/conflict invariants.
+**Recorded result:** 55 passed in 0.07s; 0 failed; 0 skipped.
+**Exact tested commit:** `4b4d0b29eb1f6b963662e9f115e67a4db65fd851`.
+**CI evidence:** [Workflow run 44181085215](https://github.com/msellamiTN/socioweave-studio/actions/runs/44181085215).
+See [CORE-02-TEST-REPORT.md](CORE-02-TEST-REPORT.md) for environment, suite scope and limitations.
 
-## 7. Next dependency
+The software PASS is limited to the implementation at the tested commit. Documentation updates are tested by the repository workflow as well; those later CI runs are tracked separately and do not retroactively change the tested source-code commit.
+
+## 7. Scientific evaluation still required
+
+No benchmark-based extraction quality result is claimed. Precision, recall, F1, span entailment, hypothesis quality, ambiguity/conflict precision and recall, extractor correlation and robustness require human-annotated evaluation under the paper's protocol. T4 fit and throughput also remain unverified.
+
+## 8. Next dependency
 
 Core 03 will formalise decomposition objects D=(S,E,kappa), including sub-problems, dependency edges and the deliverable composition map. Core 04 will implement validity checks with a strict distinction between structural checks and execution-dependent checks.
