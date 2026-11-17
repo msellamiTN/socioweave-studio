@@ -184,8 +184,10 @@ def test_final_recheck_reports_cycle_introduced_by_repair_callback():
             current.composition,
         )
 
+    orphan = Subproblem("orphan", "Orphan", (), "Unused", (), ())
+    d2 = Decomposition((*d.subproblems, orphan), d.dependencies, d.composition)
     result = repair_decomposition(
-        prompt, requirements, d,
+        prompt, requirements, d2,
         {("a", "b"): 3, ("b", "c"): 1, ("c", "a"): 2},
         repair_callback=introduce_cycle,
     )
