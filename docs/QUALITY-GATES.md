@@ -236,10 +236,15 @@ The next dependent unit may start only after the current Core's exact tested com
 
 
 ### Core 17 — Scientific Metrics and Statistical Analysis
-- Status: **PENDING — full-suite CI acceptance**
+- Status: **PASS — metric/statistical calculation software acceptance only**
 - Implementation: `engine/sociodec/metrics.py`
 - Tests: `engine/tests/test_metrics.py`
 - Specification: `docs/CORE-17-SCIENTIFIC-METRICS-STATISTICS.md`
 - Scope: extraction precision/recall/F1, span-entailment rate, Table 9 decomposition metrics, process gain, paired Wilcoxon signed-rank normal approximation, rank-biserial effect size, percentile-bootstrap confidence interval and Holm correction.
-- Statistical boundary: p-values are a tie-corrected normal approximation with continuity correction, not exact small-sample Wilcoxon probabilities. The test report must retain this limitation.
+- Exact tested commit: `d9ac96553b9b701af198668577836274422edc10`
+- Environment: GitHub Actions, Ubuntu latest, CPython 3.11.18, pytest 9.2.0
+- Command: `python -m pytest -q`
+- Result: **295 passed in 0.43s; 0 failed; 0 skipped.**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44200262195
+- Statistical boundary: p-values are a tie-corrected normal approximation with continuity correction, not exact small-sample Wilcoxon probabilities.
 - Scientific boundary: no benchmark data, gold annotations, executor outcomes or E1–E9 results are included. Metric software tests cannot establish strategy effectiveness.
