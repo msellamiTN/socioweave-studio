@@ -116,4 +116,13 @@ Each Core must contain:
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44187108609
 - Scope limitation: strategy specification only; runtime execution, visibility enforcement, decision rules and strategy selection remain future work.
 
+### Core 08 — Strategy Runtime
+- Status: **PASS — visibility-aware protocol runtime acceptance**
+- Tested commit: `23045d97814994c7f448db97b6c86eeb5c75052f`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **134 passed in 0.22s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44187520064
+- Scope limitation: serial protocol dispatch with stage visibility snapshots; no parallel latency claim, decision-rule implementation or strategy effectiveness result.
+
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
