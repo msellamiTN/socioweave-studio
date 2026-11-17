@@ -247,6 +247,9 @@ def plan_strategy_chain(
             if item is not None and item not in selected:
                 selected.append(item)
                 rules.append(rule or "")
+        if not selected:
+            selected.append(PlanItem.S5)
+            rules.append("3.4")
 
     queue = list(selected)
     reason = "Table 8 decision list"
