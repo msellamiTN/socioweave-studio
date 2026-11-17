@@ -29,7 +29,7 @@ def test_finalizer_keeps_v3_v4_not_evaluated_without_executor_evidence():
     result = run_adaptive(
         prompt, extract=lambda _: extraction,
         draft=lambda p, e, i: initial,
-        execute_strategy=lambda *args: StrategyOutcome(decomposition, 10),
+        execute_strategy=lambda *args: StrategyOutcome(initial, 10),
         budget=20, high_stakes=False, model_families=1, open_prompt=True,
     )
     final = finalize_adaptive_result(result)
