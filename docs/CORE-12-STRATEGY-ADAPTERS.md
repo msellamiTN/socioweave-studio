@@ -1,6 +1,6 @@
 # Core 12 — Concrete Strategy Adapter Layer
 
-**Status:** IMPLEMENTED — full acceptance pending CI.  
+**Status:** PASS — software protocol-adapter acceptance. See CORE-12-TEST-REPORT.md.  
 **Source basis:** Paper Table 3, Table 4, Sections 5.1–5.4, and Algorithm 1 (pages 7–16).
 
 ## 1. Scope
@@ -38,12 +38,12 @@ Protocol call counts are checked against the catalogue's Table 4 formulae. S11 i
 
 - Every agent sees its own outputs.
 - S1 and S12 require explicit prompt views. The factory refuses to invent domain or facet partitions.
-- S2 participants generate independently; the aggregator can see their outputs after generation.
-- S3 and S9 preserve independent first drafts and reveal the pooled material for ranking/voting.
+- S2 participants generate independently; the aggregator can see their outputs in a separate aggregation round.
+- S3 and S9 preserve independent first drafts and reveal the pooled material in a separate ranking/voting round.
 - S4 experts receive anonymous facilitator summaries; the facilitator can inspect the drafts. Both visible history and aggregate input text anonymise author labels.
-- S7 parties do not see the opposing party's draft/defence; the judge sees both cases.
+- S7 parties do not see the opposing party's draft/defence; the judge sees both cases in the decision phase.
 - S8 reviewers see the author draft but not one another's reviews; the editor sees all reviews and the author receives the editor-approved feedback before revision.
-- Runtime direct-step and aggregate-history inputs are now checked against the declared visibility relation. A protocol cannot use an input reference to bypass V.
+- Runtime direct-step and aggregate-history inputs are now checked against the declared visibility relation. A protocol cannot use an input reference to bypass V. Phase transitions are represented as separate protocol rounds where the paper changes access after pooling or review.
 
 ## 4. Runtime bridge and decision boundary
 
