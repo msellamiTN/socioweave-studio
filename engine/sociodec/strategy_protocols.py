@@ -170,7 +170,7 @@ def build_strategy_blueprint(
         add_roles(ids, 1)
         p.extend(ProtocolStep(a, Action.DRAFT, "prompt", 1, 1) for a in voters)
         p.extend(ProtocolStep(a, Action.VOTE, "all_previous_outputs", 1, 2) for a in voters)
-        visibility[1] = _pairs(ids, full=False)
+        visibility[1] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S5:
@@ -204,7 +204,7 @@ def build_strategy_blueprint(
         p.extend(ProtocolStep(a, Action.CRITIQUE, "step:0", 1, 2) for a in reviewers)
         p.append(ProtocolStep("editor", Action.JUDGE, "all_previous_outputs", 1, 3))
         p.append(ProtocolStep("author", Action.REVISE, "all_previous_outputs", 1, 4))
-        pairs = [("author", "author"), ("editor", "author"), ("editor", "editor")]
+        pairs = [("author", "author"), ("author", "editor"), ("editor", "author"), ("editor", "editor")]
         for reviewer in reviewers:
             pairs.extend(((reviewer, "author"), (reviewer, reviewer)))
         pairs.extend(("editor", reviewer) for reviewer in reviewers)
@@ -238,7 +238,7 @@ def build_strategy_blueprint(
             ProtocolStep("party-2", Action.DEFEND, "step:1", 1, 2),
             ProtocolStep("judge", Action.JUDGE, "all_previous_outputs", 1, 3),
         ))
-        visibility[1] = _pairs(ids, full=True)
+        visibility[1] = (("party-1", "party-1"), ("party-2", "party-2"), ("judge", "party-1"), ("judge", "party-2"), ("judge", "judge"))
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S11:
