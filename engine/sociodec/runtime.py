@@ -170,7 +170,7 @@ def run_strategy(
                     for item in stage_snapshot
                 )
                 if not input_content:
-                    raise ValueError("all_previous_outputs requires prior-stage output")
+                    input_content = inputs.get("all_previous_outputs", "")
             elif step.input_ref in inputs:
                 input_content = inputs[step.input_ref]
             elif step.input_ref.startswith("step:"):
