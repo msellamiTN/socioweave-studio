@@ -49,6 +49,8 @@ class SubproblemExecution:
     def __post_init__(self) -> None:
         if not self.subproblem_id.strip():
             raise ValueError("SubproblemExecution.subproblem_id must not be empty")
+        if not isinstance(self.status, ExecutionStatus):
+            raise ValueError("SubproblemExecution.status must be solved or failed")
         if self.status is ExecutionStatus.SOLVED and (
             self.answer is None or not self.answer.strip()
         ):
@@ -67,6 +69,8 @@ class ConstraintAssessment:
     evidence: str
 
     def __post_init__(self) -> None:
+        if not isinstance(self.satisfied, bool):
+            raise ValueError("ConstraintAssessment.satisfied must be a boolean")
         if not self.evidence.strip():
             raise ValueError("ConstraintAssessment.evidence must not be empty")
 
