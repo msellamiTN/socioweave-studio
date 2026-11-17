@@ -155,3 +155,44 @@ def test_strategy_calls_and_depth_are_distinct():
     strategy = make_strategy()
     assert strategy.calls == 3  # one deterministic protocol step
     assert strategy.depth == 3  # parallel drafts share stage 1
+
+
+def test_strategy_rejects_undefined_role_values_and_assignments_outside_role_set():
+    strategy = make_strategy()
+    with pytest.raises(ValueError, match="defined, non-empty and unique"):
+        SocialStrategy(
+            strategy.agents, ("decomposer", Role.CRITIC), strategy.assignments,
+            strategy.visibility, strategy.protocol, strategy.decision_rule,
+            strategy.rounds,
+        )
+    roles_without_judge = (Role.DECOMPOSER, Role.CRITIC)
+    with pytest.raises(ValueError, match="outside R"):
+        SocialStrategy(
+            strategy.agents, roles_without_judge, strategy.assignments,
+            strategy.visibility, strategy.protocol, strategy.decision_rule,
+            strategy.rounds,
+        )
+
+
+def test_strategy_rejects_empty_agents_roles_or_protocol():
+    strategy = make_strategy()
+    with pytest.raises(ValueError, match="unique, non-empty agent set"):
+        SocialStrategy(
+            (), strategy.roles, (), (), strategy.protocol,
+            strategy.decision_rule, strategy.rounds,
+        )
+    with pytest.raises(ValueError, match="roles must be"):
+        SocialStrategy(
+            strategy.agents, (), strategy.assignments, strategy.visibility,
+            strategy.protocol, strategy.decision_rule, strategy.rounds,
+        )
+    with pytest.raises(ValueError, match="protocol must not be empty"):
+        SocialStrategy(
+            strategy.agents, strategy.roles, strategy.assignments,
+            strategy.visibility, (), strategy.decision_rule, strategy.rounds,
+        )
+
+
+def test_protocol_step_rejects_non_boolean_call_accounting():
+    with pytest.raises(ValueError, match="invokes_model must be a boolean"):
+        ProtocolStep("a", Action.DRAFT, "prompt", 1, 1, "yes")
