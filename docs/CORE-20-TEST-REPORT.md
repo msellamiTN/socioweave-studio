@@ -11,8 +11,13 @@ Fixed-executor identity contract, execution evidence integration with Core 15, V
 - Cyclic DAG depth fails closed.
 - Provider trace and hashed composed-answer metadata are retained without raw answer text.
 
-## CI evidence
-Pending full engine CI on the exact implementation and documentation commit. No PASS status or test count is asserted before completion.
+## Acceptance evidence
+
+- Tested implementation commit: `14357f4f861da1022383325636d2aad03be18283`
+- GitHub Actions run: [44202991480](https://github.com/msellamiTN/socioweave-studio/actions/runs/44202991480)
+- Environment: GitHub Actions, Ubuntu latest, CPython 3.11.18, pytest 9.2.0
+- Command: `python -m pytest -q` from `engine/`
+- Result: **314 passed in 0.64s; 0 failed; 0 skipped.**
 
 ## Scientific boundary
-Software tests do not establish semantic executor quality, verifier independence, benchmark performance or strategy effectiveness.
+Software tests do not establish semantic executor quality, verifier independence, benchmark performance or strategy effectiveness. No real benchmark campaign, utility result, strategy ranking or E1–E9 finding is claimed.
