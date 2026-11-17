@@ -144,14 +144,15 @@ def parse_hypothesis_verdicts(value: Any, extraction: AggregatedExtraction):
     return tuple(result)
 
 def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
-                          extraction: AggregatedExtraction) -> ProtocolMessage:
+                          extraction: AggregatedExtraction,
+                          candidate_id: str | None = None) -> ProtocolMessage:
     data = _json(output.text)
     action = output.action
     candidate, objections, ranking, ballots, partitions = None, (), (), (), ()
     selected, rationale, summary = None, "", ""
     agreements, disagreements = (), ()
     if action in {"draft", "revise", "merge", "check"}:
-        candidate = parse_candidate(data.get("candidate", data), prompt=prompt, extraction=extraction)
+        candidate = parse_candidate(data.get("candidate", data), prompt=prompt, extraction=extraction, candidate_id=candidate_id)
     elif action == "critique":
         raw = data.get("objections")
         if not isinstance(raw, list):
