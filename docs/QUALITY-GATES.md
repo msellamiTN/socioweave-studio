@@ -107,4 +107,13 @@ Each Core must contain:
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44186672952
 - Scope limitation: validates supplied executor/verifier evidence consistency; it does not independently prove actual execution or semantic truth.
 
+### Core 07 — Social Strategy Model
+- Status: **PASS — formal strategy model software acceptance**
+- Tested commit: `610c372a3e9d147c9f6a60c4afd376c1d16e4c10`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **123 passed in 0.17s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44187108609
+- Scope limitation: strategy specification only; runtime execution, visibility enforcement, decision rules and strategy selection remain future work.
+
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
