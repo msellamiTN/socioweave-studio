@@ -206,7 +206,7 @@ def build_strategy_blueprint(
     elif sid is StrategyId.S8:
         reviewers = tuple(f"reviewer-{i+1}" for i in range(k))
         ids = ("author", *reviewers, "editor")
-        add_roles(ids, 1, {"author": Role.DECOMPOSER, "editor": Role.JUDGE, **{a: Role.CRITIC for a in reviewers}})
+        add_roles(ids, 4, {"author": Role.DECOMPOSER, "editor": Role.JUDGE, **{a: Role.CRITIC for a in reviewers}})
         p.append(ProtocolStep("author", Action.DRAFT, "prompt", 1, 1))
         p.extend(ProtocolStep(a, Action.CRITIQUE, "step:0", 2, 2) for a in reviewers)
         p.append(ProtocolStep("editor", Action.JUDGE, "all_previous_outputs", 3, 3))
@@ -239,7 +239,7 @@ def build_strategy_blueprint(
 
     elif sid is StrategyId.S7:
         ids = ("party-1", "party-2", "judge")
-        add_roles(ids, 1, {"party-1": Role.DECOMPOSER, "party-2": Role.DECOMPOSER, "judge": Role.JUDGE})
+        add_roles(ids, 3, {"party-1": Role.DECOMPOSER, "party-2": Role.DECOMPOSER, "judge": Role.JUDGE})
         p.extend((
             ProtocolStep("party-1", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("party-2", Action.DRAFT, "prompt", 1, 1),
