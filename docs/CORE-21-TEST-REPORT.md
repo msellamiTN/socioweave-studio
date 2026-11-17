@@ -13,7 +13,12 @@ Provider-backed initial draft decoding, q-extractor aggregation, PromptFactory b
 - Campaign policy validates minimum call budget.
 
 ## Acceptance evidence
-Pending full engine CI on the exact implementation and documentation commit.
+
+- Tested implementation commit: `7df05b583c20a304f35985cdd452476ee4412565`
+- GitHub Actions run: [44203533011](https://github.com/msellamiTN/socioweave-studio/actions/runs/44203533011)
+- Environment: GitHub Actions, Ubuntu latest, CPython 3.11.18, pytest 9.2.0
+- Command: `python -m pytest -q` from `engine/`
+- Result: **320 passed in 0.57s; 0 failed; 0 skipped.**
 
 ## Scientific boundary
-Unit tests use fake providers and executor fixtures. They establish integration behavior only; they do not establish hosted-model output quality, model independence, verifier correctness or strategy effectiveness.
+Unit tests use fake providers and executor fixtures. They establish integration behavior only; they do not establish hosted-model output quality, model independence, verifier correctness or strategy effectiveness. No real benchmark campaign, utility result, strategy ranking or E1–E9 finding is claimed.
