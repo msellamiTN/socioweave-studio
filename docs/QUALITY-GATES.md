@@ -137,9 +137,14 @@ Each Core must contain:
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
 
 ### Core 10 — Adaptive Strategy Selector
-- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Status: **PASS — software acceptance**
 - Implementation: `engine/sociodec/selector.py`
 - Tests: `engine/tests/test_selector.py`
 - Specification: `docs/CORE-10-ADAPTIVE-STRATEGY-SELECTOR.md`
 - Scope: Table 8 decision list, feature diagnosis from extraction and two supplied drafts, budget-aware chain planning and failure-based escalation planning.
-- Acceptance gate: full engine test suite must pass on the final commit; semantic flags not derivable from current extraction, seeded-call budget precision and dynamic execution-loop integration remain documented limitations.
+- Tested commit: `b57a0c89b8e0bd11948300794e4d567f16b81f1d`
+- Environment: GitHub Actions, Ubuntu latest runner, CPython 3.11
+- Command: `python -m pytest -q`
+- Result: **176 passed in 0.27s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44189680999
+- Scope limitation: deterministic planner acceptance only; semantic flags, seed-adjusted cost accounting and full dynamic Algorithm 2 orchestration remain documented limitations.
