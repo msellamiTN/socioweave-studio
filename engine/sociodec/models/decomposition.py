@@ -179,3 +179,9 @@ class Decomposition:
                 "Composition contains undeclared deliverable(s): "
                 + ", ".join(sorted(unknown_deliverables))
             )
+        missing_deliverables = declared_deliverables - mapped_deliverables
+        if missing_deliverables:
+            raise ValueError(
+                "Composition is missing deliverable key(s): "
+                + ", ".join(sorted(missing_deliverables))
+            )
