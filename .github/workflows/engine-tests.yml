@@ -22,6 +22,7 @@ on:
       - "docs/CORE-16-*.md"
       - "docs/CORE-17-*.md"
       - "docs/CORE-18-*.md"
+      - "docs/CORE-19-*.md"
       - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
   pull_request:
