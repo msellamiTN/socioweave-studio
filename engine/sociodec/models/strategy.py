@@ -143,8 +143,12 @@ class SocialStrategy:
         agent_ids = [agent.identifier for agent in self.agents]
         if not agent_ids or len(agent_ids) != len(set(agent_ids)):
             raise ValueError("SocialStrategy requires unique, non-empty agent set")
-        if not self.roles or len(set(self.roles)) != len(self.roles):
-            raise ValueError("SocialStrategy.roles must be non-empty and unique")
+        if (
+            not self.roles
+            or any(not isinstance(role, Role) for role in self.roles)
+            or len(set(self.roles)) != len(self.roles)
+        ):
+            raise ValueError("SocialStrategy.roles must be defined, non-empty and unique")
 
         known_agents = set(agent_ids)
         assignment_keys = [(item.agent_id, item.round) for item in self.assignments]
