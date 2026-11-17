@@ -191,3 +191,12 @@ The next dependent unit may start only after the current Core's exact tested com
 - Result: **241 passed in 0.43s; 0 failed; 0 skipped**
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44194445943
 - Boundary: decision application, structural validity and execution evidence remain separate gates.
+
+
+### Core 14 — Strategy Decision Assembly
+- Status: **IMPLEMENTED — acceptance pending exact-commit CI**
+- Implementation: `engine/sociodec/strategy_decoding.py`; default-wired in `engine/sociodec/strategy_adapter.py`
+- Tests: `engine/tests/test_strategy_decoding.py`
+- Specification: `docs/CORE-14-STRATEGY-DECISION-ASSEMBLY.md`
+- Scope: typed decision resolution for all established strategies; S11 and S13 require explicit adjudication because the current protocol outputs do not encode a negotiated decomposition or final authority selection.
+- Acceptance gate: full integrated suite, zero skipped tests, exact-commit CI. No semantic correctness claim follows from software conformance.
