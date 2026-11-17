@@ -37,3 +37,14 @@ def test_parameterized_cost_formulas():
         get_strategy("S3").calls(n=0)
     with pytest.raises(ValueError, match="T must"):
         get_strategy("S4").depth(T=0)
+
+
+def test_five_unexplored_matrix_cells_remain_unvalidated_candidates():
+    from sociodec.catalogue import CANDIDATE_STRATEGIES, CandidateStrategyId
+    assert len(CANDIDATE_STRATEGIES) == 5
+    assert {item.identifier for item in CANDIDATE_STRATEGIES} == set(CandidateStrategyId)
+    assert all(item.status.startswith("candidate") for item in CANDIDATE_STRATEGIES)
+    assert {item.name for item in CANDIDATE_STRATEGIES} == {
+        "Objection ballot", "Patch merge", "Redundant jigsaw",
+        "Interface negotiation", "Chaired deliberation",
+    }
