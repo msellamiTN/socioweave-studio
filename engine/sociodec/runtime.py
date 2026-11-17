@@ -164,6 +164,13 @@ def run_strategy(
             prompt_view = views.get(step.agent_id, prompt.text)
             if step.input_ref == "prompt":
                 input_content = prompt_view
+            elif step.input_ref == "all_previous_outputs":
+                input_content = "\\n\\n".join(
+                    f"[{item.agent_id}:{item.action}]\\n{item.text}"
+                    for item in stage_snapshot
+                )
+                if not input_content:
+                    raise ValueError("all_previous_outputs requires prior-stage output")
             elif step.input_ref in inputs:
                 input_content = inputs[step.input_ref]
             elif step.input_ref.startswith("step:"):
