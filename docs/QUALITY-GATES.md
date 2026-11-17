@@ -291,12 +291,12 @@ The next dependent unit may start only after the current Core's exact tested com
 
 ## Core 21 — End-to-end provider-backed campaign integration
 
-- [ ] PromptFactory supplies explicit interpretation and preserves exact benchmark prompt text.
-- [ ] q extractor outputs are aggregated without promoting hypotheses.
-- [ ] Two initial drafts are generated independently with no peer history.
-- [ ] Core 11 orchestration is wired to the configured concrete strategy adapter.
-- [ ] Composite strategies require explicit composite executors.
-- [ ] Core 20 fixed executor identity and V3/V4 evidence are preserved.
-- [ ] Trial metadata and provider traces are compatible with Core 19 checkpoint persistence.
-- [ ] Full engine suite passes on the exact implementation commit.
+- [x] PromptFactory supplies explicit interpretation and preserves exact benchmark prompt text.
+- [x] q extractor outputs are aggregated without promoting hypotheses.
+- [x] Two initial drafts are generated independently with no peer history.
+- [x] Core 11 orchestration is wired to the configured concrete strategy adapter.
+- [x] Composite strategies require explicit composite executors.
+- [x] Core 20 fixed executor identity and V3/V4 evidence are preserved.
+- [x] Trial metadata and provider traces are compatible with Core 19 checkpoint persistence.
+- [x] Full engine suite passes on the exact implementation commit (320 passed, 0 failed, 0 skipped; CI run 44203533011).
 - [ ] Real provider smoke test and small Colab pilot pass before any scientific campaign.
