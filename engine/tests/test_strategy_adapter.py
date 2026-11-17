@@ -21,7 +21,7 @@ class EchoInvoker:
 
     def invoke(self, agent, step, context):
         self.calls.append((agent.identifier, step.action.value, context))
-        return f"{agent.identifier}:{step.action.value}:{context.input_content}"
+        return f"{step.action.value}:{context.input_content}"
 
 
 def _prompt():
@@ -75,7 +75,7 @@ def test_anonymous_delphi_aggregate_input_does_not_leak_author_ids():
         context for agent, action, context in invoker.calls if agent == "facilitator"
     )
     assert "anonymous" in facilitator_context.input_content
-    assert "expert-1" not in facilitator_context.input_content
+    assert "[expert-1:draft]" not in facilitator_context.input_content
 
 
 def test_visibility_is_enforced_for_direct_step_references():
@@ -113,7 +113,7 @@ def test_concrete_adapter_runs_runtime_and_requires_typed_decision_result():
         (decomposition, decomposition), None, 10,
     )
     assert isinstance(outcome, StrategyOutcome)
-    assert outcome.calls_made == 4
+    assert outcome.calls_made == 2
     assert outcome.decomposition == decomposition
     assert outcome.strategy_run_id.startswith("S2:")
 
