@@ -7,7 +7,7 @@ reported as not evaluated by this structural validator.
 """
 from __future__ import annotations
 
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -86,7 +86,7 @@ class ValidationReport:
         return tuple(finding for check in checks for finding in check.findings)
 
 
-def _first_cycle(
+def find_directed_cycle(
     identifiers: tuple[str, ...], edges: frozenset[tuple[str, str]]
 ) -> tuple[str, ...] | None:
     """Return one directed cycle as node sequence, repeating its first node."""
@@ -201,7 +201,7 @@ def validate_decomposition(
             tuple(sorted(item.statement for item in extra)),
         ))
 
-    cycle = _first_cycle(
+    cycle = find_directed_cycle(
         tuple(item.identifier for item in decomposition.subproblems),
         decomposition.E,
     )
