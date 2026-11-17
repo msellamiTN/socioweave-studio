@@ -4,7 +4,7 @@ import pytest
 
 from sociodec.experiments import (
     BenchmarkPrompt, ExperimentConfig, ExperimentRunner, TrialOutcome,
-    content_hash, trial_seed, write_jsonl,
+    content_hash, trial_seed, write_jsonl, build_campaign_manifest, sha256_file,
 )
 
 
@@ -101,3 +101,24 @@ def test_jsonl_export_is_machine_readable_and_counts_rows(tmp_path):
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["status"] == "success"
     assert payload["config_hash"] == config(repeats=1).config_hash
+
+
+def test_campaign_manifest_fingerprints_dataset_and_dependency_lock(tmp_path):
+    dataset = tmp_path / "dataset.jsonl"
+    lock = tmp_path / "requirements.lock"
+    dataset.write_text('{"example_id":"x","prompt_text":"Do"}\\n', encoding="utf-8")
+    lock.write_text("pytest==9.2.0\\n", encoding="utf-8")
+    manifest = build_campaign_manifest(
+        config(), dataset, code_commit="abc123", dependency_lock_path=lock,
+    )
+    assert manifest.config_hash == config().config_hash
+    assert manifest.dataset_sha256 == sha256_file(dataset)
+    assert manifest.dependency_lock_sha256 == sha256_file(lock)
+    dataset.write_text('{"example_id":"x","prompt_text":"Changed"}\\n', encoding="utf-8")
+    assert sha256_file(dataset) != manifest.dataset_sha256
+
+
+def test_campaign_manifest_rejects_invalid_digests():
+    from sociodec.experiments import CampaignManifest
+    with pytest.raises(ValueError, match="SHA-256"):
+        CampaignManifest("bad", "0" * 64, "commit", "3.11", "1" * 64)
