@@ -233,3 +233,13 @@ The next dependent unit may start only after the current Core's exact tested com
 - Result: **282 passed in 0.30s; 0 failed; 0 skipped.**
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44198780523
 - Boundaries: no dataset content is bundled or downloaded; no provider/model calls, E1–E9 campaigns, annotation, metric aggregation or significance tests have been executed. Seeds do not guarantee deterministic hosted inference.
+
+
+### Core 17 — Scientific Metrics and Statistical Analysis
+- Status: **PENDING — full-suite CI acceptance**
+- Implementation: `engine/sociodec/metrics.py`
+- Tests: `engine/tests/test_metrics.py`
+- Specification: `docs/CORE-17-SCIENTIFIC-METRICS-STATISTICS.md`
+- Scope: extraction precision/recall/F1, span-entailment rate, Table 9 decomposition metrics, process gain, paired Wilcoxon signed-rank normal approximation, rank-biserial effect size, percentile-bootstrap confidence interval and Holm correction.
+- Statistical boundary: p-values are a tie-corrected normal approximation with continuity correction, not exact small-sample Wilcoxon probabilities. The test report must retain this limitation.
+- Scientific boundary: no benchmark data, gold annotations, executor outcomes or E1–E9 results are included. Metric software tests cannot establish strategy effectiveness.
