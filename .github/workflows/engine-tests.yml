@@ -25,6 +25,7 @@ on:
       - "docs/CORE-19-*.md"
       - "docs/CORE-20-*.md"
       - "docs/CORE-21-*.md"
+      - "docs/CORE-22-*.md"
       - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
   pull_request:
@@ -33,6 +34,7 @@ on:
       - "docs/CORE-16-*.md"
       - "docs/CORE-17-*.md"
       - "docs/CORE-18-*.md"
+      - "docs/CORE-22-*.md"
       - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
 
