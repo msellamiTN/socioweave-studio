@@ -126,6 +126,7 @@ def test_repair_callback_is_not_retried_when_failures_remain():
     )
     assert len(calls) == 1
     assert result.repair_call_made is True
+    assert result.final_report.v5_composition.status.value == "fail"
 
 
 def test_repair_callback_return_type_is_enforced():
@@ -145,3 +146,49 @@ def test_repair_callback_return_type_is_enforced():
             {("a", "b"): 3, ("b", "c"): 1, ("c", "a"): 2},
             repair_callback=invalid,
         )
+
+
+
+def test_multiple_disjoint_cycles_are_removed_without_model_call():
+    prompt, requirements, a, b, c, _ = case()
+    d_node = Subproblem("d", "Publish", (), "Publication", (), (requirements[0],))
+    a2 = Subproblem("a2", "Prepare", (), "Prepared", (), (requirements[0],))
+    b2 = Subproblem("b2", "Approve", (), "Approved", (), (requirements[0],))
+    decomposition = Decomposition(
+        (a, b, c, a2, b2, d_node),
+        (
+            Dependency("a", "b"), Dependency("b", "a"),
+            Dependency("a2", "b2"), Dependency("b2", "a2"),
+        ),
+        (DeliverableComposition("Service plan", ("a", "b", "c", "a2", "b2", "d")),),
+    )
+    result = repair_decomposition(
+        prompt, requirements, decomposition,
+        {
+            ("a", "b"): 2, ("b", "a"): 1,
+            ("a2", "b2"): 3, ("b2", "a2"): 0,
+        },
+    )
+    assert len(result.removed_edges) == 2
+    assert result.repair_call_made is False
+    assert result.final_report.v2_acyclicity.status.value == "pass"
+
+
+def test_final_recheck_reports_cycle_introduced_by_repair_callback():
+    prompt, requirements, _, _, _, d = case()
+
+    def introduce_cycle(current, failures):
+        return Decomposition(
+            current.subproblems,
+            (*current.dependencies, Dependency("b", "c")),
+            current.composition,
+        )
+
+    result = repair_decomposition(
+        prompt, requirements, d,
+        {("a", "b"): 3, ("b", "c"): 1, ("c", "a"): 2},
+        repair_callback=introduce_cycle,
+    )
+    assert result.repair_call_made is True
+    assert result.final_report.v2_acyclicity.status.value == "fail"
+    assert len(result.removed_edges) == 1
