@@ -264,3 +264,14 @@ The next dependent unit may start only after the current Core's exact tested com
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44201353152
 - Scientific boundary: the Colab notebook deliberately blocks real execution until a provider-backed strategy/executor adapter is supplied. Synthetic values are isolated plotting smoke tests only. No E1–E9 results are claimed.
 - Statistical boundary: paired p-values inherit Core 17's tie-corrected normal approximation; report this limitation.
+
+
+## Core 19 — Provider-backed execution and resumability
+
+- [ ] Provider bridge preserves runtime-supplied visibility and protocol role/action.
+- [ ] Provider/model identity, generation config, token usage, latency, request ID and hashes are traceable.
+- [ ] Raw prompts, outputs and credentials are not persisted in default trace.
+- [ ] Checkpoint resume validates config hash, prompt hash, seed and unique trial key.
+- [ ] Successes and failures are checkpointed; resume does not silently retry failed trials.
+- [ ] Full engine suite passes on the exact implementation commit.
+- [ ] Live provider pilot, fixed executor and V3/V4 verifier evidence are separately reported; software CI is not scientific validation.
