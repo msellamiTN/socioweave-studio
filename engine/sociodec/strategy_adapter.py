@@ -135,17 +135,19 @@ class ConcreteStrategyAdapter:
             return result
 
         sid = self._strategy_id(item)
+        if sid is StrategyId.S1:
+            preliminary_views = {"coordinator": prompt.text, **{
+                f"specialist-{i}": prompt.text for i in range(1, self.n + 1)
+            }}
+        elif sid is StrategyId.S12:
+            preliminary_views = {**{
+                f"expert-{i}": prompt.text for i in range(1, self.n + 1)
+            }, "integrator": prompt.text}
+        else:
+            preliminary_views = None
         preliminary = build_strategy_blueprint(
-            sid, model_ids=self.model_ids,
-            prompt_views=(
-                {a: prompt.text for a in (
-                    "coordinator", "specialist-1", "specialist-2", "specialist-3"
-                )} if sid is StrategyId.S1 else
-                {**{f"expert-{i}": prompt.text for i in range(1, self.n + 1)},
-                 "integrator": prompt.text} if sid is StrategyId.S12 else None
-            ),
-            agent_contexts=self.agent_contexts,
-            n=self.n, k=self.k, T=self.T,
+            sid, model_ids=self.model_ids, prompt_views=preliminary_views,
+            agent_contexts=self.agent_contexts, n=self.n, k=self.k, T=self.T,
         )
         agent_ids = tuple(agent.identifier for agent in preliminary.strategy.agents)
         views = (
