@@ -221,7 +221,7 @@ def build_strategy_blueprint(
         p.extend((
             ProtocolStep("agent-A", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("agent-B", Action.CRITIQUE, "step:0", 1, 2),
-            ProtocolStep("agent-B", Action.REVISE, "draft_and_objections", 2, 3),
+            ProtocolStep("agent-B", Action.REVISE, "all_previous_outputs", 2, 3),
             ProtocolStep("agent-A", Action.CRITIQUE, "step:2", 2, 4),
         ))
         visibility[1] = _pairs(ids, full=True)
