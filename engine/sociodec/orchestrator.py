@@ -220,7 +220,7 @@ def run_adaptive(
     initial_repair = repair_decomposition(
         prompt, extraction.requirements, initial, support,
         hypotheses=extraction.hypotheses, verdicts=(),
-        repair_callback=repair_callback,
+        repair_callback=None,
     )
     calls += int(initial_repair.repair_call_made)
     initial_validation = initial_repair.final_report
@@ -275,6 +275,8 @@ def run_adaptive(
         )
         repair_calls = int(repaired.repair_call_made)
         calls += repair_calls
+        if calls > budget:
+            raise RuntimeError("Repair exceeded the remaining call budget")
         findings = tuple((*repaired.final_report.failures, *outcome.findings))
         records.append(StrategyExecutionRecord(
             item, seed is not None, outcome, repaired.final_report,
