@@ -126,3 +126,39 @@ STRATEGIES: tuple[StrategyDefinition, ...] = (
 def get_strategy(identifier: StrategyId | str) -> StrategyDefinition:
     key = StrategyId(identifier)
     return next(item for item in STRATEGIES if item.identifier is key)
+
+
+class CandidateStrategyId(StrEnum):
+    """Five unexplored matrix cells; candidates, not validated catalogue entries."""
+    C1 = "C1"
+    C2 = "C2"
+    C3 = "C3"
+    C4 = "C4"
+    C5 = "C5"
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateStrategyDefinition:
+    identifier: CandidateStrategyId
+    name: str
+    production_pattern: str
+    decision_family: str
+    status: str = "candidate — not an established strategy in the paper"
+
+    def __post_init__(self) -> None:
+        if self.status != "candidate — not an established strategy in the paper":
+            raise ValueError("Candidate strategy status must remain explicitly unvalidated")
+
+
+CANDIDATE_STRATEGIES: tuple[CandidateStrategyDefinition, ...] = (
+    CandidateStrategyDefinition(CandidateStrategyId.C1, "Objection ballot",
+        "One author, then critics", "Rank-sum or majority"),
+    CandidateStrategyDefinition(CandidateStrategyId.C2, "Patch merge",
+        "One author, then critics", "Union or synthesis"),
+    CandidateStrategyDefinition(CandidateStrategyId.C3, "Redundant jigsaw",
+        "Partitioned authors", "Rank-sum or majority"),
+    CandidateStrategyDefinition(CandidateStrategyId.C4, "Interface negotiation",
+        "Partitioned authors", "Compromise or consensus"),
+    CandidateStrategyDefinition(CandidateStrategyId.C5, "Chaired deliberation",
+        "Shared drafting", "Authority"),
+)
