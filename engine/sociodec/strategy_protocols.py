@@ -208,14 +208,16 @@ def build_strategy_blueprint(
         ids = ("author", *reviewers, "editor")
         add_roles(ids, 1, {"author": Role.DECOMPOSER, "editor": Role.JUDGE, **{a: Role.CRITIC for a in reviewers}})
         p.append(ProtocolStep("author", Action.DRAFT, "prompt", 1, 1))
-        p.extend(ProtocolStep(a, Action.CRITIQUE, "step:0", 1, 2) for a in reviewers)
-        p.append(ProtocolStep("editor", Action.JUDGE, "all_previous_outputs", 1, 3))
-        p.append(ProtocolStep("author", Action.REVISE, "all_previous_outputs", 1, 4))
-        pairs = [("author", "author"), ("author", "editor"), ("editor", "author"), ("editor", "editor")]
+        p.extend(ProtocolStep(a, Action.CRITIQUE, "step:0", 2, 2) for a in reviewers)
+        p.append(ProtocolStep("editor", Action.JUDGE, "all_previous_outputs", 3, 3))
+        p.append(ProtocolStep("author", Action.REVISE, "all_previous_outputs", 4, 4))
+        visibility[1] = _pairs(ids, full=False)
+        review_pairs = [("author", "author"), ("editor", "editor")]
         for reviewer in reviewers:
-            pairs.extend(((reviewer, "author"), (reviewer, reviewer), ("author", reviewer)))
-        pairs.extend(("editor", reviewer) for reviewer in reviewers)
-        visibility[1] = tuple(pairs)
+            review_pairs.extend(((reviewer, "author"), (reviewer, reviewer)))
+        visibility[2] = tuple(review_pairs)
+        visibility[3] = tuple([("editor", a) for a in ids] + [(a, a) for a in ids])
+        visibility[4] = tuple([("author", a) for a in ids] + [(a, a) for a in ids])
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S13:
@@ -241,11 +243,13 @@ def build_strategy_blueprint(
         p.extend((
             ProtocolStep("party-1", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("party-2", Action.DRAFT, "prompt", 1, 1),
-            ProtocolStep("party-1", Action.DEFEND, "step:0", 1, 2),
-            ProtocolStep("party-2", Action.DEFEND, "step:1", 1, 2),
-            ProtocolStep("judge", Action.JUDGE, "all_previous_outputs", 1, 3),
+            ProtocolStep("party-1", Action.DEFEND, "step:0", 2, 2),
+            ProtocolStep("party-2", Action.DEFEND, "step:1", 2, 2),
+            ProtocolStep("judge", Action.JUDGE, "all_previous_outputs", 3, 3),
         ))
-        visibility[1] = (("party-1", "party-1"), ("party-2", "party-2"), ("judge", "party-1"), ("judge", "party-2"), ("judge", "judge"))
+        visibility[1] = _pairs(ids, full=False)
+        visibility[2] = (("party-1", "party-1"), ("party-2", "party-2"), ("judge", "party-1"), ("judge", "party-2"), ("judge", "judge"))
+        visibility[3] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S11:
@@ -280,7 +284,7 @@ def build_strategy_blueprint(
     blueprint = _make(
         sid, tuple(ids), models, roles, tuple(p),
         DecisionRule(get_strategy(sid).decision_rule),
-        (3 if sid is StrategyId.S1 else T if sid in {StrategyId.S4, StrategyId.S10} else 2 if sid is StrategyId.S13 else 1),
+        (3 if sid in {StrategyId.S1, StrategyId.S7} else T if sid in {StrategyId.S4, StrategyId.S10} else 4 if sid is StrategyId.S8 else 2 if sid in {StrategyId.S2, StrategyId.S3, StrategyId.S9, StrategyId.S12, StrategyId.S13} else 1),
         visibility, views, agent_contexts,
     )
     expected_calls = get_strategy(sid).calls(n=n, k=k, T=T)
