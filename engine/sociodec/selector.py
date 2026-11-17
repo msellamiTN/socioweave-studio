@@ -249,8 +249,9 @@ def plan_strategy_chain(
 
     queue = list(selected)
     reason = "Table 8 decision list"
-    if not queue and not rule0:
-        escalated = _escalation(failures, features.high_stakes, set(selected))
+    failure_set = tuple(failures)
+    if not queue or (queue and (failure_set or features.high_stakes)):
+        escalated = _escalation(failure_set, features.high_stakes, set(selected))
         if escalated is not None:
             queue.append(escalated)
             reason = "Algorithm 2 escalation"
