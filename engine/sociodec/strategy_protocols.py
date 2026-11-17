@@ -113,7 +113,7 @@ def build_strategy_blueprint(
         roles.update({(a, 3): Role.DECOMPOSER for a in specialists})
         p.extend([
             ProtocolStep("coordinator", Action.SPLIT, "prompt", 1, 1),
-            *(ProtocolStep(a, Action.DRAFT, "step:0", 2, 2) for a in specialists),
+            *(ProtocolStep(a, Action.DRAFT, "prompt", 2, 2) for a in specialists),
             ProtocolStep("coordinator", Action.CHECK, "all_previous_outputs", 3, 3),
         ])
         for r in (1, 2, 3):
