@@ -82,3 +82,16 @@ def test_requirement_entity_names_must_be_unique():
     with pytest.raises(ValueError, match="unique"):
         Requirement("target", RequirementType.TARGET, "ops",
                     SourceSpan(0, 6), entity_names=("Citizen", "Citizen"))
+
+@pytest.mark.parametrize("text", ["a", "abc", "Café", "東京🙂"])
+def test_all_valid_half_open_spans_match_python_slicing(text):
+    for start in range(len(text)):
+        for end in range(start + 1, len(text) + 1):
+            span = SourceSpan(start, end)
+            assert span.extract(text) == text[start:end]
+
+
+def test_frozen_domain_values_cannot_be_mutated():
+    prompt = Prompt("text", Interpretation("goal"))
+    with pytest.raises((AttributeError, TypeError)):
+        prompt.text = "changed"
