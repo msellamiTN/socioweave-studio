@@ -135,15 +135,17 @@ def _quality_key(
     requirements: tuple,
 ) -> tuple[int, int, int, float]:
     """Paper lexicographic order: fewest failures, coverage, redundancy, coupling."""
-    signatures = [
-        (item.output.strip().casefold(),
-         tuple(sorted(x.statement.strip().casefold() for x in item.covered_requirements)))
-        for item in decomposition.subproblems
-    ]
-    duplicates = len(signatures) - len(set(signatures))
+    from collections import Counter
+    from sociodec.decisions import subproblem_signature
+    signatures = [subproblem_signature(item) for item in decomposition.subproblems]
+    counts = Counter(signatures)
+    redundant_share = (
+        sum(count for count in counts.values() if count > 1)
+        / max(1, len(signatures))
+    )
     covered = len(decomposition.cov & frozenset(requirements))
     coupling = len(decomposition.E) / max(1, len(decomposition.subproblems))
-    return (-len(findings), covered, -duplicates, -coupling)
+    return (-len(findings), covered, -redundant_share, -coupling)
 
 
 def run_adaptive(
