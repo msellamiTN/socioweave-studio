@@ -205,3 +205,17 @@ The next dependent unit may start only after the current Core's exact tested com
 - Result: **257 passed in 0.25s; 0 failed; 0 skipped**
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44195876842
 - Boundary: S11/S13 require explicit adjudication; semantic correctness and E1–E9 effectiveness remain unverified.
+
+
+### Core 15 — Unified Validation and Repair Integration
+- Status: **PASS — unified software validation/finalization acceptance**
+- Implementation: `engine/sociodec/finalization.py`; winning evidence retained by `engine/sociodec/orchestrator.py`
+- Tests: `engine/tests/test_finalization.py`
+- Specification: `docs/CORE-15-UNIFIED-VALIDATION-REPAIR.md`
+- Scope: preserves the selected prompt, strategy run ID, hypothesis verdicts and candidate-edge support evidence; recomputes final structural validation; assesses V3/V4 only when an explicit Core 06 ExecutionRun is supplied.
+- Exact tested commit: `5e3b4df53bb166f855cee648912d8689d30819e4`
+- Environment: GitHub Actions, Ubuntu latest runner, CPython 3.11.18, pytest 9.2.0
+- Command: `python -m pytest -q`
+- Result: **259 passed in 0.25s; 0 failed; 0 skipped.**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44197037514
+- Boundary: V3/V4 remain NOT_EVALUATED without executor evidence. A PASS validates the supplied trace contract, not the semantic truth of generated answers. E1–E9 strategy-effectiveness experiments remain unexecuted.
