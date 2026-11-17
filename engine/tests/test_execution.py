@@ -205,3 +205,11 @@ def test_execution_evidence_does_not_claim_independent_semantic_proof():
     # A PASS means the supplied evaluator evidence is complete and affirmative.
     # It is not a theorem that the natural-language answer is true.
     assert report.v4_faithfulness.findings == ()
+
+
+def test_execution_contract_rejects_invalid_status_and_assessment_types():
+    hard = Constraint("Must be available", ConstraintKind.HARD)
+    with pytest.raises(ValueError, match="status must be solved or failed"):
+        SubproblemExecution("s", "solved", "answer")
+    with pytest.raises(ValueError, match="satisfied must be a boolean"):
+        ConstraintAssessment(hard, "yes", "Observed test evidence.")
