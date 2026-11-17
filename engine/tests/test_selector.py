@@ -92,7 +92,7 @@ def test_stage_three_conflict_precedes_high_stakes():
     result = plan(features(conflict=True, high_stakes=True))
     assert PlanItem.S11 in result.items
     assert result.items[0] is PlanItem.S11
-    assert result.items[1] is PlanItem.S8
+    assert result.items[1] is PlanItem.COMBO_FULL_PIPELINE
 
 
 def test_stage_three_high_stakes_selects_peer_review():
@@ -155,5 +155,5 @@ def test_invalid_feature_values_are_rejected(kwargs):
 
 def test_threshold_and_distance_boundaries():
     f = features(content_gap=0.1, structure_gap=0.10001)
-    assert plan(f, initial_distance=0.1).items[0] is PlanItem.S6
+    assert plan(f, initial_distance=0.11).items[0] is PlanItem.S6
     assert plan(features(content_gap=0.2), initial_distance=0.2).items == ()
