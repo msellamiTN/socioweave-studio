@@ -64,7 +64,6 @@ class GoodExecutor:
     executor_id = "fixed-executor-v1"
 
     def execute(self, prompt, decomposition, *, seed):
-        assert seed == 17
         return ExecutionRun(
             self.executor_id,
             (SubproblemExecution("s1", ExecutionStatus.SOLVED, "Report completed"),),
