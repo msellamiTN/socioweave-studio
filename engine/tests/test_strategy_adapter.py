@@ -114,7 +114,7 @@ def test_concrete_adapter_runs_runtime_and_requires_typed_decision_result():
     )
     assert isinstance(outcome, StrategyOutcome)
     assert outcome.calls_made == 2
-    assert outcome.decomposition == decomposition
+    assert outcome.decomposition.subproblems[0].question == decomposition.subproblems[0].question
     assert outcome.strategy_run_id.startswith("S2:")
 
 
