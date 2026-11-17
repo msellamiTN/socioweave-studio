@@ -165,7 +165,7 @@ def test_strategy_rejects_undefined_role_values_and_assignments_outside_role_set
             strategy.visibility, strategy.protocol, strategy.decision_rule,
             strategy.rounds,
         )
-    roles_without_judge = (Role.DECOMPOSER, Role.CRITIC)
+    roles_without_judge = (Role.DECOMPOSER, Role.JUDGE)
     with pytest.raises(ValueError, match="outside R"):
         SocialStrategy(
             strategy.agents, roles_without_judge, strategy.assignments,
