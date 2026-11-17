@@ -160,7 +160,13 @@ def test_validate_against_rejects_constraint_outside_prompt_C():
     prompt, _, r1, _, _, _ = fixtures()
     foreign = Constraint("Use a private cloud", ConstraintKind.SOFT)
     s = Subproblem("s", "Q", (), "O", (foreign,), (r1,))
-    d = Decomposition((s,), (), ())
+    d = Decomposition(
+        (s,), (),
+        (
+            DeliverableComposition("Process redesign", ("s",)),
+            DeliverableComposition("Rollout schedule", ("s",)),
+        ),
+    )
     with pytest.raises(ValueError, match="outside prompt C"):
         d.validate_against(prompt, (r1,))
 
@@ -168,7 +174,13 @@ def test_validate_against_rejects_constraint_outside_prompt_C():
 def test_validate_against_rejects_coverage_outside_explicit_requirement_set():
     prompt, _, r1, r2, _, _ = fixtures()
     s = Subproblem("s", "Q", (), "O", (), (r2,))
-    d = Decomposition((s,), (), ())
+    d = Decomposition(
+        (s,), (),
+        (
+            DeliverableComposition("Process redesign", ("s",)),
+            DeliverableComposition("Rollout schedule", ("s",)),
+        ),
+    )
     with pytest.raises(ValueError, match="outside R\\(P\\)"):
         d.validate_against(prompt, (r1,))
 
@@ -184,6 +196,19 @@ def test_validate_against_does_not_enforce_v1_v2_or_v5():
     prompt, _, r1, _, s1, _ = fixtures()
     d = Decomposition(
         (s1,), (Dependency("s1", "s1"),),
-        (DeliverableComposition("Process redesign", ()),),
+        (
+            DeliverableComposition("Process redesign", ()),
+            DeliverableComposition("Rollout schedule", ("s1",)),
+        ),
     )
     d.validate_against(prompt, (r1,))
+
+
+
+def test_validate_against_rejects_missing_deliverable_mapping_key():
+    prompt, _, r1, _, s1, _ = fixtures()
+    d = Decomposition(
+        (s1,), (), (DeliverableComposition("Process redesign", ("s1",)),)
+    )
+    with pytest.raises(ValueError, match="missing deliverable key"):
+        d.validate_against(prompt, (r1,))
