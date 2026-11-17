@@ -20,6 +20,7 @@ from sociodec.orchestrator import StrategyOutcome
 from sociodec.runtime import ProtocolInvoker, StrategyRun, run_strategy
 from sociodec.selector import PlanItem
 from sociodec.strategy_protocols import build_strategy_blueprint
+from sociodec.strategy_decoding import DecisionAdjudication, ProtocolDecisionDecoder
 from sociodec.validation import ValidationFinding, HypothesisVerdict
 
 
@@ -79,7 +80,7 @@ class ConcreteStrategyAdapter:
     def __init__(
         self,
         invoker: ProtocolInvoker,
-        decoder: StrategyDecoder,
+        decoder: StrategyDecoder | None = None,
         *,
         prompt_view_factory: PromptViewFactory | None = None,
         model_ids: Mapping[str, str] | None = None,
@@ -91,11 +92,13 @@ class ConcreteStrategyAdapter:
             [tuple[Decomposition, Decomposition]], Decomposition
         ] | None = None,
         composite_executor: CompositeExecutor | None = None,
+        decision_adjudications: Mapping[StrategyId | str, DecisionAdjudication] | None = None,
     ) -> None:
         if n < 1 or k < 1 or T < 1:
             raise ValueError("n, k and T must be >= 1")
         self.invoker = invoker
         self.decoder = decoder
+        self.decision_adjudications = dict(decision_adjudications or {})
         self.prompt_view_factory = prompt_view_factory
         self.model_ids = dict(model_ids or {})
         self.agent_contexts = dict(agent_contexts or {})
@@ -193,7 +196,10 @@ class ConcreteStrategyAdapter:
             raise RuntimeError(
                 f"{sid.value} used {run.calls_made} calls; allowance is {available_calls}"
             )
-        decoded = self.decoder(sid, run)
+        decoder = self.decoder or ProtocolDecisionDecoder(
+            prompt, extraction, adjudications=self.decision_adjudications,
+        )
+        decoded = decoder(sid, run)
         if not isinstance(decoded, DecodedStrategyResult):
             raise TypeError("decoder must return DecodedStrategyResult")
         expected = _EXPECTED_DECISION[sid]
