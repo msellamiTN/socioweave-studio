@@ -11,7 +11,7 @@ def test_extracted_explicit_requirements_validate_against_prompt_model():
             "statement": "Response within 20 days",
             "type": "target",
             "domain": "service",
-            "source_span": {"start": 4, "end": 42},
+            "source_span": {"start": 4, "end": 40},
             "entity_names": [],
         }],
         "hypotheses": [],
