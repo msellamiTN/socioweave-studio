@@ -24,6 +24,8 @@ on:
   pull_request:
     paths:
       - "engine/**"
+      - "docs/CORE-17-*.md"
+      - "docs/QUALITY-GATES.md"
       - ".github/workflows/engine-tests.yml"
 
 jobs:
