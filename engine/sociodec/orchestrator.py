@@ -133,7 +133,7 @@ def _quality_key(
     decomposition: Decomposition,
     findings: tuple[ValidationFinding, ...],
     requirements: tuple,
-) -> tuple[int, int, int, float]:
+) -> tuple[int, int, float, float]:
     """Paper lexicographic order: fewest failures, coverage, redundancy, coupling."""
     from collections import Counter
     from sociodec.decisions import subproblem_signature
