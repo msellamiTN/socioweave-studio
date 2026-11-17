@@ -165,9 +165,11 @@ def run_strategy(
             if step.input_ref == "prompt":
                 input_content = prompt_view
             elif step.input_ref == "all_previous_outputs":
+                visibility_round = next(item for item in strategy.visibility if item.round == step.round)
+                visible_authors = {author for observer, author in visibility_round.visible_pairs if observer == step.agent_id}
                 input_content = "\\n\\n".join(
                     f"[{item.agent_id}:{item.action}]\\n{item.text}"
-                    for item in stage_snapshot
+                    for item in stage_snapshot if item.agent_id in visible_authors
                 )
                 if not input_content:
                     input_content = inputs.get("all_previous_outputs", "")
@@ -182,6 +184,10 @@ def run_strategy(
                     raise ValueError(
                         f"Protocol input {step.input_ref!r} is not available before stage {stage}"
                     )
+                referenced = next(item for item in stage_snapshot if f"step:{item.step_index}" == step.input_ref)
+                visibility_round = next(item for item in strategy.visibility if item.round == step.round)
+                if (step.agent_id, referenced.agent_id) not in visibility_round.visible_pairs:
+                    raise ValueError("Protocol input is not visible to the acting agent")
                 input_content = prior[step.input_ref]
             else:
                 raise ValueError(f"Unknown protocol input reference: {step.input_ref}")
