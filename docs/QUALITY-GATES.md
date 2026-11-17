@@ -98,4 +98,13 @@ Each Core must contain:
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44186324292
 - Scope limitation: cycle repair and one injected repair callback only; no empirical effectiveness or execution-dependent V3/V4 validation.
 
+### Core 06 — Execution Evidence for V3/V4
+- Status: **PASS — execution evidence contract acceptance**
+- Tested commit: `0194fb0efc7d696de99527c6d61b41bd098a70a0`
+- Environment: GitHub Actions, Ubuntu 26.04, CPython 3.11.18
+- Command: `python -m pytest -q`
+- Result: **108 passed in 0.14s; 0 failed; 0 skipped**
+- CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44186672952
+- Scope limitation: validates supplied executor/verifier evidence consistency; it does not independently prove actual execution or semantic truth.
+
 The next dependent unit may start only after the current Core's exact tested commit and acceptance report are published.
