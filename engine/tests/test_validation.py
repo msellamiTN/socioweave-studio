@@ -193,3 +193,22 @@ def test_validator_rejects_composition_not_total_for_prompt():
     invalid = Decomposition((s1,), (), (DeliverableComposition("Service plan", ("s1",)),))
     with pytest.raises(ValueError, match="missing deliverable key"):
         validate_decomposition(prompt, requirements, invalid)
+
+
+def test_cycle_witness_is_deterministic_and_invalid_verdict_values_rejected():
+    prompt, requirements, s1, s2, _ = setup_case()
+    cyclic = Decomposition(
+        (s1, s2),
+        (Dependency("s2", "s1"), Dependency("s1", "s2")),
+        (
+            DeliverableComposition("Service plan", ("s1",)),
+            DeliverableComposition("Rollout plan", ("s2",)),
+        ),
+    )
+    first = validate_decomposition(prompt, requirements, cyclic).v2_acyclicity.findings[0].subjects
+    second = validate_decomposition(prompt, requirements, cyclic).v2_acyclicity.findings[0].subjects
+    assert first == second
+
+    h = Hypothesis("A requirement", RequirementType.TARGET, "domain")
+    with pytest.raises(ValueError, match="confirmed or rejected"):
+        HypothesisVerdict(h, "pending")
