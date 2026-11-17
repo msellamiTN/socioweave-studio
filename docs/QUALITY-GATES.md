@@ -248,3 +248,14 @@ The next dependent unit may start only after the current Core's exact tested com
 - CI: https://github.com/msellamiTN/socioweave-studio/actions/runs/44200262195
 - Statistical boundary: p-values are a tie-corrected normal approximation with continuity correction, not exact small-sample Wilcoxon probabilities.
 - Scientific boundary: no benchmark data, gold annotations, executor outcomes or E1–E9 results are included. Metric software tests cannot establish strategy effectiveness.
+
+
+### Core 18 — Campaign Evaluation & Google Colab Runtime
+- Status: **PENDING — full-suite CI acceptance**
+- Implementation: `engine/sociodec/evaluation.py`
+- Tests: `engine/tests/test_evaluation.py`
+- Notebook: `notebooks/colab/SOCIOWEAVE_Core18_Experiment_Runtime.ipynb`
+- Specification: `docs/CORE-18-CAMPAIGN-EVALUATION-COLAB.md`
+- Scope: observation validation, failure/missingness accounting, strategy summaries, prompt-paired comparisons, Holm correction, machine-readable exports and Colab analysis/plotting workflow.
+- Scientific boundary: the Colab notebook deliberately blocks real execution until a provider-backed strategy/executor adapter is supplied. Synthetic values are isolated plotting smoke tests only. No E1–E9 results are claimed.
+- Statistical boundary: paired p-values inherit Core 17's tie-corrected normal approximation; report this limitation.
