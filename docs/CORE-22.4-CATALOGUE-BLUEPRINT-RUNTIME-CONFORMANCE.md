@@ -1,6 +1,6 @@
 # Core 22.4 — Catalogue–Blueprint–Runtime Semantic Conformance
 
-**Status:** implementation under test. This is not scientific validation or an empirical strategy comparison.
+**Status:** PASS — deterministic software conformance on commit `92040644f7ffbbd7bf7774408864eeea724773d6`. This is not scientific validation or an empirical strategy comparison.
 
 ## Source contract
 
@@ -36,7 +36,7 @@ The oracle uses independent expected signatures; it does not call the strategy f
 - `precomputed_steps`: non-model outputs supplied by the caller;
 - `accounting_reconciles`: verifies that the three output classes partition all produced steps and that `calls_made == model_invocations`.
 
-The runtime's existing stage-snapshot behavior is regression-tested: peer outputs from the same stage are not visible to one another; step references must exist before the current stage and be permitted by visibility. Sequential composition tests protect the first-phase independence and second-phase seed placement contract.
+The runtime's existing stage-snapshot behavior is regression-tested: peer outputs from the same stage are not visible to one another; step references must exist before the current stage and be permitted by visibility. Sequential composition tests protect the first-phase independence and second-phase seed placement contract. The first phase receives an empty draft tuple and no chain seed; only the designated second-phase author receives the preceding decomposition.
 
 ## Conformance test matrix
 
@@ -46,6 +46,10 @@ The test suite exercises all thirteen strategies at three parameter configuratio
 - larger: (n=5,k=4,T=3).
 
 Negative mutations cover prompt-view roster, role assignment, visibility, decision rule, protocol/input references and model-call accounting. Existing runtime tests cover same-stage isolation, seed adoption, precomputed outputs, invalid references, and fail-closed behavior.
+
+## Acceptance evidence
+
+GitHub Actions run [44423184541](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423184541) on exact commit `92040644f7ffbbd7bf7774408864eeea724773d6`: **447 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
 
 ## Evidence boundary
 
