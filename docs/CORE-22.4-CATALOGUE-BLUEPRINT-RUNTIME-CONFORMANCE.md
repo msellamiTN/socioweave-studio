@@ -1,12 +1,12 @@
 # Core 22.4 — Catalogue–Blueprint–Runtime Semantic Conformance
 
-**Status:** PASS — deterministic software conformance on commit `a28f8a26a1a8739bcae9018d3c9370da11092bef`. This is not scientific validation or an empirical strategy comparison.
+**Status:** PASS — deterministic software conformance on commit `47508bfab9954e999faae7311bb0cee7b3f2a592`. This is not scientific validation or an empirical strategy comparison.
 
 ## Source contract
 
 The oracle is based on the paper's Definition 10, Table 4, strategy-specific protocol descriptions in Section 5, Definition 12 for sequential composition, and Algorithm 1 for execution. The thirteen established strategies are enumerated from the canonical catalogue. The five Table 5 candidates C1–C5 remain outside the established-strategy oracle.
 
-The machine-readable profile is exposed by `sociodec.conformance.PROFILES`, `PROFILE_BY_ID`, and `profile_as_dict()`. It records agent cardinality, roles, rounds, action sequence, input references, visibility contract, decision rule, Table 4 call/depth formulas, runtime call/depth formulas, and anonymity.
+The machine-readable profile is exposed by `sociodec.conformance.PROFILES`, `PROFILE_BY_ID`, and parameterized `profile_as_dict()`. The exported JSON-compatible object includes concrete ordered agents, role assignments, protocol steps (agent/action/input/round/stage), per-round visibility pairs, decision rule, Table 4 formulas, runtime formulas, expected calls/depth and anonymity.
 
 ## Table 4 and iterative execution distinction
 
@@ -51,7 +51,7 @@ Negative mutations cover prompt-view roster, role assignment, visibility, decisi
 
 ## Acceptance evidence
 
-GitHub Actions run [44423563050](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423563050) on exact commit `a28f8a26a1a8739bcae9018d3c9370da11092bef`: **448 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
+GitHub Actions run [44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209) on exact commit `47508bfab9954e999faae7311bb0cee7b3f2a592`: **448 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
 
 ## Evidence boundary
 
