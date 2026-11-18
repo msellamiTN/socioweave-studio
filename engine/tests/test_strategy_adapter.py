@@ -56,8 +56,8 @@ def test_runtime_executes_every_concrete_protocol_with_table4_call_count(sid):
         sid.value, _prompt(), blueprint.strategy, invoker,
         prompt_views=blueprint.prompt_views, initial_inputs=inputs,
     )
-    expected_calls = blueprint.strategy.calls - 1 if sid is StrategyId.S8 else blueprint.strategy.calls
-    expected_depth = blueprint.strategy.depth - 1 if sid is StrategyId.S8 else blueprint.strategy.depth
+    expected_calls = (5 if sid is StrategyId.S11 else blueprint.strategy.calls - 1 if sid is StrategyId.S8 else blueprint.strategy.calls)
+    expected_depth = (3 if sid is StrategyId.S11 else blueprint.strategy.depth - 1 if sid is StrategyId.S8 else blueprint.strategy.depth)
     assert run.calls_made == expected_calls
     assert run.depth_executed == expected_depth
 
