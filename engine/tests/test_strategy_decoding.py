@@ -745,3 +745,69 @@ def test_s8_requires_single_round_and_exact_configured_author_editor_roster():
         decoder(StrategyId.S8, run_s8(
             *outputs.outputs, expected_agent_ids=("author", "reviewer-1"),
         ))
+
+
+def _s13_complete_trace():
+    raw = fixture()[3]
+    return (
+        ProtocolOutput(0, "agent-A", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(1, "agent-B", 1, 2, "critique", json.dumps({
+            "objections": [{"kind": "missing_subproblem", "subject": "s1",
+                            "rationale": "The initial plan omits a required component."}]
+        }), True, False),
+        ProtocolOutput(2, "agent-B", 1, 3, "revise", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(3, "agent-A", 1, 4, "critique", json.dumps({
+            "objections": [{"kind": "hidden_dependency", "subject": "s1",
+                            "rationale": "The repaired plan does not justify the prerequisite."}]
+        }), True, False),
+    )
+
+
+def run_s13(*outputs, expected_agent_ids=("agent-A", "agent-B")):
+    return StrategyRun("S13", tuple(outputs), len(outputs), 4, (), expected_agent_ids)
+
+
+def test_s13_role_reversal_returns_b_repaired_candidate_after_a_final_critique():
+    prompt, extraction, _, _ = fixture()
+    result = ProtocolDecisionDecoder(prompt, extraction)(
+        StrategyId.S13, run_s13(*_s13_complete_trace()),
+    )
+    assert result.decision.rule == "authority"
+    assert result.decision.selected_candidate_id == "agent-B"
+
+
+@pytest.mark.parametrize("mutation", ["missing", "reordered", "wrong_stage", "wrong_round"])
+def test_s13_rejects_incomplete_or_malformed_role_reversal_trace(mutation):
+    prompt, extraction, _, _ = fixture()
+    outputs = list(_s13_complete_trace())
+    if mutation == "missing":
+        outputs.pop(2)
+    elif mutation == "reordered":
+        outputs[1], outputs[2] = outputs[2], outputs[1]
+    elif mutation == "wrong_stage":
+        item = outputs[2]
+        outputs[2] = ProtocolOutput(item.step_index, item.agent_id, item.round, 2,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    else:
+        item = outputs[3]
+        outputs[3] = ProtocolOutput(item.step_index, item.agent_id, 2, item.stage,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    with pytest.raises(StrategyDecisionError):
+        ProtocolDecisionDecoder(prompt, extraction)(
+            StrategyId.S13, run_s13(*outputs),
+        )
+
+
+def test_s13_requires_typed_objections_in_both_roles_and_exact_roster():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    outputs = list(_s13_complete_trace())
+    outputs[1] = ProtocolOutput(
+        1, "agent-B", 1, 2, "critique", json.dumps({"objections": []}), True, False,
+    )
+    with pytest.raises(StrategyDecisionError, match="agent-B must provide typed objections"):
+        decoder(StrategyId.S13, run_s13(*outputs))
+    with pytest.raises(StrategyDecisionError, match="configured roster"):
+        decoder(StrategyId.S13, run_s13(
+            *_s13_complete_trace(), expected_agent_ids=("agent-A", "agent-B", "agent-C"),
+        ))

@@ -527,29 +527,47 @@ class ProtocolDecisionDecoder:
                 next(item.decomposition for item in selected if item.identifier == candidate_id),
                 "consensus", candidate_id, f"Moderator: {moderator.rationale}",
             )
-        elif strategy_id in {StrategyId.S11, StrategyId.S13}:
+        elif strategy_id is StrategyId.S11:
             if adjudication is None or not adjudication.rationale.strip():
                 raise StrategyDecisionError(
-                    f"{strategy_id.value} requires explicit external decision adjudication; "
-                    "the protocol outputs do not contain a negotiated/final selection"
+                    "S11 requires explicit external decision adjudication for the negotiated compromise"
                 )
-            if strategy_id is StrategyId.S11:
-                selected = _required_candidates(pool, ("party-1", "party-2"))
-                if adjudication.negotiated_decomposition is None:
-                    raise StrategyDecisionError("S11 adjudication must supply negotiated_decomposition")
-                decision = compromise(
-                    selected, adjudication.negotiated_decomposition,
-                    mediator_id="mediator", rationale=adjudication.rationale,
+            selected = _required_candidates(pool, ("party-1", "party-2"))
+            if adjudication.negotiated_decomposition is None:
+                raise StrategyDecisionError("S11 adjudication must supply negotiated_decomposition")
+            decision = compromise(
+                selected, adjudication.negotiated_decomposition,
+                mediator_id="mediator", rationale=adjudication.rationale,
+            )
+        elif strategy_id is StrategyId.S13:
+            trace = tuple((agent, message.action) for agent, message in messages)
+            expected_trace = (
+                ("agent-A", "draft"),
+                ("agent-B", "critique"),
+                ("agent-B", "revise"),
+                ("agent-A", "critique"),
+            )
+            if trace != expected_trace:
+                raise StrategyDecisionError(
+                    "S13 requires the ordered role-reversal trace A draft, B critique, "
+                    "B revision, A critique"
                 )
-            else:
-                selected = tuple(pool.values())
-                if adjudication.selected_candidate_id is None:
-                    raise StrategyDecisionError("S13 adjudication must select a candidate explicitly")
-                decision = authority(
-                    selected, judge_id="agent-A",
-                    selected_candidate_id=adjudication.selected_candidate_id,
-                    rationale=adjudication.rationale,
-                )
+            if tuple(output.stage for output in run.outputs) != (1, 2, 3, 4):
+                raise StrategyDecisionError("S13 requires four sequential stages")
+            if any(output.round != 1 for output in run.outputs):
+                raise StrategyDecisionError("S13 role reversal is a single-round procedure")
+            if run.expected_agent_ids is not None and set(run.expected_agent_ids) != {"agent-A", "agent-B"}:
+                raise StrategyDecisionError("S13 configured roster must contain exactly agent-A and agent-B")
+            first_critique, final_critique = messages[1][1], messages[3][1]
+            if not first_critique.objections:
+                raise StrategyDecisionError("S13 agent-B must provide typed objections before repairing D1")
+            if not final_critique.objections:
+                raise StrategyDecisionError("S13 agent-A must critique the repaired D2")
+            repaired = _required_candidates(pool, ("agent-B",))[0]
+            decision = DecisionResult(
+                repaired.decomposition, "authority", "agent-B",
+                "Role reversal returns agent-B's repaired D2 after agent-A's final critique.",
+            )
         else:
             raise StrategyDecisionError(f"No decision assembly for {strategy_id.value}")
 
