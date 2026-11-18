@@ -185,11 +185,35 @@ class ProtocolDecisionDecoder:
                                  selected_candidate_id=judge.selected_candidate_id,
                                  rationale=judge.rationale)
         elif strategy_id is StrategyId.S8:
-            selected = _required_candidates(pool, ("author",))
-            judge = _judge_message(messages, "editor")
-            decision = authority(selected, judge_id="editor",
-                                 selected_candidate_id=judge.selected_candidate_id,
-                                 rationale=judge.rationale)
+            author_drafts = [
+                message.candidate for agent, message in messages
+                if agent == "author" and message.action == "draft" and message.candidate is not None
+            ]
+            author_revisions = [
+                message.candidate for agent, message in messages
+                if agent == "author" and message.action == "revise" and message.candidate is not None
+            ]
+            editor_messages = [
+                message for agent, message in messages
+                if agent == "editor" and message.action == "judge"
+            ]
+            if len(author_drafts) != 1 or len(editor_messages) != 1:
+                raise StrategyDecisionError("S8 requires exactly one original author draft and editor verdict")
+            editor = editor_messages[0]
+            if editor.peer_review_verdict is None:
+                raise StrategyDecisionError("S8 editor verdict must be typed accept/revise")
+            if editor.peer_review_verdict.value == "accept":
+                if author_revisions:
+                    raise StrategyDecisionError("S8 ACCEPT branch must not contain an author revision")
+                chosen = Candidate("author", author_drafts[0].decomposition)
+                rationale = f"Editor ACCEPT: {editor.rationale}"
+            else:
+                if len(author_revisions) != 1:
+                    raise StrategyDecisionError("S8 REVISE verdict requires exactly one author D1 revision")
+                chosen = Candidate("author", author_revisions[0].decomposition)
+                rationale = f"Editor REVISE: {editor.rationale}"
+            decision = authority((chosen,), judge_id="editor",
+                                selected_candidate_id="author", rationale=rationale)
         elif strategy_id is StrategyId.S10:
             participant_ids = tuple(sorted(x for x in pool if x.startswith("participant-")))
             selected = _required_candidates(pool, participant_ids)
