@@ -8,8 +8,6 @@ is implementation-conformance evidence, not a proof of strategy correctness.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Iterable
-
 from sociodec.catalogue import STRATEGIES, StrategyId, get_strategy
 from sociodec.models.strategy import Action, DecisionRule, Role, SocialStrategy
 from sociodec.strategy_protocols import StrategyBlueprint, build_strategy_blueprint
@@ -341,12 +339,22 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
         raise ValueError("n, k and T must be >= 1")
     sid = blueprint.strategy_id
     profile = PROFILE_BY_ID[sid]
+    definition = get_strategy(sid)
     strategy = blueprint.strategy
     findings: list[ConformanceFinding] = []
 
     def check(name: str, ok: bool, message: str) -> None:
         if not ok:
             findings.append(ConformanceFinding(name, message))
+
+    check("catalogue-name", profile.name == definition.name,
+          "semantic profile name differs from canonical strategy catalogue")
+    check("catalogue-decision-rule", profile.decision_rule.value == definition.decision_rule,
+          "semantic profile decision rule differs from canonical strategy catalogue")
+    check("catalogue-table4-calls", profile.table4_calls_formula == definition.call_formula,
+          "semantic profile Table 4 call formula differs from canonical strategy catalogue")
+    check("catalogue-table4-depth", profile.table4_depth_formula == definition.depth_formula,
+          "semantic profile Table 4 depth formula differs from canonical strategy catalogue")
 
     expected_agents = _expected_agent_ids(sid, n, k)
     actual_agents = tuple(agent.identifier for agent in strategy.agents)
@@ -389,6 +397,10 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
 
     # Input references are checked as executable references, not just strings.
     for index, step in enumerate(strategy.protocol):
+        if step.input_ref not in {"prompt", "all_previous_outputs"} and not step.input_ref.startswith("step:"):
+            findings.append(ConformanceFinding(
+                "input-reference", f"step {index} uses unsupported input reference {step.input_ref!r}"
+            ))
         if step.input_ref.startswith("step:"):
             try:
                 target_index = int(step.input_ref.split(":", 1)[1])
