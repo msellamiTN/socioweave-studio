@@ -29,3 +29,12 @@ These are implementation-boundary tests of runtime behavior, not a proof that th
 
 Audit the actual S3/S4 strategy constructors/factories and all prompt construction paths; capture serialized prompts for each phase; inspect traces and provider logging controls; test cross-round identity-linkability; and decide whether pseudonymization must be scoped/rotated or whether stronger privacy mechanisms are required. No live model experiment is authorized by this audit alone.
 
+
+## Sequential chain cost evidence (n=2, k=2, T=2)
+
+The provider-backed composition regression currently measures actual provider invocations for both chains. The catalogue formulas imply the following unseeded budget and seeded actual call counts:
+
+- C8 = S2 → S8: theoretical `S2= n+1 = 3`, `S8=k+3=5`, total 8. The second phase's single seeded author draft reduces actual provider calls by one; observed expected total is 7.
+- C2 = S12 → S5: theoretical `S12=n+1=3`, `S5=4`, total 7. The second phase's one seeded draft reduces actual provider calls by one; observed expected total is 6.
+
+The existing provider-backed tests assert these actual totals and verify that the second phase has one seeded agent. They do not yet assert every phase's full step-by-step theoretical-versus-actual ledger. That granular per-phase accounting is the next audit item.
