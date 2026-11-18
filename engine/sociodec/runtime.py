@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 from sociodec.extraction import Hypothesis
 from sociodec.models.prompt import Prompt
@@ -137,6 +137,12 @@ def run_strategy(
     hypotheses: tuple[Hypothesis, ...] = (),
     seeds: Mapping[str, str] | None = None,
     precomputed_outputs: Mapping[str, str] | None = None,
+    delphi_epsilon: float | None = None,
+    delphi_candidate_distance: Callable[[str, str], float] | None = None,
+    consensus_epsilon: float | None = None,
+    consensus_candidate_distance: Callable[[str, str], float] | None = None,
+    mediation_epsilon: float | None = None,
+    mediation_candidate_distance: Callable[[str, str], float] | None = None,
 ) -> StrategyRun:
     """Execute protocol steps with stage snapshots and per-agent visibility.
 
@@ -148,6 +154,27 @@ def run_strategy(
     """
     if not strategy_id.strip():
         raise ValueError("strategy_id must not be empty")
+    if strategy_id == "S4":
+        if delphi_epsilon is not None and not 0.0 <= delphi_epsilon <= 1.0:
+            raise ValueError("delphi_epsilon must be in [0, 1]")
+        if delphi_epsilon is not None and delphi_candidate_distance is None:
+            raise ValueError("delphi_candidate_distance is required when delphi_epsilon is set")
+    elif delphi_epsilon is not None or delphi_candidate_distance is not None:
+        raise ValueError("Delphi stopping options are valid only for S4")
+    if strategy_id == "S10":
+        if consensus_epsilon is not None and not 0.0 <= consensus_epsilon <= 1.0:
+            raise ValueError("consensus_epsilon must be in [0, 1]")
+        if consensus_epsilon is not None and consensus_candidate_distance is None:
+            raise ValueError("consensus_candidate_distance is required when consensus_epsilon is set")
+    elif consensus_epsilon is not None or consensus_candidate_distance is not None:
+        raise ValueError("Consensus stopping options are valid only for S10")
+    if strategy_id == "S11":
+        if mediation_epsilon is not None and not 0.0 <= mediation_epsilon <= 1.0:
+            raise ValueError("mediation_epsilon must be in [0, 1]")
+        if mediation_epsilon is not None and mediation_candidate_distance is None:
+            raise ValueError("mediation_candidate_distance is required when mediation_epsilon is set")
+    elif mediation_epsilon is not None or mediation_candidate_distance is not None:
+        raise ValueError("Mediation stopping options are valid only for S11")
     inputs = dict(initial_inputs or {})
     views = dict(prompt_views or {})
     seed_map = dict(seeds or {})
@@ -167,12 +194,30 @@ def run_strategy(
     seeded_agents: set[str] = set()
     calls_made = 0
     stages = sorted({step.stage for step in strategy.protocol})
+    consensus_stopped_after: int | None = None
+    mediation_stopped_after: int | None = None
+
+    def canonical_candidate(record: ProtocolOutput) -> str:
+        try:
+            payload = json.loads(record.text)
+        except (TypeError, json.JSONDecodeError):
+            return record.text.strip()
+        if isinstance(payload, dict):
+            payload = payload.get("candidate", payload)
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
     for stage in stages:
         stage_snapshot = tuple(outputs)
         stage_outputs: list[ProtocolOutput] = []
         for index, step in enumerate(strategy.protocol):
             if step.stage != stage:
+                continue
+            # S10 stops participant turns after a completed stable round, but
+            # retains the single final moderator closure step in the blueprint.
+            if (strategy_id == "S10" and consensus_stopped_after is not None
+                    and step.action.value != "judge" and step.round > consensus_stopped_after):
+                continue
+            if strategy_id == "S11" and mediation_stopped_after is not None and step.round > mediation_stopped_after:
                 continue
             if strategy_id == "S8" and step.action.value == "revise":
                 if not _s8_revision_required(outputs):
@@ -268,6 +313,113 @@ def run_strategy(
             )
             stage_outputs.append(record)
         outputs.extend(stage_outputs)
+
+        # Consensus stopping is evaluated only after the final sequential
+        # participant turn in a complete round. Compare the shared state left
+        # by the last participant with the preceding round's final state.
+        if strategy_id == "S10" and stage_outputs:
+            executed_round = stage_outputs[-1].round
+            round_steps = [step for step in strategy.protocol
+                           if step.round == executed_round and step.action.value != "judge"]
+            if stage == max(step.stage for step in round_steps) and executed_round > 1:
+                participants = tuple(agent.identifier for agent in strategy.agents
+                                     if agent.identifier.startswith("participant-"))
+                prior_round = [item for item in outputs
+                               if item.round == executed_round - 1 and item.agent_id in participants]
+                current_round = [item for item in outputs
+                                 if item.round == executed_round and item.agent_id in participants]
+                if len(prior_round) != len(participants) or len(current_round) != len(participants):
+                    raise ValueError(
+                        "S10 convergence requires one completed shared-draft turn per participant "
+                        f"in adjacent rounds (participants={participants}, "
+                        f"prior={[item.agent_id for item in prior_round]}, "
+                        f"current={[item.agent_id for item in current_round]}, "
+                        f"round={executed_round}, stage={stage})"
+                    )
+                previous = canonical_candidate(max(prior_round, key=lambda item: item.step_index))
+                current = canonical_candidate(max(current_round, key=lambda item: item.step_index))
+                unchanged = previous == current
+                within_epsilon = False
+                if consensus_epsilon is not None:
+                    distance = consensus_candidate_distance(previous, current)
+                    if not isinstance(distance, (int, float)) or not 0.0 <= distance <= 1.0:
+                        raise ValueError("Consensus candidate distance must return a value in [0, 1]")
+                    within_epsilon = distance <= consensus_epsilon
+                if unchanged or within_epsilon:
+                    consensus_stopped_after = executed_round
+
+        # Mediation compares the two parties' revised drafts at the end of
+        # each complete round. The mediator facilitates; it never selects a
+        # winner or manufactures the negotiated joint decomposition.
+        if strategy_id == "S11" and stage_outputs:
+            round_number = next(step.round for step in strategy.protocol if step.stage == stage)
+            round_stages = [step.stage for step in strategy.protocol if step.round == round_number]
+            if stage == max(round_stages):
+                revisions = {
+                    agent_id: [item for item in outputs
+                               if item.round == round_number and item.agent_id == agent_id
+                               and item.action == "revise"]
+                    for agent_id in ("party-1", "party-2")
+                }
+                if any(len(items) != 1 for items in revisions.values()):
+                    raise ValueError("S11 convergence requires exactly one revision from each party per completed round")
+                left = canonical_candidate(revisions["party-1"][0])
+                right = canonical_candidate(revisions["party-2"][0])
+                agreed = left == right
+                within_epsilon = False
+                if mediation_epsilon is not None:
+                    distance = mediation_candidate_distance(left, right)
+                    if not isinstance(distance, (int, float)) or not 0.0 <= distance <= 1.0:
+                        raise ValueError("Mediation candidate distance must return a value in [0, 1]")
+                    within_epsilon = distance <= mediation_epsilon
+                if agreed or within_epsilon:
+                    mediation_stopped_after = round_number
+
+        # Delphi stopping is evaluated only after the facilitator has completed
+        # the round. Each expert is compared with their own previous draft.
+        if strategy_id == "S4":
+            round_number = next(step.round for step in strategy.protocol if step.stage == stage)
+            round_stages = [step.stage for step in strategy.protocol if step.round == round_number]
+            if stage == max(round_stages) and round_number > 1:
+                def candidate_payload(record: ProtocolOutput) -> str:
+                    try:
+                        payload = json.loads(record.text)
+                    except json.JSONDecodeError:
+                        # The orchestration layer also supports non-JSON invokers.
+                        # Exact textual stability remains observable; epsilon-based
+                        # structural distance requires the caller-supplied evaluator.
+                        return record.text.strip()
+                    if not isinstance(payload, dict):
+                        return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+                    candidate = payload.get("candidate", payload)
+                    return json.dumps(candidate, sort_keys=True, separators=(",", ":"))
+
+                experts = tuple(agent.identifier for agent in strategy.agents
+                                if agent.identifier.startswith("expert-"))
+                previous = {}
+                current = {}
+                for expert in experts:
+                    history = [item for item in outputs if item.agent_id == expert
+                               and item.action in {"draft", "revise"}
+                               and item.round in {round_number - 1, round_number}]
+                    prior = [item for item in history if item.round == round_number - 1]
+                    latest = [item for item in history if item.round == round_number]
+                    if len(prior) != 1 or len(latest) != 1:
+                        raise ValueError(f"S4 convergence requires one draft per expert in rounds {round_number - 1} and {round_number}")
+                    previous[expert] = candidate_payload(prior[0])
+                    current[expert] = candidate_payload(latest[0])
+
+                unchanged = all(previous[expert] == current[expert] for expert in experts)
+                within_epsilon = False
+                if delphi_epsilon is not None:
+                    distances = [delphi_candidate_distance(previous[expert], current[expert])
+                                 for expert in experts]
+                    if any(not isinstance(value, (int, float)) or not 0.0 <= value <= 1.0
+                           for value in distances):
+                        raise ValueError("Delphi candidate distance must return values in [0, 1]")
+                    within_epsilon = max(distances) <= delphi_epsilon
+                if unchanged or within_epsilon:
+                    break
 
     return StrategyRun(
         strategy_id=strategy_id,
