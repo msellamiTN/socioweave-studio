@@ -131,10 +131,13 @@ def test_sequential_composition_discards_external_seeds_before_first_phase():
     class Adapter:
         def __init__(self):
             self.calls = []
+            self.decompositions = []
         def __call__(self, item, prompt, extraction, drafts, seed, allowance):
             from sociodec.models.decomposition import Decomposition
+            decomposition = Decomposition((), (), ())
             self.calls.append((item, drafts, seed))
-            return StrategyOutcome(Decomposition((), (), ()), 1, strategy_run_id=item.value)
+            self.decompositions.append(decomposition)
+            return StrategyOutcome(decomposition, 1, strategy_run_id=item.value)
 
     adapter = Adapter()
     executor = SequentialCompositionExecutor(adapter)
@@ -147,4 +150,4 @@ def test_sequential_composition_discards_external_seeds_before_first_phase():
     assert adapter.calls[0] == (PlanItem.S2, (), None)
     assert adapter.calls[1][0] is PlanItem.S8
     assert adapter.calls[1][1] == external_drafts
-    assert adapter.calls[1][2] == adapter.calls[0][0] or adapter.calls[1][2] is not None
+    assert adapter.calls[1][2] is adapter.decompositions[0]
