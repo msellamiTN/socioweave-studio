@@ -496,11 +496,11 @@ def test_s11_stops_after_party_revisions_agree_and_preserves_parallel_stages():
     run = run_strategy("S11", prompt(), blueprint.strategy, invoker,
                        prompt_views=blueprint.prompt_views)
     assert {item.round for item in run.outputs} == {1, 2}
-    assert run.calls_made == 10
-    assert run.depth_executed == 6
+    assert run.calls_made == 8
+    assert run.depth_executed == 5
     assert [(item.stage, item.round) for item in run.outputs] == [
         (1, 1), (1, 1), (2, 1), (3, 1), (3, 1),
-        (4, 2), (4, 2), (5, 2), (6, 2), (6, 2),
+        (4, 2), (5, 2), (5, 2),
     ]
 
 
@@ -529,8 +529,8 @@ def test_s11_runs_through_T_when_party_revisions_remain_different():
                        mediation_epsilon=0.01,
                        mediation_candidate_distance=lambda left, right: 0.5)
     assert {item.round for item in run.outputs} == {1, 2, 3}
-    assert run.calls_made == 15
-    assert run.depth_executed == 9
+    assert run.calls_made == 11
+    assert run.depth_executed == 7
 
 
 def test_s11_requires_explicit_distance_when_epsilon_is_configured():
