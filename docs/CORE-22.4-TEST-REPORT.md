@@ -1,14 +1,14 @@
 # Core 22.4 — Test and Conformance Report
 
-**Result:** PASS — deterministic software conformance tests on exact commit `a28f8a26a1a8739bcae9018d3c9370da11092bef`.  
-**GitHub Actions:** [Run 44423563050](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423563050).  
-**Result:** 448 passed in 0.92s; 0 failed; 0 skipped.
+**Result:** PASS — deterministic software conformance tests on exact commit `47508bfab9954e999faae7311bb0cee7b3f2a592`.  
+**GitHub Actions:** [Run 44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209).  
+**Result:** 448 passed in 0.69s; 0 failed; 0 skipped.
 
 ## Coverage delivered
 
 | Acceptance area | Evidence / test IDs | Result |
 |---|---|---|
-| Thirteen established strategy profiles | `PROFILES`, `PROFILE_BY_ID`, `profile_as_dict`; `test_profile_oracle_covers_only_thirteen_established_strategies` | PASS |
+| Thirteen established strategy profiles | `PROFILES`, `PROFILE_BY_ID`, `profile_as_dict`; `test_profile_oracle_covers_only_thirteen_established_strategies`; `test_profile_export_is_machine_readable_and_keeps_paper_and_runtime_costs_distinct` | PASS |
 | Candidate strategies kept separate | C1–C5 excluded from established profiles and factory | PASS |
 | Independent catalogue-to-blueprint oracle | `test_all_thirteen_profiles_conform_to_blueprints_at_boundary_configurations` | PASS |
 | Agent roster and prompt views | `test_conformance_detects_prompt_view_roster_leak_or_omission` | PASS |
