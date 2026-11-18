@@ -1,4 +1,4 @@
-from sociodec.algorithm3_c1 import Algorithm3C1Executor, C1Callbacks
+from sociodec.algorithm3_c1 import (Algorithm3C1Executor, C1Callbacks, AnonymousObjection, AnonymousObjections)
 
 
 def _executor(*, n=3, T=1, distances=None, judge_verdicts=("accept",)):
@@ -13,12 +13,12 @@ def _executor(*, n=3, T=1, distances=None, judge_verdicts=("accept",)):
     def judge(candidate, candidates):
         calls["judge"] += 1
         verdict = next(verdicts)
-        return verdict, {"issue": "repair this"} if verdict == "reject" else None
+        return verdict, AnonymousObjections((AnonymousObjection("gap", "repair this"),)) if verdict == "reject" else None
 
     callbacks = C1Callbacks(
         draft=lambda agent: (calls["draft"].append(agent) or f"draft-{agent}"),
         compare=lambda candidates: (calls.__setitem__("compare", calls["compare"] + 1)
-                                    or {"gap": "missing dependency"}),
+                                    or AnonymousObjections((AnonymousObjection("gap", "missing dependency"),))),
         revise=lambda agent, own, objections: (
             calls["revise"].append((agent, own, objections)) or f"revised-{agent}"
         ),
@@ -99,7 +99,7 @@ def test_judge_family_must_be_distinct_from_authors_and_synthesizer():
     import pytest
     models = {"a1": ("m1", "family-a"), "a2": ("m2", "family-b")}
     callbacks = C1Callbacks(
-        draft=lambda agent: agent, compare=lambda candidates: {"x": 1},
+        draft=lambda agent: agent, compare=lambda candidates: AnonymousObjections((AnonymousObjection("gap", "missing"),)),
         revise=lambda agent, own, objections: own,
         merge=lambda candidates: candidates, judge=lambda candidate, candidates: ("accept", None),
         judge_revise=lambda candidate, objections: candidate,
@@ -121,3 +121,39 @@ def test_budget_overrun_fails_closed():
     executor, _ = _executor(n=3, T=1)
     with pytest.raises(RuntimeError, match="available call budget"):
         executor.run(available_calls=8)
+
+
+def test_objection_contract_rejects_author_attribution():
+    import pytest
+    bad = AnonymousObjections((AnonymousObjection("gap", "a1 authored this objection"),))
+    with pytest.raises(ValueError, match="author attribution"):
+        bad.validate_no_author_ids(("a1",))
+
+
+def test_executor_rejects_untyped_comparator_objections():
+    import pytest
+    executor, _ = _executor()
+    executor.callbacks = C1Callbacks(
+        draft=lambda agent: f"draft-{agent}",
+        compare=lambda candidates: {"gap": "not typed"},
+        revise=lambda agent, own, objections: own,
+        merge=lambda candidates: candidates,
+        judge=lambda candidate, candidates: ("accept", None),
+        judge_revise=lambda candidate, objections: candidate,
+        check_and_repair=lambda candidate: (candidate, ()),
+        distance=lambda left, right: 1.0,
+    )
+    with pytest.raises(TypeError, match="AnonymousObjections"):
+        executor.run()
+
+
+def test_each_revision_receives_only_own_candidate_and_anonymous_objections():
+    executor, calls = _executor(n=2, T=1)
+    result = executor.run()
+    assert result.revisions == 1
+    assert len(calls["revise"]) == 2
+    for agent, own, objections in calls["revise"]:
+        assert own == f"draft-{agent}"
+        assert isinstance(objections, AnonymousObjections)
+        assert all(agent.casefold() not in (item.statement + item.evidence).casefold()
+                   for item in objections.items)
