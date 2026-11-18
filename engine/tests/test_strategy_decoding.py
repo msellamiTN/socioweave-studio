@@ -742,7 +742,7 @@ def test_s8_requires_single_round_and_exact_configured_author_editor_roster():
                        x.stage, x.action, x.text, x.model_invoked, x.from_seed)
         for x in outputs.outputs
     )
-    with pytest.raises(StrategyDecisionError, match="single-round"):
+    with pytest.raises(StrategyDecisionError, match="S11 round 1 requires"):
         decoder(StrategyId.S8, StrategyRun("S8", wrong_round, 3, 3, (), None))
     with pytest.raises(StrategyDecisionError, match="configured roster"):
         decoder(StrategyId.S8, run_s8(
