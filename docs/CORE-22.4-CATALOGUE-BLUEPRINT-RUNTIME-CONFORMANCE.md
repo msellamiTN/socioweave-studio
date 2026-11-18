@@ -1,6 +1,6 @@
 # Core 22.4 — Catalogue–Blueprint–Runtime Semantic Conformance
 
-**Status:** PASS — deterministic software conformance on commit `92040644f7ffbbd7bf7774408864eeea724773d6`. This is not scientific validation or an empirical strategy comparison.
+**Status:** PASS — deterministic software conformance on commit `39d16c623e23b9e8d7ee77cdcf27c87024bfbe23`. This is not scientific validation or an empirical strategy comparison.
 
 ## Source contract
 
@@ -30,13 +30,15 @@ The oracle uses independent expected signatures; it does not call the strategy f
 ## Runtime semantics and accounting
 
 `StrategyRun` now exposes:
+- `scheduled_steps` / `scheduled_depth`: total protocol steps and stages in the blueprint;
 - `protocol_steps`: outputs actually produced;
 - `model_invocations`: provider calls actually made;
 - `seeded_steps`: outputs adopted from caller-supplied seeds;
 - `precomputed_steps`: non-model outputs supplied by the caller;
+- `skipped_steps` / `skipped_stages`: conditional or early-stop work not executed;
 - `accounting_reconciles`: verifies that the three output classes partition all produced steps and that `calls_made == model_invocations`.
 
-The runtime's existing stage-snapshot behavior is regression-tested: peer outputs from the same stage are not visible to one another; step references must exist before the current stage and be permitted by visibility. Sequential composition tests protect the first-phase independence and second-phase seed placement contract. The first phase receives an empty draft tuple and no chain seed; only the designated second-phase author receives the preceding decomposition.
+The accounting identity is `scheduled_steps = protocol_steps + skipped_steps`; executed protocol outputs are partitioned into provider, seeded and precomputed steps. The analogous depth identity is `scheduled_depth = depth_executed + skipped_stages`. The runtime's existing stage-snapshot behavior is regression-tested: peer outputs from the same stage are not visible to one another; step references must exist before the current stage and be permitted by visibility. Sequential composition tests protect the first-phase independence and second-phase seed placement contract. The first phase receives an empty draft tuple and no chain seed; only the designated second-phase author receives the preceding decomposition.
 
 ## Conformance test matrix
 
@@ -49,7 +51,7 @@ Negative mutations cover prompt-view roster, role assignment, visibility, decisi
 
 ## Acceptance evidence
 
-GitHub Actions run [44423184541](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423184541) on exact commit `92040644f7ffbbd7bf7774408864eeea724773d6`: **447 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
+GitHub Actions run [44423378674](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423378674) on exact commit `39d16c623e23b9e8d7ee77cdcf27c87024bfbe23`: **447 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
 
 ## Evidence boundary
 
