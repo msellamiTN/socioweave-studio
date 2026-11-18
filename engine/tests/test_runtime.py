@@ -564,5 +564,7 @@ def test_runtime_accounting_partitions_model_seeded_and_precomputed_steps():
     assert result.model_invocations == 2
     assert result.seeded_steps == 1
     assert result.precomputed_steps == 1
+    assert result.skipped_steps == 0
+    assert result.skipped_stages == 0
     assert result.calls_made == 2
     assert result.accounting_reconciles
