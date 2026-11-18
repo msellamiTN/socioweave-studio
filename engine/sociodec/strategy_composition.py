@@ -143,7 +143,7 @@ class SequentialCompositionExecutor:
         # Reusing pre-existing drafts here silently seeds its generation phase,
         # undercounting provider calls and changing the protocol semantics.
         first = self.adapter(
-            first_item, prompt, extraction, (), chain_seed,
+            first_item, prompt, extraction, (), None,
             first_allowance,
         )
         if first.calls_made > first_allowance:
