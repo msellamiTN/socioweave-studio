@@ -308,6 +308,8 @@ def test_real_s3_s4_blueprints_preserve_anonymity_and_peer_visibility_in_provide
             assert actor in {"member-1", "member-2"}
             other = "member-2" if actor == "member-1" else "member-1"
             assert other not in p["agent_context"]
+            serialized_without_actor = json.dumps({k: v for k, v in p.items() if k != "agent_id"}, ensure_ascii=False)
+            assert other not in serialized_without_actor, f"peer identity leaked outside agent_id: {other}"
     else:
         # Delphi: first-round expert drafts remain independent. Facilitator
         # summaries and second-round revisions serialize anonymous author labels.
@@ -326,3 +328,5 @@ def test_real_s3_s4_blueprints_preserve_anonymity_and_peer_visibility_in_provide
             assert actor in {"expert-1", "expert-2", "facilitator"}
             peer_ids = {"expert-1", "expert-2"} - {actor}
             assert all(peer not in p["agent_context"] for peer in peer_ids)
+            serialized_without_actor = json.dumps({k: v for k, v in p.items() if k != "agent_id"}, ensure_ascii=False)
+            assert all(peer not in serialized_without_actor for peer in peer_ids), "peer identity leaked into a serialized non-agent_id field"
