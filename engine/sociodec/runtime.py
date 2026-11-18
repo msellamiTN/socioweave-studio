@@ -362,7 +362,7 @@ def run_strategy(
                     for agent_id in ("party-1", "party-2")
                 }
                 if any(len(items) != 1 for items in revisions.values()):
-                    raise ValueError("S11 convergence requires exactly one revision from each party per round")
+                    raise ValueError(f"S11 convergence requires exactly one revision from each party per round (round={round_number}, stage={stage}, revisions={{agent: [item.agent_id for item in items] for agent, items in revisions.items()}}, outputs={{[(item.round, item.stage, item.agent_id, item.action) for item in outputs]}})")
                 left = canonical_candidate(revisions["party-1"][0])
                 right = canonical_candidate(revisions["party-2"][0])
                 agreed = left == right
