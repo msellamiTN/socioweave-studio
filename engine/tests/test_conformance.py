@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from sociodec.catalogue import StrategyId
 from sociodec.conformance import (
-    PROFILE_BY_ID, PROFILES, build_and_validate_all, validate_blueprint,
+    PROFILE_BY_ID, PROFILES, build_and_validate_all, profile_as_dict, validate_blueprint,
 )
 from sociodec.models.strategy import (
     Action, DecisionRule, ProtocolStep, Role, SocialStrategy, VisibilityRound,
@@ -54,7 +54,7 @@ def test_conformance_detects_wrong_decision_rule():
 
 
 def test_conformance_detects_role_assignment_drift():
-    blueprint = _blueprint()
+    blueprint = _blueprint(StrategyId.S5)
     assignments = list(blueprint.strategy.assignments)
     assignments[0] = replace(assignments[0], role=Role.CRITIC)
     strategy = replace(blueprint.strategy, assignments=tuple(assignments))
@@ -96,3 +96,12 @@ def test_conformance_detects_model_call_accounting_drift():
 def test_candidate_strategy_is_not_a_paper_profile():
     with pytest.raises(ValueError):
         build_strategy_blueprint("C1")
+
+
+def test_profile_export_is_machine_readable_and_keeps_paper_and_runtime_costs_distinct():
+    profile = profile_as_dict(StrategyId.S11)
+    assert profile["strategy_id"] == "S11"
+    assert profile["decision_rule"] == "compromise"
+    assert profile["table4_calls_formula"] == "5"
+    assert profile["runtime_calls_formula"] == "2+3T"
+    assert "C1" not in profile.values()
