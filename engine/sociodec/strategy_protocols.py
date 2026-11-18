@@ -197,10 +197,19 @@ def build_strategy_blueprint(
         add_roles(ids, 1, {"decomposer-1": Role.DECOMPOSER, "decomposer-2": Role.DECOMPOSER, "synthesizer": Role.AGGREGATOR})
         p.extend((
             ProtocolStep("decomposer-1", Action.DRAFT, "prompt", 1, 1),
-            ProtocolStep("decomposer-2", Action.DRAFT, "step:0", 1, 2),
+            ProtocolStep("decomposer-2", Action.COUNTER_PLAN, "step:0", 1, 2),
             ProtocolStep("synthesizer", Action.MERGE, "all_previous_outputs", 1, 3),
         ))
-        visibility[1] = _pairs(ids, full=True)
+        # Directional visibility: the counter-plan author sees D1, but D1
+        # cannot see D2; the synthesizer sees both drafts.
+        visibility[1] = (
+            ("decomposer-1", "decomposer-1"),
+            ("decomposer-2", "decomposer-2"),
+            ("decomposer-2", "decomposer-1"),
+            ("synthesizer", "synthesizer"),
+            ("synthesizer", "decomposer-1"),
+            ("synthesizer", "decomposer-2"),
+        )
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S8:
