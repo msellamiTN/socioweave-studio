@@ -10,6 +10,7 @@ from sociodec.models.strategy import (
 )
 from sociodec.strategy_protocols import StrategyBlueprint, build_strategy_blueprint
 from sociodec.runtime import run_strategy
+from sociodec.models.prompt import Interpretation, Prompt
 
 
 @pytest.mark.parametrize(
@@ -34,6 +35,10 @@ def test_profile_oracle_covers_only_thirteen_established_strategies():
     assert not any(profile.strategy_id.value.startswith("C") for profile in PROFILES)
     assert PROFILE_BY_ID[StrategyId.S11].table4_calls_formula == "5"
     assert PROFILE_BY_ID[StrategyId.S11].runtime_calls_formula == "2+3T"
+
+
+def prompt():
+    return Prompt("Conformance test prompt", Interpretation("Conformance goal"))
 
 
 def _blueprint(sid=StrategyId.S3):
