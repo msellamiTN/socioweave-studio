@@ -154,11 +154,41 @@ class ConcreteStrategyAdapter:
             agent_contexts=self.agent_contexts, n=self.n, k=self.k, T=self.T,
         )
         agent_ids = tuple(agent.identifier for agent in preliminary.strategy.agents)
+        if sid in {StrategyId.S1, StrategyId.S12} and self.prompt_view_factory is None:
+            raise ValueError(
+                f"{sid.value} requires an explicit prompt_view_factory; "
+                "full-prompt fallback is forbidden for partitioned strategies"
+            )
         views = (
             self.prompt_view_factory(sid, prompt, extraction, agent_ids)
             if self.prompt_view_factory is not None else
             {agent_id: prompt.text for agent_id in agent_ids}
         )
+        if sid in {StrategyId.S1, StrategyId.S12}:
+            if set(views) != set(agent_ids):
+                missing = sorted(set(agent_ids) - set(views))
+                extra = sorted(set(views) - set(agent_ids))
+                raise ValueError(
+                    f"{sid.value} prompt views must cover exactly its agents; "
+                    f"missing={missing}, unknown={extra}"
+                )
+            if any(not isinstance(view, str) or not view.strip() for view in views.values()):
+                raise ValueError(f"{sid.value} prompt views must be non-empty strings")
+            integrator_id = "coordinator" if sid is StrategyId.S1 else "integrator"
+            if views[integrator_id] != prompt.text:
+                raise ValueError(
+                    f"{sid.value} {integrator_id} must receive the declared full prompt"
+                )
+            partition_agents = (
+                {f"specialist-{i}" for i in range(1, self.n + 1)}
+                if sid is StrategyId.S1 else
+                {f"expert-{i}" for i in range(1, self.n + 1)}
+            )
+            leaked = sorted(agent_id for agent_id in partition_agents if views[agent_id] == prompt.text)
+            if leaked:
+                raise ValueError(
+                    f"{sid.value} partition agents must not receive the full prompt: {leaked}"
+                )
         blueprint = build_strategy_blueprint(
             sid, model_ids=self.model_ids, prompt_views=views,
             agent_contexts=self.agent_contexts,
