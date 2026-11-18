@@ -153,7 +153,6 @@ class ProtocolDecisionDecoder:
             ))
             if not voter_ids:
                 raise StrategyDecisionError("S9 requires at least one configured voter")
-            selected = _required_candidates(pool, voter_ids)
             if expected_voters is not None:
                 observed_drafters = {
                     agent for agent, message in messages
@@ -171,6 +170,7 @@ class ProtocolDecisionDecoder:
                         "S9 candidate drafts do not match expected voter roster ("
                         + "; ".join(details) + ")"
                     )
+            selected = _required_candidates(pool, voter_ids)
             vote_messages = [
                 (agent, message) for agent, message in messages
                 if message.action == "vote"
