@@ -6,21 +6,21 @@
 
 ## Coverage delivered
 
-| Acceptance area | Evidence | Result |
+| Acceptance area | Evidence / test IDs | Result |
 |---|---|---|
-| Thirteen established strategy profiles | `PROFILES`, `PROFILE_BY_ID`, `profile_as_dict` | PASS |
+| Thirteen established strategy profiles | `PROFILES`, `PROFILE_BY_ID`, `profile_as_dict`; `test_profile_oracle_covers_only_thirteen_established_strategies` | PASS |
 | Candidate strategies kept separate | C1–C5 excluded from established profiles and factory | PASS |
-| Independent catalogue-to-blueprint oracle | Expected ordered signatures compared to generated blueprints | PASS |
-| Agent roster and prompt views | Exact roster/cardinality and prompt-view coverage | PASS |
-| Roles and rounds | Exact agent/round role map and strategy round bounds | PASS |
-| Action/input/stage sequence | Ordered protocol signature including `input_ref` | PASS |
-| Visibility relations | Exact per-round observer/author relation | PASS |
-| Decision semantics and anonymity | Rule and anonymity compared to profile | PASS |
-| Call/depth formulas | Formula compared with generated protocol | PASS |
-| Step references | Prior-step existence, stage precedence and visibility | PASS |
-| Runtime accounting | Scheduled, executed, skipped, provider, seeded and precomputed steps reconcile; scheduled/executed depth reconciles | PASS |
-| Stage snapshot | Existing runtime regression confirms same-stage peer isolation | PASS |
-| Sequential composition | First phase receives no inherited drafts/seed; second phase receives first decomposition as chain seed | PASS |
+| Independent catalogue-to-blueprint oracle | `test_all_thirteen_profiles_conform_to_blueprints_at_boundary_configurations` | PASS |
+| Agent roster and prompt views | `test_conformance_detects_prompt_view_roster_leak_or_omission` | PASS |
+| Roles and rounds | `test_conformance_detects_role_assignment_drift`; `test_all_thirteen_profiles_conform_to_blueprints_at_boundary_configurations` | PASS |
+| Action/input/stage sequence | `test_conformance_detects_protocol_input_reference_mutation` | PASS |
+| Visibility relations | `test_conformance_detects_visibility_mutation`; `test_conformance_detects_step_reference_that_violates_visibility` | PASS |
+| Decision semantics and anonymity | `test_conformance_detects_wrong_decision_rule`; all-strategy oracle test | PASS |
+| Call/depth formulas | all-strategy oracle test; `test_conformance_detects_model_call_accounting_drift` | PASS |
+| Step references | `test_conformance_detects_protocol_input_reference_mutation`; `test_conformance_detects_step_reference_that_violates_visibility` | PASS |
+| Runtime accounting | `test_runtime_accounting_partitions_model_seeded_and_precomputed_steps`; `test_runtime_execution_reconciles_with_blueprint_and_actual_output_accounting` | PASS |
+| Stage snapshot | `test_runtime_enforces_first_round_visibility_and_stage_snapshot`; `test_runtime_rejects_same_stage_peer_output_reference` | PASS |
+| Sequential composition | `test_sequential_composition_discards_external_seeds_before_first_phase`; `test_sequential_composition_seeds_second_phase_and_accumulates_calls_and_evidence` | PASS |
 | Negative mutation tests | Roster, roles, visibility, decision, references and call-count mutations | PASS |
 
 ## Parameter configurations
