@@ -64,6 +64,31 @@ class StrategyRun:
     def output_refs(self) -> dict[str, str]:
         return {f"step:{item.step_index}": item.text for item in self.outputs}
 
+    @property
+    def protocol_steps(self) -> int:
+        """Number of protocol outputs actually produced, including skipped calls."""
+        return len(self.outputs)
+
+    @property
+    def model_invocations(self) -> int:
+        return sum(item.model_invoked for item in self.outputs)
+
+    @property
+    def seeded_steps(self) -> int:
+        return sum(item.from_seed for item in self.outputs)
+
+    @property
+    def precomputed_steps(self) -> int:
+        return sum(not item.model_invoked and not item.from_seed for item in self.outputs)
+
+    @property
+    def accounting_reconciles(self) -> bool:
+        return (
+            self.protocol_steps
+            == self.model_invocations + self.seeded_steps + self.precomputed_steps
+            and self.calls_made == self.model_invocations
+        )
+
 
 class ProtocolInvoker(Protocol):
     def invoke(
