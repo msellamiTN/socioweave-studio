@@ -131,13 +131,63 @@ class ProtocolDecisionDecoder:
             participant_ids = tuple(sorted(x for x in pool if x.startswith("participant-")))
             decision = union(_required_candidates(pool, participant_ids))
         elif strategy_id is StrategyId.S3:
-            member_ids = tuple(sorted(x for x in pool if x.startswith("member-")))
+            expected_members = (
+                {agent_id for agent_id in run.expected_agent_ids
+                 if agent_id.startswith("member-")}
+                if run.expected_agent_ids is not None else None
+            )
+            member_ids = tuple(sorted(
+                expected_members if expected_members is not None
+                else (agent_id for agent_id in pool if agent_id.startswith("member-"))
+            ))
+            if not member_ids:
+                raise StrategyDecisionError("S3 requires at least one configured member")
+
+            draft_messages = [
+                (agent, message) for agent, message in messages
+                if message.action == "draft" and message.candidate is not None
+            ]
+            draft_ids = [agent for agent, _ in draft_messages]
+            if len(draft_ids) != len(set(draft_ids)):
+                raise StrategyDecisionError("S3 requires exactly one candidate draft per member; duplicate draft")
+            observed_drafters = set(draft_ids)
+            if observed_drafters != set(member_ids):
+                missing = sorted(set(member_ids) - observed_drafters)
+                unexpected = sorted(observed_drafters - set(member_ids))
+                details = []
+                if missing:
+                    details.append("missing drafts: " + ", ".join(missing))
+                if unexpected:
+                    details.append("unexpected drafts: " + ", ".join(unexpected))
+                raise StrategyDecisionError(
+                    "S3 candidate drafts do not match expected member roster ("
+                    + "; ".join(details) + ")"
+                )
+
             selected = _required_candidates(pool, member_ids)
-            rankings = {
-                agent: message.ranking for agent, message in messages
-                if agent in member_ids and message.action == "rank"
-            }
-            decision = rank_sum(selected, rankings)
+            ranking_messages = [
+                (agent, message) for agent, message in messages
+                if message.action == "rank"
+            ]
+            ranking_ids = [agent for agent, _ in ranking_messages]
+            if any(agent not in member_ids for agent in ranking_ids):
+                unexpected = sorted(set(ranking_ids) - set(member_ids))
+                raise StrategyDecisionError(
+                    "S3 received rankings from non-member(s): " + ", ".join(unexpected)
+                )
+            if len(ranking_ids) != len(set(ranking_ids)):
+                raise StrategyDecisionError("S3 requires exactly one ranking per member; duplicate ranking")
+            missing_rankings = sorted(set(member_ids) - set(ranking_ids))
+            if missing_rankings:
+                raise StrategyDecisionError(
+                    "S3 requires exactly one ranking per member; missing: "
+                    + ", ".join(missing_rankings)
+                )
+            rankings = {agent: message.ranking for agent, message in ranking_messages}
+            try:
+                decision = rank_sum(selected, rankings)
+            except ValueError as exc:
+                raise StrategyDecisionError(f"S3 invalid ranking evidence: {exc}") from exc
         elif strategy_id is StrategyId.S4:
             experts = tuple(sorted(x for x in pool if x.startswith("expert-")))
             decision = consensus_medoid(_required_candidates(pool, experts))
