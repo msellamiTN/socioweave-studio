@@ -205,6 +205,19 @@ def distinct_candidate_out(index, agent, action, question, output_text):
     return out(index, agent, action, {"candidate": raw})
 
 
+def run_s8(*outputs, expected_agent_ids=None):
+    stage_by_action = {"draft": 1, "critique": 2, "judge": 3, "revise": 4}
+    staged = tuple(
+        ProtocolOutput(item.step_index, item.agent_id, 1,
+                       stage_by_action[item.action], item.action,
+                       item.text, item.model_invoked, item.from_seed)
+        for item in outputs
+    )
+    return StrategyRun("S8", staged, len(staged),
+                       max(item.stage for item in staged), (),
+                       expected_agent_ids)
+
+
 @pytest.mark.parametrize("verdict,expected_question,expected_output,revise_present", [
     ("accept", "Original D0 question", "D0 output", False),
     ("revise", "Revised D1 question", "D1 output", True),
@@ -220,7 +233,7 @@ def test_s8_typed_verdict_assembles_original_d0_or_revised_d1(
     ]
     if revise_present:
         outputs.append(distinct_candidate_out(3, "author", "revise", "Revised D1 question", "D1 output"))
-    result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+    result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run_s8(*outputs))
     assert result.decision.rule == "authority"
     assert result.decision.selected_candidate_id == "author"
     assert result.decision.decomposition.subproblems[0].question == expected_question
@@ -235,7 +248,7 @@ def test_s8_typed_verdict_assembles_original_d0_or_revised_d1(
 def test_s8_rejects_inconsistent_branch_evidence(verdict, outputs, match):
     prompt, extraction, _, _ = fixture()
     with pytest.raises(StrategyDecisionError, match=match):
-        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run_s8(*outputs))
 
 
 def test_s8_rejects_duplicate_reviewer_critiques():
@@ -247,7 +260,7 @@ def test_s8_rejects_duplicate_reviewer_critiques():
         out(3, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
     )
     with pytest.raises(StrategyDecisionError, match="exactly one critique per reviewer"):
-        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run_s8(*outputs))
 
 
 def test_s8_rejects_critique_from_unregistered_role_name():
@@ -258,7 +271,7 @@ def test_s8_rejects_critique_from_unregistered_role_name():
         out(2, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
     )
     with pytest.raises(StrategyDecisionError, match="named reviewer critique"):
-        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run_s8(*outputs))
 
 
 def test_s8_revise_requires_exactly_one_author_revision():
@@ -271,7 +284,7 @@ def test_s8_revise_requires_exactly_one_author_revision():
         candidate_out(4, "author", "revise"),
     )
     with pytest.raises(StrategyDecisionError, match="exactly one author D1 revision"):
-        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run_s8(*outputs))
 
 @pytest.mark.parametrize("reviewer_count", [1, 3, 5])
 def test_s8_requires_complete_configured_reviewer_roster(reviewer_count):
@@ -283,15 +296,11 @@ def test_s8_requires_complete_configured_reviewer_roster(reviewer_count):
     complete.append(out(reviewer_count + 1, "editor", "judge",
                         {"verdict": "accept", "rationale": "Reviewed"}))
     decoder = ProtocolDecisionDecoder(prompt, extraction)
-    assert decoder(StrategyId.S8, StrategyRun(
-        "S8", tuple(complete), len(complete), 3, (), expected,
-    )).decision.rule == "authority"
+    assert decoder(StrategyId.S8, run_s8(*complete, expected_agent_ids=expected)).decision.rule == "authority"
     for missing_id in (f"reviewer-{i}" for i in range(1, reviewer_count + 1)):
         incomplete = tuple(item for item in complete if item.agent_id != missing_id)
         with pytest.raises(StrategyDecisionError, match="do not match expected roster"):
-            decoder(StrategyId.S8, StrategyRun(
-                "S8", incomplete, len(incomplete), 3, (), expected,
-            ))
+            decoder(StrategyId.S8, run_s8(*incomplete, expected_agent_ids=expected))
 
 
 def test_s8_rejects_unexpected_reviewer_when_roster_is_known():
@@ -302,9 +311,8 @@ def test_s8_rejects_unexpected_reviewer_when_roster_is_known():
         out(2, "reviewer-2", "critique", {"objections": []}),
         out(3, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
     )
-    known_roster = StrategyRun(
-        "S8", outputs, len(outputs), 3, (),
-        ("author", "reviewer-1", "editor"),
+    known_roster = run_s8(
+        *outputs, expected_agent_ids=("author", "reviewer-1", "editor"),
     )
     with pytest.raises(StrategyDecisionError, match="unexpected: reviewer-2"):
         ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, known_roster)
@@ -318,7 +326,7 @@ def test_s8_legacy_run_without_roster_retains_minimum_reviewer_validation():
         out(2, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
     )
     assert ProtocolDecisionDecoder(prompt, extraction)(
-        StrategyId.S8, run(*outputs),
+        StrategyId.S8, run_s8(*outputs),
     ).decision.rule == "authority"
 
 
@@ -673,3 +681,67 @@ def test_s7_judge_must_select_one_of_the_two_submitted_cases():
     )
     with pytest.raises(StrategyDecisionError, match="may select only a supplied candidate"):
         ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S7, run_s7(*outputs))
+
+
+
+def test_s8_requires_parallel_review_stage_and_editor_after_all_reviews():
+    prompt, extraction, _, _ = fixture()
+    outputs = (
+        candidate_out(0, "author"),
+        out(1, "reviewer-1", "critique", {"objections": []}),
+        out(2, "reviewer-2", "critique", {"objections": []}),
+        out(3, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    valid = run_s8(*outputs)
+    assert decoder(StrategyId.S8, valid).decision.rule == "authority"
+
+    serial_reviews = list(valid.outputs)
+    serial_reviews[2] = ProtocolOutput(
+        2, "reviewer-2", 1, 3, "critique",
+        serial_reviews[2].text, True, False,
+    )
+    invalid = StrategyRun("S8", tuple(serial_reviews), 4, 3, (), None)
+    with pytest.raises(StrategyDecisionError, match="stages 1/2/3/4"):
+        decoder(StrategyId.S8, invalid)
+
+
+def test_s8_rejects_editor_before_reviewers_and_revision_outside_stage_four():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    draft = candidate_out(0, "author")
+    review = out(1, "reviewer-1", "critique", {"objections": []})
+    editor = out(2, "editor", "judge", {"verdict": "revise", "rationale": "Revise"})
+    revision = candidate_out(3, "author", "revise")
+
+    reordered = run_s8(draft, editor, review, revision)
+    with pytest.raises(StrategyDecisionError, match="author draft, parallel reviewer critiques"):
+        decoder(StrategyId.S8, reordered)
+
+    valid = run_s8(draft, review, editor, revision)
+    changed = list(valid.outputs)
+    changed[-1] = ProtocolOutput(3, "author", 1, 3, "revise",
+                                 changed[-1].text, True, False)
+    with pytest.raises(StrategyDecisionError, match="stages 1/2/3/4"):
+        decoder(StrategyId.S8, StrategyRun("S8", tuple(changed), 4, 3, (), None))
+
+
+def test_s8_requires_single_round_and_exact_configured_author_editor_roster():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    outputs = run_s8(
+        candidate_out(0, "author"),
+        out(1, "reviewer-1", "critique", {"objections": []}),
+        out(2, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
+    )
+    wrong_round = tuple(
+        ProtocolOutput(x.step_index, x.agent_id, 2 if x.agent_id == "reviewer-1" else 1,
+                       x.stage, x.action, x.text, x.model_invoked, x.from_seed)
+        for x in outputs.outputs
+    )
+    with pytest.raises(StrategyDecisionError, match="single-round"):
+        decoder(StrategyId.S8, StrategyRun("S8", wrong_round, 3, 3, (), None))
+    with pytest.raises(StrategyDecisionError, match="configured roster"):
+        decoder(StrategyId.S8, run_s8(
+            *outputs.outputs, expected_agent_ids=("author", "reviewer-1"),
+        ))
