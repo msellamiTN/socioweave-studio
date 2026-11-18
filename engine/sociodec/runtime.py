@@ -314,36 +314,39 @@ def run_strategy(
             stage_outputs.append(record)
         outputs.extend(stage_outputs)
 
-        # Consensus stopping is evaluated after the final participant's turn,
-        # i.e. only after the complete sequential shared-draft round.
-        if strategy_id == "S10":
+        # Consensus stopping is evaluated only after the final sequential
+        # participant turn in a complete round. Compare the shared state left
+        # by the last participant with the preceding round's final state.
+        if strategy_id == "S10" and stage_outputs:
+            executed_round = stage_outputs[-1].round
             round_steps = [step for step in strategy.protocol
-                           if step.round == next(item.round for item in strategy.protocol if item.stage == stage)
-                           and step.action.value != "judge"]
-            if round_steps and stage == max(step.stage for step in round_steps):
-                round_number = round_steps[0].round
-                if round_number > 1:
-                    participants = tuple(agent.identifier for agent in strategy.agents
-                                         if agent.identifier.startswith("participant-"))
-                    prior_round = [item for item in outputs
-                                   if item.round == round_number - 1 and item.agent_id in participants]
-                    current_round = [item for item in outputs
-                                     if item.round == round_number and item.agent_id in participants]
-                    if len(prior_round) != len(participants) or len(current_round) != len(participants):
-                        raise ValueError(f"S10 convergence requires one completed shared-draft turn per participant in adjacent rounds (participants={participants}, prior={[item.agent_id for item in prior_round]}, current={[item.agent_id for item in current_round]})")
-                    # The last participant's revision is the shared draft after
-                    # the full turn; compare that state across adjacent rounds.
-                    previous = canonical_candidate(max(prior_round, key=lambda item: item.step_index))
-                    current = canonical_candidate(max(current_round, key=lambda item: item.step_index))
-                    unchanged = previous == current
-                    within_epsilon = False
-                    if consensus_epsilon is not None:
-                        distance = consensus_candidate_distance(previous, current)
-                        if not isinstance(distance, (int, float)) or not 0.0 <= distance <= 1.0:
-                            raise ValueError("Consensus candidate distance must return a value in [0, 1]")
-                        within_epsilon = distance <= consensus_epsilon
-                    if unchanged or within_epsilon:
-                        consensus_stopped_after = round_number
+                           if step.round == executed_round and step.action.value != "judge"]
+            if stage == max(step.stage for step in round_steps) and executed_round > 1:
+                participants = tuple(agent.identifier for agent in strategy.agents
+                                     if agent.identifier.startswith("participant-"))
+                prior_round = [item for item in outputs
+                               if item.round == executed_round - 1 and item.agent_id in participants]
+                current_round = [item for item in outputs
+                                 if item.round == executed_round and item.agent_id in participants]
+                if len(prior_round) != len(participants) or len(current_round) != len(participants):
+                    raise ValueError(
+                        "S10 convergence requires one completed shared-draft turn per participant "
+                        f"in adjacent rounds (participants={participants}, "
+                        f"prior={[item.agent_id for item in prior_round]}, "
+                        f"current={[item.agent_id for item in current_round]}, "
+                        f"round={executed_round}, stage={stage})"
+                    )
+                previous = canonical_candidate(max(prior_round, key=lambda item: item.step_index))
+                current = canonical_candidate(max(current_round, key=lambda item: item.step_index))
+                unchanged = previous == current
+                within_epsilon = False
+                if consensus_epsilon is not None:
+                    distance = consensus_candidate_distance(previous, current)
+                    if not isinstance(distance, (int, float)) or not 0.0 <= distance <= 1.0:
+                        raise ValueError("Consensus candidate distance must return a value in [0, 1]")
+                    within_epsilon = distance <= consensus_epsilon
+                if unchanged or within_epsilon:
+                    consensus_stopped_after = executed_round
 
         # Mediation compares the two parties' revised drafts at the end of
         # each complete round. The mediator facilitates; it never selects a
