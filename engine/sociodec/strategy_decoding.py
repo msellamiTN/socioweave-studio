@@ -528,13 +528,44 @@ class ProtocolDecisionDecoder:
                 "consensus", candidate_id, f"Moderator: {moderator.rationale}",
             )
         elif strategy_id is StrategyId.S11:
-            if adjudication is None or not adjudication.rationale.strip():
+            # Two parties draft in parallel, a neutral mediator summarises
+            # agreements/disagreements, then both parties revise in parallel.
+            # The mediator does not select a winner: the agreed joint draft is
+            # supplied explicitly by the negotiation controller.
+            expected_trace = (
+                ("party-1", "draft"), ("party-2", "draft"),
+                ("mediator", "summarise"),
+                ("party-1", "revise"), ("party-2", "revise"),
+            )
+            observed_trace = tuple((output.agent_id, output.action) for output in run.outputs)
+            if observed_trace != expected_trace:
                 raise StrategyDecisionError(
-                    "S11 requires explicit external decision adjudication for the negotiated compromise"
+                    "S11 requires two parallel drafts, one mediator summary, and two parallel revisions"
                 )
+            if tuple(output.stage for output in run.outputs) != (1, 1, 2, 3, 3):
+                raise StrategyDecisionError("S11 requires parallel stages 1/3 around mediator stage 2")
+            if any(output.round != 1 for output in run.outputs):
+                raise StrategyDecisionError("S11 single-round trace must contain one negotiation round")
+            if run.expected_agent_ids is not None and set(run.expected_agent_ids) != {
+                "party-1", "party-2", "mediator"
+            }:
+                raise StrategyDecisionError(
+                    "S11 configured roster must contain exactly party-1, party-2, and mediator"
+                )
+            summary = messages[2][1]
+            if not summary.summary.strip():
+                raise StrategyDecisionError("S11 mediator must provide a non-empty summary")
+            if not summary.agreements and not summary.disagreements:
+                raise StrategyDecisionError(
+                    "S11 mediator summary must identify agreements or disagreements"
+                )
+            if adjudication is None or adjudication.negotiated_decomposition is None:
+                raise StrategyDecisionError(
+                    "S11 requires an explicit negotiated joint decomposition; the mediator cannot choose a party draft"
+                )
+            if not adjudication.rationale.strip():
+                raise StrategyDecisionError("S11 negotiated joint decomposition requires acceptance rationale")
             selected = _required_candidates(pool, ("party-1", "party-2"))
-            if adjudication.negotiated_decomposition is None:
-                raise StrategyDecisionError("S11 adjudication must supply negotiated_decomposition")
             decision = compromise(
                 selected, adjudication.negotiated_decomposition,
                 mediator_id="mediator", rationale=adjudication.rationale,

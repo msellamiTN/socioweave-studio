@@ -128,14 +128,16 @@ def test_s11_compromise_requires_explicit_negotiated_result():
         candidate_out(3, "party-1", "revise"),
         candidate_out(4, "party-2", "revise"),
     )
-    with pytest.raises(StrategyDecisionError, match="explicit external decision adjudication"):
-        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S11, run(*outputs))
+    configured = StrategyRun("S11", outputs, len(outputs), 3, (),
+                              ("party-1", "party-2", "mediator"))
+    with pytest.raises(StrategyDecisionError, match="explicit negotiated joint decomposition"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S11, configured)
     decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
         StrategyId.S11: DecisionAdjudication(
             negotiated_decomposition=d, rationale="Both parties accepted the negotiated plan",
         ),
     })
-    assert decoder(StrategyId.S11, run(*outputs)).decision.rule == "compromise"
+    assert decoder(StrategyId.S11, configured).decision.rule == "compromise"
 
 
 def test_s13_rejects_empty_critique_instead_of_inventing_a_separate_judge():
@@ -804,4 +806,59 @@ def test_s13_requires_typed_objections_in_both_roles_and_exact_roster():
     with pytest.raises(StrategyDecisionError, match="configured roster"):
         decoder(StrategyId.S13, run_s13(
             *_s13_complete_trace(), expected_agent_ids=("agent-A", "agent-B", "agent-C"),
+        ))
+
+
+
+def test_s11_rejects_invalid_stage_order_round_and_roster():
+    prompt, extraction, d, _ = fixture()
+    outputs = (
+        candidate_out(0, "party-1"), candidate_out(1, "party-2"),
+        out(2, "mediator", "summarise", {
+            "summary": "Both want reliable access but disagree on cost.",
+            "agreements": ["reliable access"], "disagreements": ["cost allocation"],
+        }),
+        candidate_out(3, "party-1", "revise"), candidate_out(4, "party-2", "revise"),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d, rationale="Parties accepted the joint draft",
+        ),
+    })
+    valid = StrategyRun("S11", outputs, 5, 3, (), ("party-1", "party-2", "mediator"))
+    assert decoder(StrategyId.S11, valid).decision.rule == "compromise"
+    wrong_stage = list(outputs)
+    item = wrong_stage[4]
+    wrong_stage[4] = ProtocolOutput(item.step_index, item.agent_id, item.round, 2,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    with pytest.raises(StrategyDecisionError, match="parallel stages"):
+        decoder(StrategyId.S11, StrategyRun("S11", tuple(wrong_stage), 5, 3, (),
+                                            ("party-1", "party-2", "mediator")))
+    wrong_round = list(outputs)
+    item = wrong_round[4]
+    wrong_round[4] = ProtocolOutput(item.step_index, item.agent_id, 2, item.stage,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    with pytest.raises(StrategyDecisionError, match="single-round"):
+        decoder(StrategyId.S11, StrategyRun("S11", tuple(wrong_round), 5, 3, (),
+                                            ("party-1", "party-2", "mediator")))
+    with pytest.raises(StrategyDecisionError, match="configured roster"):
+        decoder(StrategyId.S11, StrategyRun("S11", outputs, 5, 3, (),
+                                            ("party-1", "party-2")))
+
+
+def test_s11_requires_mediator_summary_to_state_agreements_or_disagreements():
+    prompt, extraction, d, _ = fixture()
+    outputs = (
+        candidate_out(0, "party-1"), candidate_out(1, "party-2"),
+        out(2, "mediator", "summarise", {"summary": "There are differences."}),
+        candidate_out(3, "party-1", "revise"), candidate_out(4, "party-2", "revise"),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d, rationale="Agreed joint plan",
+        ),
+    })
+    with pytest.raises(StrategyDecisionError, match="agreements or disagreements"):
+        decoder(StrategyId.S11, StrategyRun(
+            "S11", outputs, 5, 3, (), ("party-1", "party-2", "mediator"),
         ))
