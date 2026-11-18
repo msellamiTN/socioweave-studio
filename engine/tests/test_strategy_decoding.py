@@ -83,9 +83,8 @@ def run(*outputs):
             out(2, "judge", "judge", {"selected_candidate_id": "party-1", "rationale": "Stronger defence"}),
         ), "authority"),
         (StrategyId.S8, (
-            candidate_out(0, "author"), candidate_out(1, "editor", "judge")
-            if False else out(1, "editor", "judge", {"selected_candidate_id": "author", "rationale": "Reviews addressed"}),
-            candidate_out(2, "author", "revise"),
+            candidate_out(0, "author"),
+            out(1, "editor", "judge", {"verdict": "accept", "rationale": "Reviews addressed"}),
         ), "authority"),
         (StrategyId.S10, (
             candidate_out(0, "participant-1", "revise"),
