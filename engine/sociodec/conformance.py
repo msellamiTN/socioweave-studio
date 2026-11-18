@@ -376,6 +376,8 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
         (agent, r): _expected_role(sid, agent, r)
         for r in range(1, expected_rounds + 1) for agent in expected_agents
     }
+    check("role-set", set(strategy.roles) == set(profile.roles),
+          "declared role set differs from the paper strategy profile")
     check("role-assignment", _role_map(strategy) == expected_role_map,
           "role assignments differ from the paper strategy profile")
     check("decision-rule", strategy.decision_rule is profile.decision_rule,
