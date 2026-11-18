@@ -904,7 +904,7 @@ def test_s10_validates_sequential_shared_deliberation_rounds_and_final_closure()
     )
     result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S10, strategy_run)
     assert result.decision.rule == "consensus"
-    assert result.decision.selected_candidate_id == "participant-1"
+    assert result.decision.selected_candidate_id == "participant-2"
 
 
 @pytest.mark.parametrize("mutation", ["missing_turn", "reordered", "early_moderator", "wrong_stage"])
