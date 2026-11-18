@@ -261,3 +261,68 @@ def test_provider_serialized_nominal_group_first_round_peer_drafts_are_hidden():
     assert all(payload["visible_history"] == [] for payload in payloads[:2])
     assert all("a1:draft" not in payload["input_content"] for payload in payloads[:2])
     assert all("a2:draft" not in payload["input_content"] for payload in payloads[:2])
+
+
+@pytest.mark.parametrize("strategy_id,n,T,expected_calls", [("S3", 2, 2, 4), ("S4", 2, 2, 6)])
+def test_real_s3_s4_blueprints_preserve_anonymity_and_peer_visibility_in_provider_json(strategy_id, n, T, expected_calls):
+    import json
+    from sociodec.catalogue import StrategyId
+    from sociodec.providers.base import GenerationResult
+    from sociodec.providers.protocol_invoker import ProviderProtocolInvoker
+    from sociodec.strategy_protocols import build_strategy_blueprint
+
+    class CapturingProvider:
+        provider_name = "mock-provider"
+        model_name = "mock-model"
+        def __init__(self):
+            self.requests = []
+        def generate(self, messages, config=None):
+            self.requests.append(messages)
+            return GenerationResult("candidate decomposition text", self.provider_name, self.model_name)
+
+    provider = CapturingProvider()
+    # Blueprint agents use model_id="default-model"; the invoker resolves by model ID.
+    models = {"default-model": provider}
+    families = {"default-model": "same-test-family"}
+    invoker = ProviderProtocolInvoker(models, model_families=families)
+    blueprint = build_strategy_blueprint(StrategyId(strategy_id), n=n, T=T)
+    result = run_strategy(strategy_id, prompt(), blueprint.strategy, invoker, prompt_views=blueprint.prompt_views)
+    payloads = [json.loads(messages[1].content) for messages in provider.requests]
+    assert result.calls_made == expected_calls
+    assert len(payloads) == expected_calls
+
+    if strategy_id == "S3":
+        # NGT: member drafts are private in round 1; rankings see the pooled
+        # drafts, but the provider serialization masks their authors.
+        initial = payloads[:n]
+        rankings = payloads[n:]
+        assert all(p["visible_history"] == [] for p in initial)
+        assert all("anonymous" not in p["input_content"] for p in initial)
+        assert all("member-1" not in p["input_content"] and "member-2" not in p["input_content"] for p in initial)
+        assert all(p["visible_history"] for p in rankings)
+        assert all({v["author"] for v in p["visible_history"]} == {"anonymous"} for p in rankings)
+        assert all("anonymous" in p["input_content"] for p in rankings)
+        assert all("member-1" not in p["input_content"] and "member-2" not in p["input_content"] for p in rankings)
+        for p in payloads:
+            actor = p["agent_id"]
+            assert actor in {"member-1", "member-2"}
+            other = "member-2" if actor == "member-1" else "member-1"
+            assert other not in p["agent_context"]
+    else:
+        # Delphi: first-round expert drafts remain independent. Facilitator
+        # summaries and second-round revisions serialize anonymous author labels.
+        first_round = payloads[:n]
+        facilitator = payloads[n]
+        revisions = payloads[n + 1:n + 1 + n]
+        assert all(p["visible_history"] == [] for p in first_round)
+        assert all("anonymous" not in p["input_content"] for p in first_round)
+        assert facilitator["visible_history"]
+        assert {v["author"] for v in facilitator["visible_history"]} == {"anonymous"}
+        assert all(p["visible_history"] for p in revisions)
+        assert all({v["author"] for v in p["visible_history"]} == {"anonymous"} for p in revisions)
+        assert all("expert-1" not in p["input_content"] and "expert-2" not in p["input_content"] for p in payloads)
+        for p in payloads:
+            actor = p["agent_id"]
+            assert actor in {"expert-1", "expert-2", "facilitator"}
+            peer_ids = {"expert-1", "expert-2"} - {actor}
+            assert all(peer not in p["agent_context"] for peer in peer_ids)
