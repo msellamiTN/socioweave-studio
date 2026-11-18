@@ -262,7 +262,11 @@ def _expected_visibility(sid: StrategyId, agent_ids: tuple[str, ...], T: int):
     if sid is StrategyId.S1:
         for r in range(1, 4):
             pairs_by_round[r] = full if r == 3 else own
-    elif sid in {StrategyId.S2, StrategyId.S3, StrategyId.S9}:
+    elif sid is StrategyId.S2:
+        participants = tuple(a for a in agent_ids if a != "aggregator")
+        pairs_by_round[1] = own
+        pairs_by_round[2] = own + tuple(("aggregator", a) for a in participants)
+    elif sid in {StrategyId.S3, StrategyId.S9}:
         pairs_by_round[1] = own
         pairs_by_round[2] = full
     elif sid is StrategyId.S12:
