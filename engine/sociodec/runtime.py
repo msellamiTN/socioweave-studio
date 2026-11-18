@@ -7,6 +7,7 @@ selects a provider or changes the strategy's declared decision rule.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Mapping, Protocol
 
 from sociodec.extraction import Hypothesis
@@ -112,6 +113,18 @@ def _visible_history(
     )
 
 
+def _s8_revision_required(outputs: list[ProtocolOutput]) -> bool:
+    judges = [item for item in outputs if item.action == "judge"]
+    if not judges:
+        raise ValueError("S8 revision step requires a preceding editor verdict")
+    try:
+        payload = json.loads(judges[-1].text)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid S8 editor verdict JSON") from exc
+    if not isinstance(payload, dict) or payload.get("verdict") not in {"accept", "revise"}:
+        raise ValueError("Invalid S8 editor verdict; expected accept or revise")
+    return payload["verdict"] == "revise"
+
 def run_strategy(
     strategy_id: str,
     prompt: Prompt,
@@ -160,8 +173,10 @@ def run_strategy(
         for index, step in enumerate(strategy.protocol):
             if step.stage != stage:
                 continue
-            agent = known_agents[step.agent_id]
-            prompt_view = views.get(step.agent_id, prompt.text)
+            if strategy_id == "S8" and step.action.value == "revise":
+                if not _s8_revision_required(outputs):
+                    continue
+            agent = known_agents[step.agent_id]            prompt_view = views.get(step.agent_id, prompt.text)
             if step.input_ref == "prompt":
                 input_content = prompt_view
             elif step.input_ref == "all_previous_outputs":
@@ -256,6 +271,6 @@ def run_strategy(
         strategy_id=strategy_id,
         outputs=tuple(sorted(outputs, key=lambda item: item.step_index)),
         calls_made=calls_made,
-        depth_executed=len(stages),
+        depth_executed=len({item.stage for item in outputs}),
         seeded_agents=tuple(sorted(seeded_agents)),
     )
