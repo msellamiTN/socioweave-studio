@@ -571,14 +571,27 @@ class ProtocolDecisionDecoder:
             expected_stages = tuple(range(1, len(run.outputs) + 1))
             if tuple(output.stage for output in run.outputs) != expected_stages:
                 raise StrategyDecisionError("S10 all turns must occupy strictly sequential stages")
-            selected = _required_candidates(pool, participant_ids)
-            moderator = _judge_message(messages, "moderator")
-            candidate_id = moderator.selected_candidate_id
-            if candidate_id not in {item.identifier for item in selected}:
-                raise StrategyDecisionError("Moderator selected a candidate outside the deliberation pool")
+            final_message = next(
+                message for output, (_, message) in reversed(tuple(zip(run.outputs, messages)))
+                if output.agent_id.startswith("participant-") and message.candidate is not None
+            )
+            final_candidate_id = next(
+                output.agent_id for output in reversed(run.outputs)
+                if output.agent_id.startswith("participant-")
+            )
+            moderator = moderator_turns[0]
+            moderator_message = next(
+                message for output, (_, message) in zip(run.outputs, messages)
+                if output is moderator
+            )
+            if moderator_message.consensus_no_objection is not True:
+                raise StrategyDecisionError(
+                    "S10 moderator must explicitly report no_objection=true to close consensus"
+                )
             decision = DecisionResult(
-                next(item.decomposition for item in selected if item.identifier == candidate_id),
-                "consensus", candidate_id, f"Moderator: {moderator.rationale}",
+                final_message.candidate.decomposition,
+                "consensus", final_candidate_id,
+                f"Moderator closed the shared draft: {moderator_message.rationale}",
             )
         elif strategy_id is StrategyId.S11:
             # Two parties draft in parallel, a neutral mediator summarises

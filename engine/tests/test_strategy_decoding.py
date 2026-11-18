@@ -105,7 +105,7 @@ def _s7_complete_trace():
         (StrategyId.S10, (
             candidate_out(0, "participant-1", "revise"),
             candidate_out(1, "participant-2", "revise"),
-            out(2, "moderator", "judge", {"selected_candidate_id": "participant-1", "rationale": "No unresolved objection"}),
+            out(2, "moderator", "judge", {"no_objection": True, "rationale": "No unresolved objection"}),
         ), "consensus"),
     ],
 )
@@ -888,7 +888,7 @@ def _s10_round_trace(rounds=1, participants=("participant-1", "participant-2")):
             index += 1
     outputs.append(ProtocolOutput(
         index, "moderator", rounds, index + 1, "judge",
-        json.dumps({"selected_candidate_id": participants[0],
+        json.dumps({"no_objection": True,
                     "rationale": "No participant objects to the shared draft."}),
         True, False,
     ))
