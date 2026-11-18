@@ -1,3 +1,4 @@
+import json
 import pytest
 
 from sociodec.extraction import Hypothesis
@@ -78,7 +79,7 @@ def test_s8_conditional_revision_branch_counts_and_stable_step_indexes(verdict, 
     assert 3 not in run.output_refs if verdict == "accept" else 3 in [o.step_index for o in run.outputs]
     assert sum(1 for action, _ in invoker.calls if action == "revise") == (1 if verdict == "revise" else 0)
 
-@pytest.mark.parametrize("bad_json", ["{invalid", "{}", "{\\\"verdict\\\":\\\"maybe\\\"}"])
+@pytest.mark.parametrize("bad_json", ["{invalid", "{}", "not-json"])
 def test_s8_runtime_fails_closed_for_invalid_editor_verdict(bad_json):
     blueprint = build_strategy_blueprint("S8", k=1)
     class InvalidVerdictInvoker:
