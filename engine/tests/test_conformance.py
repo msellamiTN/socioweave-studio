@@ -105,11 +105,16 @@ def test_candidate_strategy_is_not_a_paper_profile():
 
 
 def test_profile_export_is_machine_readable_and_keeps_paper_and_runtime_costs_distinct():
-    profile = profile_as_dict(StrategyId.S11)
+    profile = profile_as_dict(StrategyId.S11, n=2, T=2)
     assert profile["strategy_id"] == "S11"
     assert profile["decision_rule"] == "compromise"
     assert profile["table4_calls_formula"] == "5"
     assert profile["runtime_calls_formula"] == "2+3T"
+    assert profile["agents"] == ["party-1", "party-2", "mediator"]
+    assert len(profile["protocol"]) == 8
+    assert profile["expected_model_calls"] == 8
+    assert profile["expected_depth"] == 5
+    assert profile["visibility_relation"]["1"]
     assert "C1" not in profile.values()
 
 
