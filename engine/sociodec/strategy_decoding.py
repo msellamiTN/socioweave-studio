@@ -189,8 +189,80 @@ class ProtocolDecisionDecoder:
             except ValueError as exc:
                 raise StrategyDecisionError(f"S3 invalid ranking evidence: {exc}") from exc
         elif strategy_id is StrategyId.S4:
-            experts = tuple(sorted(x for x in pool if x.startswith("expert-")))
-            decision = consensus_medoid(_required_candidates(pool, experts))
+            expected_experts = (
+                {agent_id for agent_id in run.expected_agent_ids
+                 if agent_id.startswith("expert-")}
+                if run.expected_agent_ids is not None else None
+            )
+            observed_experts = {
+                agent for agent, message in messages
+                if message.action in {"draft", "revise"} and message.candidate is not None
+                and agent.startswith("expert-")
+            }
+            experts_set = expected_experts if expected_experts is not None else observed_experts
+            experts = tuple(sorted(experts_set))
+            if not experts:
+                raise StrategyDecisionError("S4 requires at least one configured expert")
+
+            # Validate the complete Delphi trace round by round. Each round has
+            # one draft/revision from every expert and one anonymous facilitator
+            # summary; only the final round's drafts enter the medoid operator.
+            round_numbers = sorted({output.round for output in run.outputs})
+            if not round_numbers or round_numbers != list(range(1, max(round_numbers) + 1)):
+                raise StrategyDecisionError("S4 rounds must be contiguous from round 1")
+            final_round = max(round_numbers)
+            final_candidates: dict[str, Candidate] = {}
+            for round_number in round_numbers:
+                round_outputs = [
+                    (output, message)
+                    for output, (_, message) in zip(run.outputs, messages)
+                    if output.round == round_number
+                ]
+                expected_action = "draft" if round_number == 1 else "revise"
+                expert_messages = [
+                    (output, message) for output, message in round_outputs
+                    if output.agent_id.startswith("expert-")
+                    and output.action in {"draft", "revise"}
+                ]
+                observed_ids = [output.agent_id for output, _ in expert_messages]
+                if len(observed_ids) != len(set(observed_ids)):
+                    raise StrategyDecisionError(
+                        f"S4 round {round_number} contains duplicate expert drafts"
+                    )
+                if set(observed_ids) != set(experts):
+                    missing = sorted(set(experts) - set(observed_ids))
+                    unexpected = sorted(set(observed_ids) - set(experts))
+                    raise StrategyDecisionError(
+                        f"S4 round {round_number} expert roster mismatch; "
+                        f"missing={missing}, unexpected={unexpected}"
+                    )
+                wrong_actions = [
+                    output.agent_id for output, _ in expert_messages
+                    if output.action != expected_action
+                ]
+                if wrong_actions:
+                    raise StrategyDecisionError(
+                        f"S4 round {round_number} requires {expected_action} from every expert"
+                    )
+                facilitator_summaries = [
+                    message for output, message in round_outputs
+                    if output.agent_id == "facilitator" and output.action == "summarise"
+                ]
+                if len(facilitator_summaries) != 1:
+                    raise StrategyDecisionError(
+                        f"S4 round {round_number} requires exactly one facilitator summary"
+                    )
+                if round_number == final_round:
+                    final_candidates = {
+                        output.agent_id: message.candidate
+                        for output, message in expert_messages
+                        if message.candidate is not None
+                    }
+            if len(final_candidates) != len(experts):
+                raise StrategyDecisionError("S4 final round is missing an expert candidate")
+            decision = consensus_medoid(
+                tuple(final_candidates[expert] for expert in experts)
+            )
         elif strategy_id is StrategyId.S9:
             expected_voters = (
                 {agent_id for agent_id in run.expected_agent_ids

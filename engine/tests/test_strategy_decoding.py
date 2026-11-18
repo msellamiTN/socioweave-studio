@@ -61,9 +61,12 @@ def run(*outputs):
             out(3, "member-2", "rank", {"ranking": ["member-2", "member-1"]}),
         ), "rank-sum"),
         (StrategyId.S4, (
-            candidate_out(0, "expert-1"), candidate_out(1, "expert-2"),
-            out(2, "facilitator", "summarise", {"summary": "Shared summary"}),
-            candidate_out(3, "expert-1", "revise"), candidate_out(4, "expert-2", "revise"),
+            ProtocolOutput(0, "expert-1", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+            ProtocolOutput(1, "expert-2", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+            ProtocolOutput(2, "facilitator", 1, 2, "summarise", json.dumps({"summary": "Shared summary"}), True, False),
+            ProtocolOutput(3, "expert-1", 2, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+            ProtocolOutput(4, "expert-2", 2, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+            ProtocolOutput(5, "facilitator", 2, 4, "summarise", json.dumps({"summary": "No remaining divergence"}), True, False),
         ), "consensus-medoid"),
         (StrategyId.S9, (
             candidate_out(0, "voter-1"), candidate_out(1, "voter-2"),
@@ -458,3 +461,83 @@ def test_s3_legacy_run_without_roster_requires_observed_members_and_rankings():
     assert ProtocolDecisionDecoder(prompt, extraction)(
         StrategyId.S3, run(*outputs),
     ).decision.rule == "rank-sum"
+
+
+def _s4_outputs(rounds=2, *, omit=None, duplicate=None):
+    raw = fixture()[3]
+    outputs = []
+    index = 0
+    for round_number in range(1, rounds + 1):
+        action = "draft" if round_number == 1 else "revise"
+        stage = 2 * round_number - 1
+        for expert in ("expert-1", "expert-2"):
+            if omit == (round_number, expert):
+                continue
+            outputs.append(ProtocolOutput(
+                index, expert, round_number, stage, action,
+                json.dumps({"candidate": raw}), True, False,
+            ))
+            index += 1
+        if duplicate == (round_number, "expert-1"):
+            outputs.append(ProtocolOutput(
+                index, "expert-1", round_number, stage, action,
+                json.dumps({"candidate": raw}), True, False,
+            ))
+            index += 1
+        outputs.append(ProtocolOutput(
+            index, "facilitator", round_number, 2 * round_number,
+            "summarise", json.dumps({"summary": f"Round {round_number} summary"}),
+            True, False,
+        ))
+        index += 1
+    return tuple(outputs)
+
+
+def test_s4_requires_every_configured_expert_in_every_round():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    outputs = _s4_outputs(2, omit=(2, "expert-2"))
+    with pytest.raises(StrategyDecisionError, match="round 2 expert roster mismatch"):
+        decoder(StrategyId.S4, StrategyRun(
+            "S4", outputs, len(outputs), 4, (),
+            ("expert-1", "expert-2", "facilitator"),
+        ))
+
+
+def test_s4_requires_exactly_one_facilitator_summary_per_round():
+    prompt, extraction, _, _ = fixture()
+    outputs = tuple(x for x in _s4_outputs(2) if not (x.round == 1 and x.agent_id == "facilitator"))
+    with pytest.raises(StrategyDecisionError, match="round 1 requires exactly one facilitator summary"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S4, StrategyRun(
+            "S4", outputs, len(outputs), 4, (),
+            ("expert-1", "expert-2", "facilitator"),
+        ))
+
+
+def test_s4_rejects_duplicate_expert_drafts_within_a_round():
+    prompt, extraction, _, _ = fixture()
+    outputs = _s4_outputs(2, duplicate=(2, "expert-1"))
+    with pytest.raises(StrategyDecisionError, match="duplicate expert drafts"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S4, StrategyRun(
+            "S4", outputs, len(outputs), 4, (),
+            ("expert-1", "expert-2", "facilitator"),
+        ))
+
+
+def test_s4_requires_contiguous_rounds():
+    prompt, extraction, _, _ = fixture()
+    outputs = tuple(x for x in _s4_outputs(2) if x.round != 1)
+    with pytest.raises(StrategyDecisionError, match="contiguous from round 1"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S4, StrategyRun(
+            "S4", outputs, len(outputs), 2, (),
+            ("expert-1", "expert-2", "facilitator"),
+        ))
+
+
+def test_s4_legacy_run_validates_observed_expert_roster_per_round():
+    prompt, extraction, _, _ = fixture()
+    outputs = _s4_outputs(2)
+    result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S4, StrategyRun(
+        "S4", outputs, len(outputs), 4, (),
+    ))
+    assert result.decision.rule == "consensus-medoid"
