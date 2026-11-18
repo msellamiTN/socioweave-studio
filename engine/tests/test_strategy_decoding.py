@@ -370,3 +370,91 @@ def test_s9_rejects_missing_configured_voter_draft():
         ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S9, StrategyRun(
             "S9", outputs, len(outputs), 2, (), expected,
         ))
+
+
+@pytest.mark.parametrize("member_count", [1, 3, 5])
+def test_s3_requires_complete_configured_member_drafts_and_rankings(member_count):
+    prompt, extraction, _, _ = fixture()
+    expected = tuple(f"member-{i}" for i in range(1, member_count + 1))
+    outputs = [candidate_out(i, member) for i, member in enumerate(expected)]
+    outputs.extend(
+        out(member_count + i, member, "rank", {"ranking": list(expected)})
+        for i, member in enumerate(expected)
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = StrategyRun("S3", tuple(outputs), len(outputs), 2, (), expected)
+    assert decoder(StrategyId.S3, complete).decision.rule == "rank-sum"
+
+    for missing in expected:
+        incomplete = tuple(
+            item for item in outputs
+            if not (item.action == "rank" and item.agent_id == missing)
+        )
+        with pytest.raises(StrategyDecisionError, match="exactly one ranking per member; missing"):
+            decoder(StrategyId.S3, StrategyRun(
+                "S3", incomplete, len(incomplete), 2, (), expected,
+            ))
+
+
+def test_s3_rejects_unexpected_and_duplicate_rankings():
+    prompt, extraction, _, _ = fixture()
+    expected = ("member-1", "member-2")
+    base = (
+        candidate_out(0, "member-1"),
+        candidate_out(1, "member-2"),
+        out(2, "member-1", "rank", {"ranking": list(expected)}),
+        out(3, "member-2", "rank", {"ranking": list(expected)}),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    duplicate = (*base, out(4, "member-1", "rank", {"ranking": list(expected)}))
+    with pytest.raises(StrategyDecisionError, match="duplicate ranking"):
+        decoder(StrategyId.S3, StrategyRun(
+            "S3", duplicate, len(duplicate), 2, (), expected,
+        ))
+    unexpected = (*base, out(4, "observer", "rank", {"ranking": list(expected)}))
+    with pytest.raises(StrategyDecisionError, match="non-member"):
+        decoder(StrategyId.S3, StrategyRun(
+            "S3", unexpected, len(unexpected), 2, (), expected,
+        ))
+
+
+def test_s3_rejects_missing_configured_member_draft():
+    prompt, extraction, _, _ = fixture()
+    expected = ("member-1", "member-2")
+    outputs = (
+        candidate_out(0, "member-1"),
+        out(1, "member-1", "rank", {"ranking": list(expected)}),
+        out(2, "member-2", "rank", {"ranking": list(expected)}),
+    )
+    with pytest.raises(StrategyDecisionError, match="candidate drafts do not match"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S3, StrategyRun(
+            "S3", outputs, len(outputs), 2, (), expected,
+        ))
+
+
+def test_s3_rejects_incomplete_ranking_permutation():
+    prompt, extraction, _, _ = fixture()
+    expected = ("member-1", "member-2")
+    outputs = (
+        candidate_out(0, "member-1"),
+        candidate_out(1, "member-2"),
+        out(2, "member-1", "rank", {"ranking": ["member-1"]}),
+        out(3, "member-2", "rank", {"ranking": list(expected)}),
+    )
+    with pytest.raises(StrategyDecisionError, match="invalid ranking evidence"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S3, StrategyRun(
+            "S3", outputs, len(outputs), 2, (), expected,
+        ))
+
+
+def test_s3_legacy_run_without_roster_requires_observed_members_and_rankings():
+    prompt, extraction, _, _ = fixture()
+    outputs = (
+        candidate_out(0, "member-1"),
+        candidate_out(1, "member-2"),
+        out(2, "member-1", "rank", {"ranking": ["member-1", "member-2"]}),
+        out(3, "member-2", "rank", {"ranking": ["member-2", "member-1"]}),
+    )
+    assert ProtocolDecisionDecoder(prompt, extraction)(
+        StrategyId.S3, run(*outputs),
+    ).decision.rule == "rank-sum"
