@@ -109,7 +109,7 @@ def test_e2e_rejected_judge_then_accept_has_exactly_one_revision_and_second_verd
     assert result.verdict == "accept"
     assert result.judge_revisions == 1
     assert state["judge"] == 2 and state["judge_revise"] == 1
-    assert result.calls_made == 13  # 3 gen + 2*(exa+3 rev) + merge + 2 judge + 1 revise + check
+    assert result.calls_made == 15  # 3 gen + 2*(exa+3 rev) + merge + 2 judge + 1 revise
 
 
 def test_e2e_second_judge_rejection_is_preserved_as_failure():
