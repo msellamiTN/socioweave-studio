@@ -946,16 +946,19 @@ def test_s10_rejects_missing_moderator_or_wrong_configured_roster():
 
 
 def _s11_iterative_trace(rounds=2):
-    outputs = []
-    index = 0
+    outputs = [
+        ProtocolOutput(0, "party-1", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+    ]
+    index = 2
     for round_number in range(1, rounds + 1):
-        first_stage = (round_number - 1) * 3 + 1
+        summary_stage = 2 * round_number
         for agent_id, action, stage in (
-            ("party-1", "draft", first_stage),
-            ("party-2", "draft", first_stage),
-            ("mediator", "summarise", first_stage + 1),
-            ("party-1", "revise", first_stage + 2),
-            ("party-2", "revise", first_stage + 2),
+            ("mediator", "summarise", summary_stage),
+            ("party-1", "revise", summary_stage + 1),
+            ("party-2", "revise", summary_stage + 1),
         ):
             if action == "summarise":
                 payload = {
@@ -977,7 +980,7 @@ def test_s11_validates_multiple_complete_mediation_rounds():
     prompt, extraction, d, _ = fixture()
     outputs = _s11_iterative_trace(rounds=3)
     run_value = StrategyRun(
-        "S11", outputs, len(outputs), 9, (),
+        "S11", outputs, len(outputs), 7, (),
         ("party-1", "party-2", "mediator"),
     )
     decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
@@ -995,10 +998,10 @@ def test_s11_rejects_incomplete_iterative_rounds(mutation):
     prompt, extraction, d, _ = fixture()
     outputs = list(_s11_iterative_trace(rounds=2))
     if mutation == "missing_party_turn":
-        outputs.pop(8)
+        outputs.pop(7)
     elif mutation == "missing_summary_evidence":
-        item = outputs[7]
-        outputs[7] = ProtocolOutput(
+        item = outputs[5]
+        outputs[5] = ProtocolOutput(
             item.step_index, item.agent_id, item.round, item.stage, item.action,
             json.dumps({"summary": "No explicit agreement or disagreement"}),
             item.model_invoked, item.from_seed,
@@ -1012,7 +1015,7 @@ def test_s11_rejects_incomplete_iterative_rounds(mutation):
         outputs[6] = ProtocolOutput(item.step_index, item.agent_id, item.round, item.stage - 1,
                                     item.action, item.text, item.model_invoked, item.from_seed)
     run_value = StrategyRun(
-        "S11", tuple(outputs), len(outputs), 6, (),
+        "S11", tuple(outputs), len(outputs), 5, (),
         ("party-1", "party-2", "mediator"),
     )
     decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
