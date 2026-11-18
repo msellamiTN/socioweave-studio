@@ -123,3 +123,81 @@ def test_sequential_composition_rejects_conflicting_hypothesis_verdicts():
             PlanItem.COMBO_JIGSAW_THEN_CRITIC, _prompt(), _extraction(),
             (None, None), None, 8,
         )
+
+
+
+@pytest.mark.parametrize("item,expected_first,expected_second,expected_calls", [
+    (PlanItem.C8_BRAINSTORM_THEN_REVIEW, PlanItem.S2, PlanItem.S8, 7),
+    (PlanItem.COMBO_JIGSAW_THEN_CRITIC, PlanItem.S12, PlanItem.S5, 6),
+])
+def test_provider_backed_sequential_compositions_execute_through_real_adapter_runtime(
+    item, expected_first, expected_second, expected_calls,
+):
+    from sociodec.decisions import DecisionResult
+    from sociodec.models.decomposition import Decomposition, Subproblem
+    from sociodec.providers.base import GenerationResult
+    from sociodec.providers.protocol_invoker import ProviderProtocolInvoker
+    from sociodec.strategy_adapter import ConcreteStrategyAdapter, DecodedStrategyResult
+
+    class RecordingProvider:
+        provider_name = "recording-provider"
+        model_name = "model-v2"
+        def __init__(self):
+            self.calls = []
+        def generate(self, messages, config=None):
+            self.calls.append(messages)
+            return GenerationResult(
+                "opaque protocol response", self.provider_name, self.model_name,
+                10, 5, "stop", f"request-{len(self.calls)}",
+            )
+
+    decomposition = Decomposition(
+        (Subproblem("s1", "Build service", (), "Service", (), ()),), (), (),
+    )
+    provider = RecordingProvider()
+    invoker = ProviderProtocolInvoker(
+        {"default-model": provider},
+        model_families={"default-model": "family-a"},
+    )
+    decoder_runs = []
+
+    def decoder(sid, run):
+        decoder_runs.append((sid, run.seeded_agents))
+        rule = "union" if sid in {StrategyId.S2, StrategyId.S12} else "authority"
+        return DecodedStrategyResult(
+            DecisionResult(decomposition, rule, "selected", "test adjudication")
+        )
+
+    def prompt_views(sid, prompt, extraction, agent_ids):
+        if sid is not StrategyId.S12:
+            raise AssertionError("Prompt partition factory should only be called for S12")
+        return {
+            **{agent: f"explicit facet view for {agent}" for agent in agent_ids if agent != "integrator"},
+            "integrator": prompt.text,
+        }
+
+    adapter = ConcreteStrategyAdapter(
+        invoker, decoder, prompt_view_factory=prompt_views, n=2, k=2,
+    )
+    executor = SequentialCompositionExecutor(adapter)
+    available = 8 if item is PlanItem.C8_BRAINSTORM_THEN_REVIEW else 7
+    result = executor(
+        item, _prompt(), _extraction(),
+        (decomposition, decomposition), None, available,
+    )
+
+    assert result.calls_made == expected_calls
+    assert len(provider.calls) == expected_calls
+    assert len(invoker.traces) == expected_calls
+    assert [entry[0] for entry in decoder_runs] == [
+        StrategyId(expected_first.value), StrategyId(expected_second.value)
+    ]
+    assert decoder_runs[1][1] == ("author",)
+    assert result.strategy_run_id.startswith(item.value + ":")
+    assert all(trace.model_family == "family-a" for trace in invoker.traces)
+    if item is PlanItem.COMBO_JIGSAW_THEN_CRITIC:
+        expert_payloads = [
+            json.loads(messages[1].content)
+            for messages in provider.calls[:2]
+        ]
+        assert all(payload["prompt_view"].startswith("explicit facet view") for payload in expert_payloads)
