@@ -942,3 +942,83 @@ def test_s10_rejects_missing_moderator_or_wrong_configured_roster():
         decoder(StrategyId.S10, StrategyRun(
             "S10", outputs, len(outputs), 3, (), ("participant-1", "participant-2"),
         ))
+
+
+
+def _s11_iterative_trace(rounds=2):
+    outputs = []
+    index = 0
+    for round_number in range(1, rounds + 1):
+        first_stage = (round_number - 1) * 3 + 1
+        for agent_id, action, stage in (
+            ("party-1", "draft", first_stage),
+            ("party-2", "draft", first_stage),
+            ("mediator", "summarise", first_stage + 1),
+            ("party-1", "revise", first_stage + 2),
+            ("party-2", "revise", first_stage + 2),
+        ):
+            if action == "summarise":
+                payload = {
+                    "summary": f"Neutral mediation summary round {round_number}",
+                    "agreements": ["Shared objective"],
+                    "disagreements": ["Task order"],
+                }
+            else:
+                payload = {"candidate": fixture()[3]}
+            outputs.append(ProtocolOutput(
+                index, agent_id, round_number, stage, action,
+                json.dumps(payload), True, False,
+            ))
+            index += 1
+    return tuple(outputs)
+
+
+def test_s11_validates_multiple_complete_mediation_rounds():
+    prompt, extraction, d, _ = fixture()
+    outputs = _s11_iterative_trace(rounds=3)
+    run_value = StrategyRun(
+        "S11", outputs, len(outputs), 9, (),
+        ("party-1", "party-2", "mediator"),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d,
+            rationale="The parties accepted the explicit negotiated decomposition.",
+        ),
+    })
+    result = decoder(StrategyId.S11, run_value)
+    assert result.decision.rule == "compromise"
+
+
+@pytest.mark.parametrize("mutation", ["missing_party_turn", "missing_summary_evidence", "wrong_round", "wrong_stage"])
+def test_s11_rejects_incomplete_iterative_rounds(mutation):
+    prompt, extraction, d, _ = fixture()
+    outputs = list(_s11_iterative_trace(rounds=2))
+    if mutation == "missing_party_turn":
+        outputs.pop(8)
+    elif mutation == "missing_summary_evidence":
+        item = outputs[7]
+        outputs[7] = ProtocolOutput(
+            item.step_index, item.agent_id, item.round, item.stage, item.action,
+            json.dumps({"summary": "No explicit agreement or disagreement"}),
+            item.model_invoked, item.from_seed,
+        )
+    elif mutation == "wrong_round":
+        item = outputs[5]
+        outputs[5] = ProtocolOutput(item.step_index, item.agent_id, 3, item.stage,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    else:
+        item = outputs[6]
+        outputs[6] = ProtocolOutput(item.step_index, item.agent_id, item.round, item.stage - 1,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    run_value = StrategyRun(
+        "S11", tuple(outputs), len(outputs), 6, (),
+        ("party-1", "party-2", "mediator"),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d, rationale="Explicit negotiation result",
+        ),
+    })
+    with pytest.raises(StrategyDecisionError):
+        decoder(StrategyId.S11, run_value)
