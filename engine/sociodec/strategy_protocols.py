@@ -295,7 +295,7 @@ def build_strategy_blueprint(
     blueprint = _make(
         sid, tuple(ids), models, roles, tuple(p),
         DecisionRule(get_strategy(sid).decision_rule),
-        (3 if sid in {StrategyId.S1, StrategyId.S7} else T if sid in {StrategyId.S4, StrategyId.S10} else 4 if sid is StrategyId.S8 else 2 if sid in {StrategyId.S2, StrategyId.S3, StrategyId.S9, StrategyId.S12, StrategyId.S13} else 1),
+        (3 if sid in {StrategyId.S1, StrategyId.S7} else T if sid in {StrategyId.S4, StrategyId.S10, StrategyId.S11} else 4 if sid is StrategyId.S8 else 2 if sid in {StrategyId.S2, StrategyId.S3, StrategyId.S9, StrategyId.S12, StrategyId.S13} else 1),
         visibility, views, agent_contexts,
     )
     expected_calls = get_strategy(sid).calls(n=n, k=k, T=T)
