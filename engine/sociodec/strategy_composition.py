@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
-from sociodec.catalogue import StrategyId
+from sociodec.catalogue import StrategyId, get_strategy
 from sociodec.extraction import AggregatedExtraction
 from sociodec.models.prompt import Prompt
 from sociodec.orchestrator import StrategyOutcome
@@ -132,17 +132,25 @@ class SequentialCompositionExecutor:
                 "C1 requires the dedicated Algorithm 3 phase-composition executor"
             )
         first_item, second_item = self._CHAINS[item]
+        n = getattr(self.adapter, "n", 3)
+        k = getattr(self.adapter, "k", 3)
+        T = getattr(self.adapter, "T", 2)
+        first_allowance = get_strategy(StrategyId(first_item.value)).calls(n=n, k=k, T=T)
+        second_allowance = get_strategy(StrategyId(second_item.value)).calls(n=n, k=k, T=T)
+        if first_allowance + second_allowance > available_calls:
+            raise RuntimeError("Available call budget cannot cover both sequential phases")
         first = self.adapter(
             first_item, prompt, extraction, initial_drafts, chain_seed,
-            available_calls,
+            first_allowance,
         )
-        remaining = available_calls - first.calls_made
-        if remaining < 0:
-            raise RuntimeError("First chain phase exceeded the available call budget")
+        if first.calls_made > first_allowance:
+            raise RuntimeError("First chain phase exceeded its Table 4 call allowance")
         second = self.adapter(
             second_item, prompt, extraction, initial_drafts,
-            first.decomposition, remaining,
+            first.decomposition, second_allowance,
         )
+        if second.calls_made > second_allowance:
+            raise RuntimeError("Second chain phase exceeded its Table 4 call allowance")
         total = first.calls_made + second.calls_made
         if total > available_calls:
             raise RuntimeError("Sequential composition exceeded the available call budget")
