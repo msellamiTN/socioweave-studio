@@ -121,6 +121,21 @@ PROFILES: tuple[StrategySemanticProfile, ...] = tuple(
 PROFILE_BY_ID = {profile.strategy_id: profile for profile in PROFILES}
 
 
+def _formula_value(expression: str, n: int, k: int, T: int) -> int:
+    """Evaluate only the finite, reviewed formula vocabulary used by profiles."""
+    formulas = {
+        "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+        "n": n, "k": k, "T": T,
+        "n+1": n + 1, "n+2": n + 2, "k+2": k + 2, "k+3": k + 3,
+        "2n": 2 * n, "T(n+1)": T * (n + 1), "nT+1": n * T + 1,
+        "2+3T": 2 + 3 * T, "1+2T": 1 + 2 * T,
+    }
+    try:
+        return formulas[expression]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported strategy profile formula: {expression}") from exc
+
+
 def _expected_agent_ids(sid: StrategyId, n: int, k: int) -> tuple[str, ...]:
     if sid is StrategyId.S1:
         return ("coordinator", *(f"specialist-{i}" for i in range(1, n + 1)))
@@ -361,6 +376,8 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
           "semantic profile Table 4 depth formula differs from canonical strategy catalogue")
 
     expected_agents = _expected_agent_ids(sid, n, k)
+    check("agent-count-formula", len(expected_agents) == _formula_value(profile.agent_count_formula, n, k, T),
+          "profile agent-count formula does not match the expected roster")
     actual_agents = tuple(agent.identifier for agent in strategy.agents)
     check("agent-roster", actual_agents == expected_agents,
           f"expected ordered agents {expected_agents}, got {actual_agents}")
@@ -370,6 +387,8 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
           "every prompt view must be a non-empty string")
 
     expected_rounds = _expected_rounds(sid, T)
+    check("rounds-formula", expected_rounds == _formula_value(profile.rounds_formula, n, k, T),
+          "profile rounds formula does not match the expected protocol rounds")
     check("round-bound", strategy.rounds == expected_rounds,
           f"expected {expected_rounds} rounds, got {strategy.rounds}")
     expected_role_map = {
@@ -396,6 +415,10 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
           "visibility relation differs from the strategy's paper profile")
 
     expected_calls, expected_depth = _expected_call_depth(sid, n, k, T)
+    check("runtime-calls-formula", expected_calls == _formula_value(profile.runtime_calls_formula, n, k, T),
+          "profile runtime call formula does not match the independent protocol oracle")
+    check("runtime-depth-formula", expected_depth == _formula_value(profile.runtime_depth_formula, n, k, T),
+          "profile runtime depth formula does not match the independent protocol oracle")
     check("call-formula", strategy.calls == expected_calls,
           f"expected {expected_calls} model calls, got {strategy.calls}")
     check("depth-formula", strategy.depth == expected_depth,
