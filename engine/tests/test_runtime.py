@@ -320,3 +320,12 @@ def test_s8_runtime_persists_exact_expected_agent_roster(reviewer_count):
         *(f"reviewer-{i}" for i in range(1, reviewer_count + 1)),
         "editor",
     )
+
+
+def test_s9_runtime_persists_exact_expected_voter_roster():
+    blueprint = build_strategy_blueprint("S9", n=4)
+    result = run_strategy(
+        "S9", prompt(), blueprint.strategy, RecordingInvoker(),
+        prompt_views=blueprint.prompt_views,
+    )
+    assert result.expected_agent_ids == ("voter-1", "voter-2", "voter-3", "voter-4")

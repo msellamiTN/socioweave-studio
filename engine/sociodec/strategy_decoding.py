@@ -142,13 +142,56 @@ class ProtocolDecisionDecoder:
             experts = tuple(sorted(x for x in pool if x.startswith("expert-")))
             decision = consensus_medoid(_required_candidates(pool, experts))
         elif strategy_id is StrategyId.S9:
-            voter_ids = tuple(sorted(x for x in pool if x.startswith("voter-")))
+            expected_voters = (
+                {agent_id for agent_id in run.expected_agent_ids
+                 if agent_id.startswith("voter-")}
+                if run.expected_agent_ids is not None else None
+            )
+            voter_ids = tuple(sorted(
+                expected_voters if expected_voters is not None
+                else (x for x in pool if x.startswith("voter-"))
+            ))
+            if not voter_ids:
+                raise StrategyDecisionError("S9 requires at least one configured voter")
             selected = _required_candidates(pool, voter_ids)
+            if expected_voters is not None:
+                observed_drafters = {
+                    agent for agent, message in messages
+                    if message.action == "draft" and message.candidate is not None
+                }
+                if observed_drafters != expected_voters:
+                    missing = sorted(expected_voters - observed_drafters)
+                    unexpected = sorted(observed_drafters - expected_voters)
+                    details = []
+                    if missing:
+                        details.append("missing drafts: " + ", ".join(missing))
+                    if unexpected:
+                        details.append("unexpected drafts: " + ", ".join(unexpected))
+                    raise StrategyDecisionError(
+                        "S9 candidate drafts do not match expected voter roster ("
+                        + "; ".join(details) + ")"
+                    )
+            vote_messages = [
+                (agent, message) for agent, message in messages
+                if message.action == "vote"
+            ]
+            vote_ids = [agent for agent, _ in vote_messages]
+            if any(agent not in voter_ids for agent in vote_ids):
+                unexpected = sorted(set(vote_ids) - set(voter_ids))
+                raise StrategyDecisionError(
+                    "S9 received ballots from non-voter(s): " + ", ".join(unexpected)
+                )
+            if len(vote_ids) != len(set(vote_ids)):
+                raise StrategyDecisionError("S9 requires exactly one ballot per voter; duplicate ballot")
+            missing_votes = sorted(set(voter_ids) - set(vote_ids))
+            if missing_votes:
+                raise StrategyDecisionError(
+                    "S9 requires exactly one ballot per voter; missing: "
+                    + ", ".join(missing_votes)
+                )
             by_candidate = {candidate.identifier: candidate for candidate in selected}
             ballots = {}
-            for agent, message in messages:
-                if agent not in voter_ids or message.action != "vote":
-                    continue
+            for agent, message in vote_messages:
                 signatures = set()
                 for candidate_id, subproblem_id in message.endorsed_subproblems:
                     candidate = by_candidate.get(candidate_id)

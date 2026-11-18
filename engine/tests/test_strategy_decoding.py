@@ -304,3 +304,69 @@ def test_s8_legacy_run_without_roster_retains_minimum_reviewer_validation():
     assert ProtocolDecisionDecoder(prompt, extraction)(
         StrategyId.S8, run(*outputs),
     ).decision.rule == "authority"
+
+
+@pytest.mark.parametrize("voter_count", [1, 3, 5])
+def test_s9_requires_exactly_one_ballot_from_every_configured_voter(voter_count):
+    prompt, extraction, _, _ = fixture()
+    expected = tuple(f"voter-{i}" for i in range(1, voter_count + 1))
+    outputs = [candidate_out(i, voter) for i, voter in enumerate(expected)]
+    outputs.extend(
+        out(voter_count + i, voter, "vote", {
+            "endorsed_subproblems": [
+                {"candidate_id": voter, "subproblem_id": "s1"}
+            ],
+        })
+        for i, voter in enumerate(expected)
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = StrategyRun(
+        "S9", tuple(outputs), len(outputs), 2, (), expected,
+    )
+    assert decoder(StrategyId.S9, complete).decision.rule == "majority"
+
+    for missing_voter in expected:
+        incomplete = tuple(
+            item for item in outputs
+            if not (item.action == "vote" and item.agent_id == missing_voter)
+        )
+        with pytest.raises(StrategyDecisionError, match="exactly one ballot per voter; missing"):
+            decoder(StrategyId.S9, StrategyRun(
+                "S9", incomplete, len(incomplete), 2, (), expected,
+            ))
+
+
+def test_s9_rejects_duplicate_ballots_and_non_voter_ballots():
+    prompt, extraction, _, _ = fixture()
+    expected = ("voter-1", "voter-2")
+    base = (
+        candidate_out(0, "voter-1"),
+        candidate_out(1, "voter-2"),
+        out(2, "voter-1", "vote", {"endorsed_subproblems": []}),
+        out(3, "voter-2", "vote", {"endorsed_subproblems": []}),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    duplicate = (*base, out(4, "voter-1", "vote", {"endorsed_subproblems": []}))
+    with pytest.raises(StrategyDecisionError, match="duplicate ballot"):
+        decoder(StrategyId.S9, StrategyRun(
+            "S9", duplicate, len(duplicate), 2, (), expected,
+        ))
+    unexpected = (*base, out(4, "observer", "vote", {"endorsed_subproblems": []}))
+    with pytest.raises(StrategyDecisionError, match="non-voter"):
+        decoder(StrategyId.S9, StrategyRun(
+            "S9", unexpected, len(unexpected), 2, (), expected,
+        ))
+
+
+def test_s9_rejects_missing_configured_voter_draft():
+    prompt, extraction, _, _ = fixture()
+    expected = ("voter-1", "voter-2")
+    outputs = (
+        candidate_out(0, "voter-1"),
+        out(1, "voter-1", "vote", {"endorsed_subproblems": []}),
+        out(2, "voter-2", "vote", {"endorsed_subproblems": []}),
+    )
+    with pytest.raises(StrategyDecisionError, match="candidate drafts do not match"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S9, StrategyRun(
+            "S9", outputs, len(outputs), 2, (), expected,
+        ))
