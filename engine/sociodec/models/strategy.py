@@ -25,6 +25,7 @@ class Role(StrEnum):
 class Action(StrEnum):
     SPLIT = "split"
     DRAFT = "draft"
+    COUNTER_PLAN = "counter-plan"
     CRITIQUE = "critique"
     DEFEND = "defend"
     REVISE = "revise"

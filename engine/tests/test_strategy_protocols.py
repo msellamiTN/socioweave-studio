@@ -132,3 +132,19 @@ def test_partitioned_strategies_fail_closed_without_explicit_prompt_views():
 def test_unknown_or_candidate_strategy_is_not_accepted_as_established():
     with pytest.raises(ValueError):
         build_strategy_blueprint("C1")
+
+
+def test_dialectical_inquiry_is_explicit_counter_plan_with_directional_visibility():
+    blueprint = build_strategy_blueprint("S6")
+    protocol = blueprint.strategy.protocol
+    assert [step.action for step in protocol] == [
+        Action.DRAFT, Action.COUNTER_PLAN, Action.MERGE,
+    ]
+    assert protocol[0].input_ref == "prompt"
+    assert protocol[1].input_ref == "step:0"
+    pairs = set(blueprint.strategy.visibility[0].visible_pairs)
+    assert ("decomposer-2", "decomposer-1") in pairs
+    assert ("decomposer-1", "decomposer-2") not in pairs
+    assert ("synthesizer", "decomposer-1") in pairs
+    assert blueprint.strategy.calls == 3
+    assert blueprint.strategy.depth == 3
