@@ -742,7 +742,7 @@ def test_s8_requires_single_round_and_exact_configured_author_editor_roster():
                        x.stage, x.action, x.text, x.model_invoked, x.from_seed)
         for x in outputs.outputs
     )
-    with pytest.raises(StrategyDecisionError, match="S11 round 1 requires"):
+    with pytest.raises(StrategyDecisionError, match="single-round"):
         decoder(StrategyId.S8, StrategyRun("S8", wrong_round, 3, 3, (), None))
     with pytest.raises(StrategyDecisionError, match="configured roster"):
         decoder(StrategyId.S8, run_s8(
@@ -840,14 +840,14 @@ def test_s11_rejects_invalid_stage_order_round_and_roster():
     item = wrong_stage[4]
     wrong_stage[4] = ProtocolOutput(item.step_index, item.agent_id, item.round, 2,
                                     item.action, item.text, item.model_invoked, item.from_seed)
-    with pytest.raises(StrategyDecisionError, match="parallel stages"):
+    with pytest.raises(StrategyDecisionError, match="summary stage followed by parallel revision stage"):
         decoder(StrategyId.S11, StrategyRun("S11", tuple(wrong_stage), 5, 3, (),
                                             ("party-1", "party-2", "mediator")))
     wrong_round = list(outputs)
     item = wrong_round[4]
     wrong_round[4] = ProtocolOutput(item.step_index, item.agent_id, 2, item.stage,
                                     item.action, item.text, item.model_invoked, item.from_seed)
-    with pytest.raises(StrategyDecisionError, match="single-round"):
+    with pytest.raises(StrategyDecisionError, match="S11 round 1 requires"):
         decoder(StrategyId.S11, StrategyRun("S11", tuple(wrong_round), 5, 3, (),
                                             ("party-1", "party-2", "mediator")))
     with pytest.raises(StrategyDecisionError, match="configured roster"):
