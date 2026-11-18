@@ -38,3 +38,13 @@ The provider-backed composition regression currently measures actual provider in
 - C2 = S12 → S5: theoretical `S12=n+1=3`, `S5=4`, total 7. The second phase's one seeded draft reduces actual provider calls by one; observed expected total is 6.
 
 The existing provider-backed tests assert these actual totals and verify that the second phase has one seeded agent. The parameterized assertions now check per-phase unseeded catalogue budgets and actual calls (first phase fully unseeded; second phase reduced by one seeded draft), as well as totals. This still does not verify every protocol step against a formal paper trace or cost proof.
+
+## Actual S3/S4 blueprint boundary tests (Core 22.3.13)
+
+The follow-up test suite instantiates the actual `build_strategy_blueprint(StrategyId.S3/S4)` factories with `n=2,T=2`, runs those strategies through `run_strategy` and `ProviderProtocolInvoker`, and captures serialized JSON payloads at the mock provider boundary.
+
+
+- **S3/NGT:** first-round drafts have empty peer-visible history and no pooled peer draft in input; ranking-phase prompts receive pooled drafts with author labels serialized as `anonymous`.
+- **S4/Delphi:** initial expert drafts have empty peer-visible history; facilitator and revision-phase prompts receive anonymous author labels in visible history. Expert identifiers are not included in peer-visible input text in the checked payloads.
+
+These tests establish prompt-level masking and visibility for the current concrete blueprint at these configurations. They do not prove content-level anonymity, identity unlinkability, privacy against model inference, or provider/telemetry privacy. The actor's `agent_id` remains present in its own request payload.
