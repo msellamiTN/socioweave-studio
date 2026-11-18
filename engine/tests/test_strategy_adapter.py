@@ -1,3 +1,4 @@
+import json
 import pytest
 
 from sociodec.catalogue import StrategyId
@@ -21,6 +22,8 @@ class EchoInvoker:
 
     def invoke(self, agent, step, context):
         self.calls.append((agent.identifier, step.action.value, context))
+        if agent.identifier == "editor" and step.action.value == "judge":
+            return json.dumps({"verdict": "accept", "rationale": "Echo test accepts draft."})
         return f"{step.action.value}:{context.input_content}"
 
 
@@ -53,8 +56,10 @@ def test_runtime_executes_every_concrete_protocol_with_table4_call_count(sid):
         sid.value, _prompt(), blueprint.strategy, invoker,
         prompt_views=blueprint.prompt_views, initial_inputs=inputs,
     )
-    assert run.calls_made == blueprint.strategy.calls
-    assert run.depth_executed == blueprint.strategy.depth
+    expected_calls = blueprint.strategy.calls - 1 if sid is StrategyId.S8 else blueprint.strategy.calls
+    expected_depth = blueprint.strategy.depth - 1 if sid is StrategyId.S8 else blueprint.strategy.depth
+    assert run.calls_made == expected_calls
+    assert run.depth_executed == expected_depth
 
 
 def test_s1_specialists_receive_only_their_domain_view_not_coordinator_split():

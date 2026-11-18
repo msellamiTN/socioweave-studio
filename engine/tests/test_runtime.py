@@ -1,3 +1,4 @@
+import json
 import pytest
 
 from sociodec.extraction import Hypothesis
@@ -7,6 +8,7 @@ from sociodec.models.strategy import (
     SocialStrategy, VisibilityRound,
 )
 from sociodec.runtime import run_strategy
+from sociodec.strategy_protocols import build_strategy_blueprint
 
 
 class RecordingInvoker:
@@ -53,6 +55,40 @@ def prompt():
     return Prompt("Improve the permit service.", Interpretation("Improve service"))
 
 
+class S8VerdictInvoker:
+    def __init__(self, verdict):
+        self.verdict = verdict
+        self.calls = []
+    def invoke(self, agent, step, context):
+        self.calls.append((step.action.value, context))
+        if step.action.value == "judge":
+            return json.dumps({"verdict": self.verdict, "rationale": "Test verdict."})
+        return "stub:" + step.action.value
+
+@pytest.mark.parametrize("verdict,expected_calls,expected_depth,expected_steps", [
+    ("accept", 3, 3, (0, 1, 2)),
+    ("revise", 4, 4, (0, 1, 2, 3)),
+])
+def test_s8_conditional_revision_branch_counts_and_stable_step_indexes(verdict, expected_calls, expected_depth, expected_steps):
+    blueprint = build_strategy_blueprint("S8", k=1)
+    invoker = S8VerdictInvoker(verdict)
+    run = run_strategy("S8", prompt(), blueprint.strategy, invoker, prompt_views=blueprint.prompt_views)
+    assert run.calls_made == expected_calls
+    assert run.depth_executed == expected_depth
+    assert tuple(output.step_index for output in run.outputs) == expected_steps
+    assert 3 not in run.output_refs if verdict == "accept" else 3 in [o.step_index for o in run.outputs]
+    assert sum(1 for action, _ in invoker.calls if action == "revise") == (1 if verdict == "revise" else 0)
+
+@pytest.mark.parametrize("bad_json", ["{invalid", "{}", "not-json"])
+def test_s8_runtime_fails_closed_for_invalid_editor_verdict(bad_json):
+    blueprint = build_strategy_blueprint("S8", k=1)
+    class InvalidVerdictInvoker:
+        def invoke(self, agent, step, context):
+            if step.action.value == "judge":
+                return bad_json
+            return "stub"
+    with pytest.raises(ValueError, match="S8 editor verdict"):
+        run_strategy("S8", prompt(), blueprint.strategy, InvalidVerdictInvoker(), prompt_views=blueprint.prompt_views)
 def test_runtime_executes_protocol_and_counts_calls_and_depth():
     invoker = RecordingInvoker()
     result = run_strategy("test", prompt(), strategy(), invoker)
@@ -193,3 +229,19 @@ def test_runtime_rejects_empty_invoker_or_precomputed_output():
     )
     with pytest.raises(ValueError, match="requires precomputed output"):
         run_strategy("missing-precomputed", prompt(), strat, RecordingInvoker())
+
+
+
+def test_s8_reviewers_are_independent_and_table4_profile_is_preserved():
+    blueprint = build_strategy_blueprint("S8", k=3)
+    assert blueprint.strategy.calls == 6  # k + 3 worst-case
+    assert blueprint.strategy.depth == 4
+    invoker = S8VerdictInvoker("revise")
+    run = run_strategy("S8", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views)
+    reviewer_contexts = [context for action, context in invoker.calls if action == "critique"]
+    assert len(reviewer_contexts) == 3
+    for context in reviewer_contexts:
+        assert context.input_content == "stub:draft"
+        assert "reviewer-" not in context.input_content
+        assert all(item.author == "author" for item in context.visible_history)

@@ -83,9 +83,8 @@ def run(*outputs):
             out(2, "judge", "judge", {"selected_candidate_id": "party-1", "rationale": "Stronger defence"}),
         ), "authority"),
         (StrategyId.S8, (
-            candidate_out(0, "author"), candidate_out(1, "editor", "judge")
-            if False else out(1, "editor", "judge", {"selected_candidate_id": "author", "rationale": "Reviews addressed"}),
-            candidate_out(2, "author", "revise"),
+            candidate_out(0, "author"),
+            out(1, "editor", "judge", {"verdict": "accept", "rationale": "Reviews addressed"}),
         ), "authority"),
         (StrategyId.S10, (
             candidate_out(0, "participant-1", "revise"),
@@ -179,3 +178,44 @@ def test_edge_support_counts_use_decomposition_edge_ids_for_algorithm1_repair():
             out(1, "participant-2", "draft", payload)),
     )
     assert result.candidate_support_counts == ((("s1", "s2"), 2),)
+
+
+
+def distinct_candidate_out(index, agent, action, question, output_text):
+    _, _, _, raw = fixture()
+    raw["subproblems"][0]["question"] = question
+    raw["subproblems"][0]["output"] = output_text
+    return out(index, agent, action, {"candidate": raw})
+
+
+@pytest.mark.parametrize("verdict,expected_question,expected_output,revise_present", [
+    ("accept", "Original D0 question", "D0 output", False),
+    ("revise", "Revised D1 question", "D1 output", True),
+])
+def test_s8_typed_verdict_assembles_original_d0_or_revised_d1(
+    verdict, expected_question, expected_output, revise_present,
+):
+    prompt, extraction, _, _ = fixture()
+    outputs = [
+        distinct_candidate_out(0, "author", "draft", "Original D0 question", "D0 output"),
+        out(1, "reviewer-1", "critique", {"objections": []}),
+        out(2, "editor", "judge", {"verdict": verdict, "rationale": "Typed editor decision"}),
+    ]
+    if revise_present:
+        outputs.append(distinct_candidate_out(3, "author", "revise", "Revised D1 question", "D1 output"))
+    result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+    assert result.decision.rule == "authority"
+    assert result.decision.selected_candidate_id == "author"
+    assert result.decision.decomposition.subproblems[0].question == expected_question
+    assert result.decision.decomposition.subproblems[0].output == expected_output
+    assert verdict.upper() in result.decision.rationale
+
+
+@pytest.mark.parametrize("verdict,outputs,match", [
+    ("accept", (distinct_candidate_out(0, "author", "draft", "D0", "D0"), out(1, "editor", "judge", {"verdict":"accept","rationale":"ok"}), distinct_candidate_out(2, "author", "revise", "D1","D1")), "ACCEPT branch"),
+    ("revise", (distinct_candidate_out(0, "author", "draft", "D0", "D0"), out(1, "editor", "judge", {"verdict":"revise","rationale":"fix"})), "REVISE verdict"),
+])
+def test_s8_rejects_inconsistent_branch_evidence(verdict, outputs, match):
+    prompt, extraction, _, _ = fixture()
+    with pytest.raises(StrategyDecisionError, match=match):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))

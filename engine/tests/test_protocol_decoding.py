@@ -2,7 +2,7 @@ import json
 import pytest
 from sociodec.extraction import ExtractionResult, Hypothesis, aggregate_extractions
 from sociodec.models.prompt import Constraint, ConstraintKind, Interpretation, Prompt, Requirement, RequirementType, SourceSpan
-from sociodec.protocol_decoding import ObjectionKind, ProtocolDecodeError, parse_candidate, parse_hypothesis_verdicts, parse_protocol_output
+from sociodec.protocol_decoding import ObjectionKind, PeerReviewVerdict, ProtocolDecodeError, parse_candidate, parse_hypothesis_verdicts, parse_protocol_output
 from sociodec.runtime import ProtocolOutput
 
 
@@ -132,6 +132,21 @@ def test_rank_vote_judge_summary_split_and_defence_actions_decode():
     assert defence.rationale.startswith("This plan")
 
 
+def test_judge_decodes_typed_peer_review_accept_and_revise_verdicts():
+    prompt, extraction, _, _ = fixtures()
+    accept = parse_protocol_output(output("judge", {"verdict": "accept", "rationale": "No blocking issues."}), prompt=prompt, extraction=extraction)
+    revise = parse_protocol_output(output("judge", {"verdict": "revise", "rationale": "Address reviewer concerns."}), prompt=prompt, extraction=extraction)
+    assert accept.peer_review_verdict is PeerReviewVerdict.ACCEPT
+    assert revise.peer_review_verdict is PeerReviewVerdict.REVISE
+    assert accept.selected_candidate_id is None
+    assert revise.selected_candidate_id is None
+
+def test_judge_rejects_invalid_peer_review_verdict_and_missing_rationale():
+    prompt, extraction, _, _ = fixtures()
+    with pytest.raises(ProtocolDecodeError, match="Invalid peer-review verdict"):
+        parse_protocol_output(output("judge", {"verdict": "maybe", "rationale": "Unclear."}), prompt=prompt, extraction=extraction)
+    with pytest.raises(ProtocolDecodeError, match="rationale"):
+        parse_protocol_output(output("judge", {"verdict": "accept"}), prompt=prompt, extraction=extraction)
 def test_parser_rejects_malformed_json_and_unknown_action():
     prompt, extraction, _, _ = fixtures()
     malformed = ProtocolOutput(0, "a", 1, 1, "draft", "{bad", True, False)
