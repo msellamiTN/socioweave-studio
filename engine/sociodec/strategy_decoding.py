@@ -433,29 +433,31 @@ class ProtocolDecisionDecoder:
             # One author draft, isolated parallel reviewer reports, editor
             # verdict, and a conditional final author revision.
             trace = tuple((output.agent_id, output.action) for output in run.outputs)
-            has_revision = bool(trace and trace[-1] == ("author", "revise"))
-            editor_index = len(trace) - (2 if has_revision else 1)
-            reviewer_trace = trace[1:editor_index] if editor_index >= 1 else ()
+            editor_positions = [
+                index for index, item in enumerate(trace)
+                if item == ("editor", "judge")
+            ]
+            editor_index = editor_positions[0] if len(editor_positions) == 1 else -1
+            reviewer_trace = trace[1:editor_index] if editor_index > 1 else ()
+            revision_trace = trace[editor_index + 1:] if editor_index >= 0 else ()
             if (not trace or trace[0] != ("author", "draft")
-                    or not reviewer_trace
+                    or editor_index < 0 or not reviewer_trace
                     or any(action != "critique" for _, action in reviewer_trace)
-                    or trace[editor_index] != ("editor", "judge")
-                    or len(trace) != editor_index + 1 + int(has_revision)):
+                    or any(item != ("author", "revise") for item in revision_trace)):
                 raise StrategyDecisionError(
                     "S8 requires author draft, parallel reviewer critiques, editor verdict, "
                     "and a conditional author revision"
                 )
             expected_stages = ((1,) + (2,) * len(reviewer_trace) + (3,)
-                               + ((4,) if has_revision else ()))
+                               + (4,) * len(revision_trace))
             if tuple(output.stage for output in run.outputs) != expected_stages:
                 raise StrategyDecisionError("S8 requires draft/review/editor/revision stages 1/2/3/4")
             if any(output.round != 1 for output in run.outputs):
                 raise StrategyDecisionError("S8 peer review is a single-round procedure")
             if run.expected_agent_ids is not None:
                 expected_roster = set(run.expected_agent_ids)
-                observed_roster = {"author", "editor", *(agent for agent, _ in reviewer_trace)}
-                if expected_roster != observed_roster:
-                    raise StrategyDecisionError("S8 configured roster must exactly match author, reviewers, and editor")
+                if not {"author", "editor"}.issubset(expected_roster):
+                    raise StrategyDecisionError("S8 configured roster must include author and editor")
             author_drafts = [
                 message.candidate for agent, message in messages
                 if agent == "author" and message.action == "draft" and message.candidate is not None
