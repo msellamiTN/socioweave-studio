@@ -10,10 +10,11 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Mapping, TYPE_CHECKING
 
 from sociodec.models.strategy import Agent
-from sociodec.runtime import ProtocolContext, ProtocolStep
+if TYPE_CHECKING:
+    from sociodec.runtime import ProtocolContext, ProtocolStep
 from .base import ChatMessage, GenerationConfig, LLMProvider
 
 
