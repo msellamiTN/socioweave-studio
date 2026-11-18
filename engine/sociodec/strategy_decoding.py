@@ -438,9 +438,7 @@ class ProtocolDecisionDecoder:
             reviewer_trace = trace[1:editor_index] if editor_index >= 1 else ()
             if (not trace or trace[0] != ("author", "draft")
                     or not reviewer_trace
-                    or any(action != "critique" or not agent.startswith("reviewer-")
-                           for agent, action in reviewer_trace)
-                    or len({agent for agent, _ in reviewer_trace}) != len(reviewer_trace)
+                    or any(action != "critique" for _, action in reviewer_trace)
                     or trace[editor_index] != ("editor", "judge")
                     or len(trace) != editor_index + 1 + int(has_revision)):
                 raise StrategyDecisionError(
