@@ -14,6 +14,10 @@ from sociodec.validation import HypothesisVerdict, HypothesisVerdictValue
 class ProtocolDecodeError(ValueError):
     pass
 
+class PeerReviewVerdict(StrEnum):
+    ACCEPT = "accept"
+    REVISE = "revise"
+
 class ObjectionKind(StrEnum):
     MISSING_SUBPROBLEM = "missing_subproblem"
     REDUNDANT_SUBPROBLEM = "redundant_subproblem"
@@ -38,6 +42,7 @@ class ProtocolMessage:
     agreements: tuple[str, ...] = ()
     disagreements: tuple[str, ...] = ()
     partitions: tuple[tuple[str, str], ...] = ()
+    peer_review_verdict: PeerReviewVerdict | None = None
     hypothesis_verdicts: tuple[HypothesisVerdict, ...] = ()
 
 def _obj(value: Any, label: str) -> dict:
@@ -150,6 +155,7 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
     action = output.action
     candidate, objections, ranking, ballots, partitions = None, (), (), (), ()
     selected, rationale, summary = None, "", ""
+    peer_review_verdict = None
     agreements, disagreements = (), ()
     if action in {"draft", "revise", "merge", "check"}:
         candidate = parse_candidate(data.get("candidate", data), prompt=prompt, extraction=extraction, candidate_id=candidate_id)
@@ -181,8 +187,14 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
         if len(set(ballots)) != len(ballots):
             raise ProtocolDecodeError("Duplicate ballot reference")
     elif action == "judge":
-        selected = _str(data.get("selected_candidate_id"), "selected_candidate_id")
         rationale = _str(data.get("rationale"), "rationale")
+        if "verdict" in data:
+            try:
+                peer_review_verdict = PeerReviewVerdict(_str(data.get("verdict"), "verdict"))
+            except ValueError as exc:
+                raise ProtocolDecodeError("Invalid peer-review verdict; expected accept or revise") from exc
+        else:
+            selected = _str(data.get("selected_candidate_id"), "selected_candidate_id")
     elif action == "summarise":
         summary = _str(data.get("summary"), "summary")
         agreements = _strings(data.get("agreements", []), "agreements")
@@ -198,4 +210,5 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
         raise ProtocolDecodeError(f"Unsupported action: {action}")
     verdicts = parse_hypothesis_verdicts(data.get("hypothesis_verdicts"), extraction)
     return ProtocolMessage(action, candidate, objections, ranking, ballots, selected,
-                           rationale, summary, agreements, disagreements, partitions, verdicts)
+                           rationale, summary, agreements, disagreements, partitions, verdicts,
+                           peer_review_verdict)
