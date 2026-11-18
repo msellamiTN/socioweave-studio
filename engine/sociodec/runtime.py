@@ -287,10 +287,13 @@ def run_strategy(
                 def candidate_payload(record: ProtocolOutput) -> str:
                     try:
                         payload = json.loads(record.text)
-                    except json.JSONDecodeError as exc:
-                        raise ValueError("S4 expert output must be valid JSON for convergence checks") from exc
+                    except json.JSONDecodeError:
+                        # The orchestration layer also supports non-JSON invokers.
+                        # Exact textual stability remains observable; epsilon-based
+                        # structural distance requires the caller-supplied evaluator.
+                        return record.text.strip()
                     if not isinstance(payload, dict):
-                        raise ValueError("S4 expert output must be a JSON object")
+                        return json.dumps(payload, sort_keys=True, separators=(",", ":"))
                     candidate = payload.get("candidate", payload)
                     return json.dumps(candidate, sort_keys=True, separators=(",", ":"))
 
