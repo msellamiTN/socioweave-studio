@@ -351,7 +351,7 @@ def run_strategy(
         # Mediation compares the two parties' revised drafts at the end of
         # each complete round. The mediator facilitates; it never selects a
         # winner or manufactures the negotiated joint decomposition.
-        if strategy_id == "S11":
+        if strategy_id == "S11" and stage_outputs:
             round_number = next(step.round for step in strategy.protocol if step.stage == stage)
             round_stages = [step.stage for step in strategy.protocol if step.round == round_number]
             if stage == max(round_stages):
@@ -362,7 +362,7 @@ def run_strategy(
                     for agent_id in ("party-1", "party-2")
                 }
                 if any(len(items) != 1 for items in revisions.values()):
-                    raise ValueError(f"S11 convergence requires exactly one revision from each party per round (round={round_number}, stage={stage}, revisions={{agent: [item.agent_id for item in items] for agent, items in revisions.items()}}, outputs={{[(item.round, item.stage, item.agent_id, item.action) for item in outputs]}})")
+                    raise ValueError("S11 convergence requires exactly one revision from each party per completed round")
                 left = canonical_candidate(revisions["party-1"][0])
                 right = canonical_candidate(revisions["party-2"][0])
                 agreed = left == right
