@@ -396,3 +396,77 @@ def test_s4_rejects_delphi_options_for_other_strategies():
     with pytest.raises(ValueError, match="only for S4"):
         run_strategy("S5", prompt(), blueprint.strategy, RecordingInvoker(),
                      prompt_views=blueprint.prompt_views, delphi_epsilon=0.1)
+
+
+
+class ConsensusInvoker:
+    def __init__(self, value_for_round):
+        self.value_for_round = value_for_round
+        self.calls = []
+
+    def invoke(self, agent, step, context):
+        self.calls.append((agent.identifier, step.round, step.action.value, context))
+        if step.action.value == "judge":
+            return json.dumps({"no_objection": True, "rationale": "The shared draft is stable."})
+        return json.dumps({"candidate": {"value": self.value_for_round(step.round)}})
+
+
+def test_s10_stops_after_stable_full_shared_draft_turn_and_keeps_moderator_closure():
+    blueprint = build_strategy_blueprint("S10", n=2, T=4)
+    invoker = ConsensusInvoker(lambda round_number: 0)
+    run = run_strategy("S10", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views)
+    participant_rounds = {item.round for item in run.outputs if item.agent_id.startswith("participant-")}
+    assert participant_rounds == {1, 2}
+    assert run.calls_made == 5
+    assert run.depth_executed == 5
+    assert run.outputs[-1].agent_id == "moderator"
+    assert run.outputs[-1].action == "judge"
+    # Participant 2 sees participant 1's immediately preceding shared-draft turn.
+    second_participant_call = next(call for call in invoker.calls
+                                   if call[0] == "participant-2" and call[1] == 2)
+    assert any(item.author == "participant-1" for item in second_participant_call[3].visible_history)
+
+
+def test_s10_epsilon_stopping_compares_completed_shared_draft_states():
+    blueprint = build_strategy_blueprint("S10", n=2, T=4)
+    invoker = ConsensusInvoker(lambda round_number: round_number - 1)
+    distances = []
+    def distance(previous, current):
+        distances.append((previous, current))
+        return 0.04
+    run = run_strategy("S10", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views,
+                       consensus_epsilon=0.05,
+                       consensus_candidate_distance=distance)
+    participant_rounds = {item.round for item in run.outputs if item.agent_id.startswith("participant-")}
+    assert participant_rounds == {1, 2}
+    assert len(distances) == 1
+    assert distances[0] == ('{"value":0}', '{"value":1}')
+    assert run.outputs[-1].agent_id == "moderator"
+
+
+def test_s10_continues_until_maximum_round_when_shared_draft_keeps_changing():
+    blueprint = build_strategy_blueprint("S10", n=2, T=3)
+    invoker = ConsensusInvoker(lambda round_number: round_number)
+    run = run_strategy("S10", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views)
+    participant_rounds = {item.round for item in run.outputs if item.agent_id.startswith("participant-")}
+    assert participant_rounds == {1, 2, 3}
+    assert run.calls_made == 7
+    assert run.outputs[-1].agent_id == "moderator"
+
+
+def test_s10_requires_explicit_distance_when_epsilon_is_configured():
+    blueprint = build_strategy_blueprint("S10", n=2, T=2)
+    with pytest.raises(ValueError, match="consensus_candidate_distance is required"):
+        run_strategy("S10", prompt(), blueprint.strategy,
+                     ConsensusInvoker(lambda round_number: round_number),
+                     prompt_views=blueprint.prompt_views, consensus_epsilon=0.1)
+
+
+def test_s10_rejects_consensus_options_for_other_strategies():
+    blueprint = build_strategy_blueprint("S5")
+    with pytest.raises(ValueError, match="only for S10"):
+        run_strategy("S5", prompt(), blueprint.strategy, RecordingInvoker(),
+                     prompt_views=blueprint.prompt_views, consensus_epsilon=0.1)

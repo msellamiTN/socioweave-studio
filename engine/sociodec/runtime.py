@@ -139,6 +139,8 @@ def run_strategy(
     precomputed_outputs: Mapping[str, str] | None = None,
     delphi_epsilon: float | None = None,
     delphi_candidate_distance: Callable[[str, str], float] | None = None,
+    consensus_epsilon: float | None = None,
+    consensus_candidate_distance: Callable[[str, str], float] | None = None,
 ) -> StrategyRun:
     """Execute protocol steps with stage snapshots and per-agent visibility.
 
@@ -157,6 +159,13 @@ def run_strategy(
             raise ValueError("delphi_candidate_distance is required when delphi_epsilon is set")
     elif delphi_epsilon is not None or delphi_candidate_distance is not None:
         raise ValueError("Delphi stopping options are valid only for S4")
+    if strategy_id == "S10":
+        if consensus_epsilon is not None and not 0.0 <= consensus_epsilon <= 1.0:
+            raise ValueError("consensus_epsilon must be in [0, 1]")
+        if consensus_epsilon is not None and consensus_candidate_distance is None:
+            raise ValueError("consensus_candidate_distance is required when consensus_epsilon is set")
+    elif consensus_epsilon is not None or consensus_candidate_distance is not None:
+        raise ValueError("Consensus stopping options are valid only for S10")
     inputs = dict(initial_inputs or {})
     views = dict(prompt_views or {})
     seed_map = dict(seeds or {})
@@ -176,12 +185,27 @@ def run_strategy(
     seeded_agents: set[str] = set()
     calls_made = 0
     stages = sorted({step.stage for step in strategy.protocol})
+    consensus_stopped_after: int | None = None
+
+    def canonical_candidate(record: ProtocolOutput) -> str:
+        try:
+            payload = json.loads(record.text)
+        except (TypeError, json.JSONDecodeError):
+            return record.text.strip()
+        if isinstance(payload, dict):
+            payload = payload.get("candidate", payload)
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
     for stage in stages:
         stage_snapshot = tuple(outputs)
         stage_outputs: list[ProtocolOutput] = []
         for index, step in enumerate(strategy.protocol):
             if step.stage != stage:
+                continue
+            # S10 stops participant turns after a completed stable round, but
+            # retains the single final moderator closure step in the blueprint.
+            if (strategy_id == "S10" and consensus_stopped_after is not None
+                    and step.action.value != "judge" and step.round > consensus_stopped_after):
                 continue
             if strategy_id == "S8" and step.action.value == "revise":
                 if not _s8_revision_required(outputs):
@@ -277,6 +301,37 @@ def run_strategy(
             )
             stage_outputs.append(record)
         outputs.extend(stage_outputs)
+
+        # Consensus stopping is evaluated after the final participant's turn,
+        # i.e. only after the complete sequential shared-draft round.
+        if strategy_id == "S10":
+            round_steps = [step for step in strategy.protocol
+                           if step.round == next(item.round for item in strategy.protocol if item.stage == stage)
+                           and step.action.value != "judge"]
+            if round_steps and stage == max(step.stage for step in round_steps):
+                round_number = round_steps[0].round
+                if round_number > 1:
+                    participants = tuple(agent.identifier for agent in strategy.agents
+                                         if agent.identifier.startswith("participant-"))
+                    prior_round = [item for item in outputs
+                                   if item.round == round_number - 1 and item.agent_id in participants]
+                    current_round = [item for item in outputs
+                                     if item.round == round_number and item.agent_id in participants]
+                    if len(prior_round) != len(participants) or len(current_round) != len(participants):
+                        raise ValueError("S10 convergence requires one completed shared-draft turn per participant in adjacent rounds")
+                    # The last participant's revision is the shared draft after
+                    # the full turn; compare that state across adjacent rounds.
+                    previous = canonical_candidate(max(prior_round, key=lambda item: item.step_index))
+                    current = canonical_candidate(max(current_round, key=lambda item: item.step_index))
+                    unchanged = previous == current
+                    within_epsilon = False
+                    if consensus_epsilon is not None:
+                        distance = consensus_candidate_distance(previous, current)
+                        if not isinstance(distance, (int, float)) or not 0.0 <= distance <= 1.0:
+                            raise ValueError("Consensus candidate distance must return a value in [0, 1]")
+                        within_epsilon = distance <= consensus_epsilon
+                    if unchanged or within_epsilon:
+                        consensus_stopped_after = round_number
 
         # Delphi stopping is evaluated only after the facilitator has completed
         # the round. Each expert is compared with their own previous draft.
