@@ -466,11 +466,40 @@ def build_and_validate_all(*, n: int = 3, k: int = 3, T: int = 2) -> tuple[Confo
     return tuple(reports)
 
 
-def profile_as_dict(identifier: StrategyId | str) -> dict[str, object]:
-    """Return a JSON-serializable, machine-readable paper strategy profile."""
-    profile = PROFILE_BY_ID[StrategyId(identifier)]
+def profile_as_dict(
+    identifier: StrategyId | str, *, n: int = 3, k: int = 3, T: int = 2,
+) -> dict[str, object]:
+    """Return a concrete JSON-serializable strategy profile for given parameters."""
+    if min(n, k, T) < 1:
+        raise ValueError("n, k and T must be >= 1")
+    sid = StrategyId(identifier)
+    profile = PROFILE_BY_ID[sid]
+    agents = _expected_agent_ids(sid, n, k)
+    rounds = _expected_rounds(sid, T)
+    protocol = _expected_steps(sid, n, k, T)
+    visibility = _expected_visibility(sid, agents, T)
+    calls, depth = _expected_call_depth(sid, n, k, T)
     payload = asdict(profile)
     payload["strategy_id"] = profile.strategy_id.value
     payload["roles"] = [role.value for role in profile.roles]
     payload["decision_rule"] = profile.decision_rule.value
+    payload["parameters"] = {"n": n, "k": k, "T": T}
+    payload["agents"] = list(agents)
+    payload["rounds"] = rounds
+    payload["role_assignments"] = [
+        {"agent_id": agent, "round": round_number,
+         "role": _expected_role(sid, agent, round_number).value}
+        for round_number in range(1, rounds + 1) for agent in agents
+    ]
+    payload["protocol"] = [
+        {"index": index, "agent_id": agent, "action": action.value,
+         "input_ref": input_ref, "round": round_number, "stage": stage}
+        for index, (agent, action, input_ref, round_number, stage) in enumerate(protocol)
+    ]
+    payload["visibility_relation"] = {
+        str(round_number): [list(pair) for pair in sorted(pairs)]
+        for round_number, pairs in visibility
+    }
+    payload["expected_model_calls"] = calls
+    payload["expected_depth"] = depth
     return payload
