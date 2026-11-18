@@ -281,9 +281,9 @@ def test_real_s3_s4_blueprints_preserve_anonymity_and_peer_visibility_in_provide
             return GenerationResult("candidate decomposition text", self.provider_name, self.model_name)
 
     provider = CapturingProvider()
-    models = {f"agent-{i}": provider for i in range(1, n + 1)}
-    models.update({"member-1": provider, "member-2": provider, "expert-1": provider, "expert-2": provider, "facilitator": provider})
-    families = {key: "same-test-family" for key in models}
+    # Blueprint agents use model_id="default-model"; the invoker resolves by model ID.
+    models = {"default-model": provider}
+    families = {"default-model": "same-test-family"}
     invoker = ProviderProtocolInvoker(models, model_families=families)
     blueprint = build_strategy_blueprint(StrategyId(strategy_id), n=n, T=T)
     result = run_strategy(strategy_id, prompt(), blueprint.strategy, invoker, prompt_views=blueprint.prompt_views)
