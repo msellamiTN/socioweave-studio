@@ -364,14 +364,31 @@ class ProtocolDecisionDecoder:
             except ValueError as exc:
                 raise StrategyDecisionError(f"S5 judge decision is invalid: {exc}") from exc
         elif strategy_id is StrategyId.S6:
+            # S6 is a sequential dialectic: the second decomposer sees D1,
+            # inverts its main assumption, and returns a counter-plan D2.
+            # The synthesizer then compares both and emits D*.
+            expected_trace = (
+                ("decomposer-1", "draft"),
+                ("decomposer-2", "counter_plan"),
+                ("synthesizer", "merge"),
+            )
+            observed_trace = tuple((output.agent_id, output.action) for output in run.outputs)
+            if observed_trace != expected_trace:
+                raise StrategyDecisionError(
+                    "S6 requires the ordered three-step trace: first draft, counter-plan, synthesis"
+                )
             selected = _required_candidates(pool, ("decomposer-1", "decomposer-2"))
             synthesized = [message.candidate for agent, message in messages
-                           if agent == "synthesizer" and message.candidate is not None]
+                           if agent == "synthesizer" and message.action == "merge"
+                           and message.candidate is not None]
             if len(synthesized) != 1:
                 raise StrategyDecisionError("S6 requires exactly one typed synthesizer decomposition")
-            decision = synthesis(selected, synthesized[0].decomposition,
-                                 synthesizer_id="synthesizer",
-                                 rationale="Typed synthesis output.")
+            try:
+                decision = synthesis(selected, synthesized[0].decomposition,
+                                     synthesizer_id="synthesizer",
+                                     rationale="Typed synthesis output.")
+            except ValueError as exc:
+                raise StrategyDecisionError(f"S6 synthesis decision is invalid: {exc}") from exc
         elif strategy_id is StrategyId.S7:
             selected = _required_candidates(pool, ("party-1", "party-2"))
             judge = _judge_message(messages, "judge")

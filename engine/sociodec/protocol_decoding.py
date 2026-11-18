@@ -157,7 +157,7 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
     selected, rationale, summary = None, "", ""
     peer_review_verdict = None
     agreements, disagreements = (), ()
-    if action in {"draft", "revise", "merge", "check"}:
+    if action in {"draft", "revise", "counter_plan", "merge", "check"}:
         candidate = parse_candidate(data.get("candidate", data), prompt=prompt, extraction=extraction, candidate_id=candidate_id)
     elif action == "critique":
         raw = data.get("objections")

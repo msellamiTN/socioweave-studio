@@ -80,7 +80,7 @@ def run(*outputs):
             out(3, "judge", "judge", {"selected_candidate_id": "author", "rationale": "The revision addresses the objection."}),
         ), "authority"),
         (StrategyId.S6, (
-            candidate_out(0, "decomposer-1"), candidate_out(1, "decomposer-2"),
+            candidate_out(0, "decomposer-1"), candidate_out(1, "decomposer-2", "counter_plan"),
             candidate_out(2, "synthesizer", "merge"),
         ), "synthesis"),
         (StrategyId.S7, (
@@ -584,3 +584,37 @@ def test_s5_judge_must_select_the_revised_author_candidate():
     })
     with pytest.raises(StrategyDecisionError, match="may select only a supplied candidate"):
         ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S5, run(*outputs))
+
+
+
+def _s6_complete_trace():
+    return (
+        candidate_out(0, "decomposer-1"),
+        candidate_out(1, "decomposer-2", "counter_plan"),
+        candidate_out(2, "synthesizer", "merge"),
+    )
+
+
+def test_s6_rejects_missing_counter_plan_or_synthesis():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = _s6_complete_trace()
+    for incomplete in ((complete[0], complete[2]), complete[:2]):
+        with pytest.raises(StrategyDecisionError, match="ordered three-step trace"):
+            decoder(StrategyId.S6, run(*incomplete))
+
+
+def test_s6_rejects_reordered_or_duplicate_dialectical_steps():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = _s6_complete_trace()
+    for invalid in ((complete[1], complete[0], complete[2]),
+                    (complete[0], complete[1], complete[1], complete[2])):
+        with pytest.raises(StrategyDecisionError, match="ordered three-step trace"):
+            decoder(StrategyId.S6, run(*invalid))
+
+
+def test_s6_counter_plan_is_a_typed_candidate_action():
+    prompt, extraction, _, _ = fixture()
+    result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S6, run(*_s6_complete_trace()))
+    assert result.decision.rule == "synthesis"
