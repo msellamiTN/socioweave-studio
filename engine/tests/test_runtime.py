@@ -242,6 +242,6 @@ def test_s8_reviewers_are_independent_and_table4_profile_is_preserved():
     reviewer_contexts = [context for action, context in invoker.calls if action == "critique"]
     assert len(reviewer_contexts) == 3
     for context in reviewer_contexts:
-        assert "[author:draft]" in context.input_content
-        assert "[reviewer-" not in context.input_content
+        assert context.input_content == "stub:draft"
+        assert "reviewer-" not in context.input_content
         assert all(item.author == "author" for item in context.visible_history)
