@@ -37,4 +37,4 @@ The provider-backed composition regression currently measures actual provider in
 - C8 = S2 → S8: theoretical `S2= n+1 = 3`, `S8=k+3=5`, total 8. The second phase's single seeded author draft reduces actual provider calls by one; observed expected total is 7.
 - C2 = S12 → S5: theoretical `S12=n+1=3`, `S5=4`, total 7. The second phase's one seeded draft reduces actual provider calls by one; observed expected total is 6.
 
-The existing provider-backed tests assert these actual totals and verify that the second phase has one seeded agent. They do not yet assert every phase's full step-by-step theoretical-versus-actual ledger. That granular per-phase accounting is the next audit item.
+The existing provider-backed tests assert these actual totals and verify that the second phase has one seeded agent. The parameterized assertions now check per-phase unseeded catalogue budgets and actual calls (first phase fully unseeded; second phase reduced by one seeded draft), as well as totals. This still does not verify every protocol step against a formal paper trace or cost proof.
