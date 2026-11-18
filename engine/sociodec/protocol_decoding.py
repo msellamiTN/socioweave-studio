@@ -44,6 +44,7 @@ class ProtocolMessage:
     partitions: tuple[tuple[str, str], ...] = ()
     hypothesis_verdicts: tuple[HypothesisVerdict, ...] = ()
     peer_review_verdict: PeerReviewVerdict | None = None
+    consensus_no_objection: bool | None = None
 
 def _obj(value: Any, label: str) -> dict:
     if not isinstance(value, dict):
@@ -156,8 +157,9 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
     candidate, objections, ranking, ballots, partitions = None, (), (), (), ()
     selected, rationale, summary = None, "", ""
     peer_review_verdict = None
+    consensus_no_objection = None
     agreements, disagreements = (), ()
-    if action in {"draft", "revise", "merge", "check"}:
+    if action in {"draft", "revise", "counter_plan", "merge", "check"}:
         candidate = parse_candidate(data.get("candidate", data), prompt=prompt, extraction=extraction, candidate_id=candidate_id)
     elif action == "critique":
         raw = data.get("objections")
@@ -193,6 +195,11 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
                 peer_review_verdict = PeerReviewVerdict(_str(data.get("verdict"), "verdict"))
             except ValueError as exc:
                 raise ProtocolDecodeError("Invalid peer-review verdict; expected accept or revise") from exc
+        elif "no_objection" in data:
+            value = data.get("no_objection")
+            if not isinstance(value, bool):
+                raise ProtocolDecodeError("no_objection must be a boolean")
+            consensus_no_objection = value
         else:
             selected = _str(data.get("selected_candidate_id"), "selected_candidate_id")
     elif action == "summarise":
@@ -210,4 +217,4 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
         raise ProtocolDecodeError(f"Unsupported action: {action}")
     verdicts = parse_hypothesis_verdicts(data.get("hypothesis_verdicts"), extraction)
     return ProtocolMessage(action, candidate, objections, ranking, ballots, selected,
-                           rationale, summary, agreements, disagreements, partitions, verdicts, peer_review_verdict)
+                           rationale, summary, agreements, disagreements, partitions, verdicts, peer_review_verdict, consensus_no_objection)

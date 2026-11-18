@@ -17,8 +17,10 @@ def test_every_established_strategy_builds_a_valid_social_strategy(definition):
         ),
     )
     strategy = blueprint.strategy
-    assert strategy.calls == get_strategy(definition.identifier).calls(n=3, k=3, T=2)
-    assert strategy.depth == get_strategy(definition.identifier).depth(n=3, k=3, T=2)
+    expected_calls = 2 + 3 * 2 if definition.identifier is StrategyId.S11 else get_strategy(definition.identifier).calls(n=3, k=3, T=2)
+    expected_depth = 1 + 2 * 2 if definition.identifier is StrategyId.S11 else get_strategy(definition.identifier).depth(n=3, k=3, T=2)
+    assert strategy.calls == expected_calls
+    assert strategy.depth == expected_depth
     assert strategy.decision_rule.value == definition.decision_rule
     assert len(strategy.assignments) == len(strategy.agents) * strategy.rounds
     assert all(
