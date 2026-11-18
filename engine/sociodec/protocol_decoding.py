@@ -42,8 +42,8 @@ class ProtocolMessage:
     agreements: tuple[str, ...] = ()
     disagreements: tuple[str, ...] = ()
     partitions: tuple[tuple[str, str], ...] = ()
-    peer_review_verdict: PeerReviewVerdict | None = None
     hypothesis_verdicts: tuple[HypothesisVerdict, ...] = ()
+    peer_review_verdict: PeerReviewVerdict | None = None
 
 def _obj(value: Any, label: str) -> dict:
     if not isinstance(value, dict):
@@ -210,5 +210,4 @@ def parse_protocol_output(output: ProtocolOutput, *, prompt: Prompt,
         raise ProtocolDecodeError(f"Unsupported action: {action}")
     verdicts = parse_hypothesis_verdicts(data.get("hypothesis_verdicts"), extraction)
     return ProtocolMessage(action, candidate, objections, ranking, ballots, selected,
-                           rationale, summary, agreements, disagreements, partitions, verdicts,
-                           peer_review_verdict)
+                           rationale, summary, agreements, disagreements, partitions, verdicts, peer_review_verdict)
