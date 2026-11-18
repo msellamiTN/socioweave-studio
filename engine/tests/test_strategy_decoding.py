@@ -858,9 +858,11 @@ def test_s11_rejects_invalid_stage_order_round_and_roster():
 def test_s11_requires_mediator_summary_to_state_agreements_or_disagreements():
     prompt, extraction, d, _ = fixture()
     outputs = (
-        candidate_out(0, "party-1"), candidate_out(1, "party-2"),
-        out(2, "mediator", "summarise", {"summary": "There are differences."}),
-        candidate_out(3, "party-1", "revise"), candidate_out(4, "party-2", "revise"),
+        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(2, "mediator", 1, 2, "summarise", json.dumps({"summary": "There are differences."}), True, False),
+        ProtocolOutput(3, "party-1", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(4, "party-2", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
     )
     decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
         StrategyId.S11: DecisionAdjudication(
