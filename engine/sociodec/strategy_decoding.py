@@ -354,12 +354,15 @@ class ProtocolDecisionDecoder:
             if len(revisions) != 1:
                 raise StrategyDecisionError("S5 requires exactly one typed author revision")
             judge = _judge_message(messages, "judge")
-            decision = authority(
-                (Candidate("author", revisions[0].decomposition),),
-                judge_id="judge",
-                selected_candidate_id=judge.selected_candidate_id,
-                rationale=judge.rationale,
-            )
+            try:
+                decision = authority(
+                    (Candidate("author", revisions[0].decomposition),),
+                    judge_id="judge",
+                    selected_candidate_id=judge.selected_candidate_id,
+                    rationale=judge.rationale,
+                )
+            except ValueError as exc:
+                raise StrategyDecisionError(f"S5 judge decision is invalid: {exc}") from exc
         elif strategy_id is StrategyId.S6:
             selected = _required_candidates(pool, ("decomposer-1", "decomposer-2"))
             synthesized = [message.candidate for agent, message in messages
