@@ -193,3 +193,71 @@ def test_runtime_rejects_empty_invoker_or_precomputed_output():
     )
     with pytest.raises(ValueError, match="requires precomputed output"):
         run_strategy("missing-precomputed", prompt(), strat, RecordingInvoker())
+
+
+# Serialized provider-boundary privacy regression tests.
+def test_provider_serialized_delphi_anonymity_and_peer_visibility_contracts():
+    import json
+    from sociodec.providers.base import GenerationResult
+    from sociodec.providers.protocol_invoker import ProviderProtocolInvoker
+
+    class PromptRecordingProvider:
+        provider_name = "test-provider"
+        model_name = "test-model"
+        def __init__(self):
+            self.requests = []
+        def generate(self, messages, config=None):
+            self.requests.append(messages)
+            return GenerationResult("opaque-response", self.provider_name, self.model_name)
+
+    provider = PromptRecordingProvider()
+    invoker = ProviderProtocolInvoker(
+        {"model-A": provider, "model-B": provider},
+        model_families={"model-A": "family-A", "model-B": "family-B"},
+    )
+    # Synthetic Delphi-style contract: first-round drafts are private; later
+    # peer-visible history is author-masked at the runtime AND serialized edge.
+    anon_strategy = strategy(anonymous=True, peer_visible=False)
+    result = run_strategy("delphi-privacy-contract", prompt(), anon_strategy, invoker)
+    payloads = [json.loads(messages[1].content) for messages in provider.requests]
+    first_round_payloads = payloads[:2]
+    assert all(payload["visible_history"] == [] for payload in first_round_payloads)
+    assert "a1:draft" not in first_round_payloads[1]["input_content"]
+    later_payload = payloads[2]
+    assert later_payload["visible_history"]
+    assert {item["author"] for item in later_payload["visible_history"]} == {"anonymous"}
+    assert "a1" not in {item["author"] for item in later_payload["visible_history"]}
+    assert "a2" not in {item["author"] for item in later_payload["visible_history"]}
+    # The request still exposes the current actor ID; this test does not claim
+    # full identity unlinkability or remove identity from traces/telemetry.
+    assert later_payload["agent_id"] in {"a1", "a2"}
+
+
+def test_provider_serialized_nominal_group_first_round_peer_drafts_are_hidden():
+    import json
+    from sociodec.providers.base import GenerationResult
+    from sociodec.providers.protocol_invoker import ProviderProtocolInvoker
+
+    class PromptRecordingProvider:
+        provider_name = "test-provider"
+        model_name = "test-model"
+        def __init__(self):
+            self.requests = []
+        def generate(self, messages, config=None):
+            self.requests.append(messages)
+            return GenerationResult("candidate draft", self.provider_name, self.model_name)
+
+    provider = PromptRecordingProvider()
+    invoker = ProviderProtocolInvoker(
+        {"model-A": provider, "model-B": provider},
+        model_families={"model-A": "family-A", "model-B": "family-B"},
+    )
+    # Synthetic NGT-style visibility contract: both initial drafts must be
+    # provider-isolated. Later peer exposure is not tested as an NGT ranking
+    # implementation here; strategy-factory wiring remains a separate audit.
+    run_strategy("ngt-visibility-contract", prompt(), strategy(peer_visible=False), invoker)
+    payloads = [json.loads(messages[1].content) for messages in provider.requests]
+    assert len(payloads) >= 2
+    assert all(payload["visible_history"] == [] for payload in payloads[:2])
+    assert all("a1:draft" not in payload["input_content"] for payload in payloads[:2])
+    assert all("a2:draft" not in payload["input_content"] for payload in payloads[:2])
