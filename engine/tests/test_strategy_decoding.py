@@ -105,7 +105,7 @@ def _s7_complete_trace():
         (StrategyId.S10, (
             candidate_out(0, "participant-1", "revise"),
             candidate_out(1, "participant-2", "revise"),
-            out(2, "moderator", "judge", {"selected_candidate_id": "participant-1", "rationale": "No unresolved objection"}),
+            out(2, "moderator", "judge", {"no_objection": True, "rationale": "No unresolved objection"}),
         ), "consensus"),
     ],
 )
@@ -122,20 +122,29 @@ def test_strategy_decision_assembly_applies_paper_operator(sid, outputs, expecte
 def test_s11_compromise_requires_explicit_negotiated_result():
     prompt, extraction, d, _ = fixture()
     outputs = (
-        candidate_out(0, "party-1"),
-        candidate_out(1, "party-2"),
-        out(2, "mediator", "summarise", {"summary": "Balance cost and access"}),
-        candidate_out(3, "party-1", "revise"),
-        candidate_out(4, "party-2", "revise"),
+        ProtocolOutput(0, "party-1", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(2, "mediator", 1, 2, "summarise",
+                       json.dumps({"summary": "Balance cost and access",
+                                   "agreements": ["access"],
+                                   "disagreements": ["cost"]}), True, False),
+        ProtocolOutput(3, "party-1", 1, 3, "revise",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(4, "party-2", 1, 3, "revise",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
     )
-    with pytest.raises(StrategyDecisionError, match="explicit external decision adjudication"):
-        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S11, run(*outputs))
+    configured = StrategyRun("S11", outputs, len(outputs), 3, (),
+                              ("party-1", "party-2", "mediator"))
+    with pytest.raises(StrategyDecisionError, match="explicit negotiated joint decomposition"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S11, configured)
     decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
         StrategyId.S11: DecisionAdjudication(
             negotiated_decomposition=d, rationale="Both parties accepted the negotiated plan",
         ),
     })
-    assert decoder(StrategyId.S11, run(*outputs)).decision.rule == "compromise"
+    assert decoder(StrategyId.S11, configured).decision.rule == "compromise"
 
 
 def test_s13_rejects_empty_critique_instead_of_inventing_a_separate_judge():
@@ -739,6 +748,283 @@ def test_s8_requires_single_round_and_exact_configured_author_editor_roster():
         decoder(StrategyId.S8, run_s8(
             *outputs.outputs, expected_agent_ids=("author", "reviewer-1"),
         ))
+
+
+def _s13_complete_trace():
+    raw = fixture()[3]
+    return (
+        ProtocolOutput(0, "agent-A", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(1, "agent-B", 1, 2, "critique", json.dumps({
+            "objections": [{"kind": "missing_subproblem", "subject": "s1",
+                            "rationale": "The initial plan omits a required component."}]
+        }), True, False),
+        ProtocolOutput(2, "agent-B", 1, 3, "revise", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(3, "agent-A", 1, 4, "critique", json.dumps({
+            "objections": [{"kind": "hidden_dependency", "subject": "s1",
+                            "rationale": "The repaired plan does not justify the prerequisite."}]
+        }), True, False),
+    )
+
+
+def run_s13(*outputs, expected_agent_ids=("agent-A", "agent-B")):
+    return StrategyRun("S13", tuple(outputs), len(outputs), 4, (), expected_agent_ids)
+
+
+def test_s13_role_reversal_returns_b_repaired_candidate_after_a_final_critique():
+    prompt, extraction, _, _ = fixture()
+    result = ProtocolDecisionDecoder(prompt, extraction)(
+        StrategyId.S13, run_s13(*_s13_complete_trace()),
+    )
+    assert result.decision.rule == "authority"
+    assert result.decision.selected_candidate_id == "agent-B"
+
+
+@pytest.mark.parametrize("mutation", ["missing", "reordered", "wrong_stage", "wrong_round"])
+def test_s13_rejects_incomplete_or_malformed_role_reversal_trace(mutation):
+    prompt, extraction, _, _ = fixture()
+    outputs = list(_s13_complete_trace())
+    if mutation == "missing":
+        outputs.pop(2)
+    elif mutation == "reordered":
+        outputs[1], outputs[2] = outputs[2], outputs[1]
+    elif mutation == "wrong_stage":
+        item = outputs[2]
+        outputs[2] = ProtocolOutput(item.step_index, item.agent_id, item.round, 2,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    else:
+        item = outputs[3]
+        outputs[3] = ProtocolOutput(item.step_index, item.agent_id, 2, item.stage,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    with pytest.raises(StrategyDecisionError):
+        ProtocolDecisionDecoder(prompt, extraction)(
+            StrategyId.S13, run_s13(*outputs),
+        )
+
+
+def test_s13_requires_typed_objections_in_both_roles_and_exact_roster():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    outputs = list(_s13_complete_trace())
+    outputs[1] = ProtocolOutput(
+        1, "agent-B", 1, 2, "critique", json.dumps({"objections": []}), True, False,
+    )
+    with pytest.raises(StrategyDecisionError, match="agent-B must provide typed objections"):
+        decoder(StrategyId.S13, run_s13(*outputs))
+    with pytest.raises(StrategyDecisionError, match="configured roster"):
+        decoder(StrategyId.S13, run_s13(
+            *_s13_complete_trace(), expected_agent_ids=("agent-A", "agent-B", "agent-C"),
+        ))
+
+
+
+def test_s11_rejects_invalid_stage_order_round_and_roster():
+    prompt, extraction, d, _ = fixture()
+    outputs = (
+        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(2, "mediator", 1, 2, "summarise", json.dumps({
+            "summary": "Both want reliable access but disagree on cost.",
+            "agreements": ["reliable access"], "disagreements": ["cost allocation"],
+        }), True, False),
+        ProtocolOutput(3, "party-1", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(4, "party-2", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d, rationale="Parties accepted the joint draft",
+        ),
+    })
+    valid = StrategyRun("S11", outputs, 5, 3, (), ("party-1", "party-2", "mediator"))
+    assert decoder(StrategyId.S11, valid).decision.rule == "compromise"
+    wrong_stage = list(outputs)
+    item = wrong_stage[4]
+    wrong_stage[4] = ProtocolOutput(item.step_index, item.agent_id, item.round, 2,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    with pytest.raises(StrategyDecisionError, match="summary stage followed by parallel revision stage"):
+        decoder(StrategyId.S11, StrategyRun("S11", tuple(wrong_stage), 5, 3, (),
+                                            ("party-1", "party-2", "mediator")))
+    wrong_round = list(outputs)
+    item = wrong_round[4]
+    wrong_round[4] = ProtocolOutput(item.step_index, item.agent_id, 2, item.stage,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    with pytest.raises(StrategyDecisionError, match="S11 round 1 requires"):
+        decoder(StrategyId.S11, StrategyRun("S11", tuple(wrong_round), 5, 3, (),
+                                            ("party-1", "party-2", "mediator")))
+    with pytest.raises(StrategyDecisionError, match="configured roster"):
+        decoder(StrategyId.S11, StrategyRun("S11", outputs, 5, 3, (),
+                                            ("party-1", "party-2")))
+
+
+def test_s11_requires_mediator_summary_to_state_agreements_or_disagreements():
+    prompt, extraction, d, _ = fixture()
+    outputs = (
+        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(2, "mediator", 1, 2, "summarise", json.dumps({"summary": "There are differences."}), True, False),
+        ProtocolOutput(3, "party-1", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(4, "party-2", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d, rationale="Agreed joint plan",
+        ),
+    })
+    with pytest.raises(StrategyDecisionError, match="agreements or disagreements"):
+        decoder(StrategyId.S11, StrategyRun(
+            "S11", outputs, 5, 3, (), ("party-1", "party-2", "mediator"),
+        ))
+
+
+
+def _s10_round_trace(rounds=1, participants=("participant-1", "participant-2")):
+    outputs = []
+    index = 0
+    for round_number in range(1, rounds + 1):
+        for participant in participants:
+            outputs.append(ProtocolOutput(
+                index, participant, round_number, index + 1, "revise",
+                json.dumps({"candidate": fixture()[3]}), True, False,
+            ))
+            index += 1
+    outputs.append(ProtocolOutput(
+        index, "moderator", rounds, index + 1, "judge",
+        json.dumps({"no_objection": True,
+                    "rationale": "No participant objects to the shared draft."}),
+        True, False,
+    ))
+    return tuple(outputs)
+
+
+def test_s10_validates_sequential_shared_deliberation_rounds_and_final_closure():
+    prompt, extraction, _, _ = fixture()
+    outputs = _s10_round_trace(rounds=2)
+    strategy_run = StrategyRun(
+        "S10", outputs, len(outputs), len(outputs), (),
+        ("participant-1", "participant-2", "moderator"),
+    )
+    result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S10, strategy_run)
+    assert result.decision.rule == "consensus"
+    assert result.decision.selected_candidate_id == "participant-2"
+
+
+@pytest.mark.parametrize("mutation", ["missing_turn", "reordered", "early_moderator", "wrong_stage"])
+def test_s10_rejects_incomplete_or_nonsequential_deliberation(mutation):
+    prompt, extraction, _, _ = fixture()
+    outputs = list(_s10_round_trace(rounds=1))
+    if mutation == "missing_turn":
+        outputs.pop(1)
+    elif mutation == "reordered":
+        outputs[0], outputs[1] = outputs[1], outputs[0]
+    elif mutation == "early_moderator":
+        outputs.insert(1, outputs.pop())
+    else:
+        item = outputs[1]
+        outputs[1] = ProtocolOutput(item.step_index, item.agent_id, item.round, 1,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    run_value = StrategyRun(
+        "S10", tuple(outputs), len(outputs), len({x.stage for x in outputs}), (),
+        ("participant-1", "participant-2", "moderator"),
+    )
+    with pytest.raises(StrategyDecisionError):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S10, run_value)
+
+
+def test_s10_rejects_missing_moderator_or_wrong_configured_roster():
+    prompt, extraction, _, _ = fixture()
+    outputs = _s10_round_trace()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    with pytest.raises(StrategyDecisionError, match="final moderator closure"):
+        decoder(StrategyId.S10, StrategyRun(
+            "S10", outputs[:-1], len(outputs) - 1, 2, (),
+            ("participant-1", "participant-2", "moderator"),
+        ))
+    with pytest.raises(StrategyDecisionError, match="include the moderator"):
+        decoder(StrategyId.S10, StrategyRun(
+            "S10", outputs, len(outputs), 3, (), ("participant-1", "participant-2"),
+        ))
+
+
+
+def _s11_iterative_trace(rounds=2):
+    outputs = [
+        ProtocolOutput(0, "party-1", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+    ]
+    index = 2
+    for round_number in range(1, rounds + 1):
+        summary_stage = 2 * round_number
+        for agent_id, action, stage in (
+            ("mediator", "summarise", summary_stage),
+            ("party-1", "revise", summary_stage + 1),
+            ("party-2", "revise", summary_stage + 1),
+        ):
+            if action == "summarise":
+                payload = {
+                    "summary": f"Neutral mediation summary round {round_number}",
+                    "agreements": ["Shared objective"],
+                    "disagreements": ["Task order"],
+                }
+            else:
+                payload = {"candidate": fixture()[3]}
+            outputs.append(ProtocolOutput(
+                index, agent_id, round_number, stage, action,
+                json.dumps(payload), True, False,
+            ))
+            index += 1
+    return tuple(outputs)
+
+
+def test_s11_validates_multiple_complete_mediation_rounds():
+    prompt, extraction, d, _ = fixture()
+    outputs = _s11_iterative_trace(rounds=3)
+    run_value = StrategyRun(
+        "S11", outputs, len(outputs), 7, (),
+        ("party-1", "party-2", "mediator"),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d,
+            rationale="The parties accepted the explicit negotiated decomposition.",
+        ),
+    })
+    result = decoder(StrategyId.S11, run_value)
+    assert result.decision.rule == "compromise"
+
+
+@pytest.mark.parametrize("mutation", ["missing_party_turn", "missing_summary_evidence", "wrong_round", "wrong_stage"])
+def test_s11_rejects_incomplete_iterative_rounds(mutation):
+    prompt, extraction, d, _ = fixture()
+    outputs = list(_s11_iterative_trace(rounds=2))
+    if mutation == "missing_party_turn":
+        outputs.pop(7)
+    elif mutation == "missing_summary_evidence":
+        item = outputs[5]
+        outputs[5] = ProtocolOutput(
+            item.step_index, item.agent_id, item.round, item.stage, item.action,
+            json.dumps({"summary": "No explicit agreement or disagreement"}),
+            item.model_invoked, item.from_seed,
+        )
+    elif mutation == "wrong_round":
+        item = outputs[5]
+        outputs[5] = ProtocolOutput(item.step_index, item.agent_id, 3, item.stage,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    else:
+        item = outputs[6]
+        outputs[6] = ProtocolOutput(item.step_index, item.agent_id, item.round, item.stage - 1,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    run_value = StrategyRun(
+        "S11", tuple(outputs), len(outputs), 5, (),
+        ("party-1", "party-2", "mediator"),
+    )
+    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
+        StrategyId.S11: DecisionAdjudication(
+            negotiated_decomposition=d, rationale="Explicit negotiation result",
+        ),
+    })
+    with pytest.raises(StrategyDecisionError):
+        decoder(StrategyId.S11, run_value)
 
 
 def _s13_complete_trace():

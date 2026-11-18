@@ -263,15 +263,22 @@ def build_strategy_blueprint(
 
     elif sid is StrategyId.S11:
         ids = ("party-1", "party-2", "mediator")
-        add_roles(ids, 1, {"party-1": Role.DECOMPOSER, "party-2": Role.DECOMPOSER, "mediator": Role.MEDIATOR})
+        add_roles(ids, T, {"party-1": Role.DECOMPOSER, "party-2": Role.DECOMPOSER, "mediator": Role.MEDIATOR})
+        # The initial round drafts independently once. Every mediation round
+        # thereafter is one mediator summary followed by parallel revisions.
         p.extend((
             ProtocolStep("party-1", Action.DRAFT, "prompt", 1, 1),
             ProtocolStep("party-2", Action.DRAFT, "prompt", 1, 1),
-            ProtocolStep("mediator", Action.SUMMARISE, "all_previous_outputs", 1, 2),
-            ProtocolStep("party-1", Action.REVISE, "all_previous_outputs", 1, 3),
-            ProtocolStep("party-2", Action.REVISE, "all_previous_outputs", 1, 3),
         ))
-        visibility[1] = _pairs(ids, full=True)
+        for round_number in range(1, T + 1):
+            summary_stage = 2 * round_number
+            revision_stage = summary_stage + 1
+            p.extend((
+                ProtocolStep("mediator", Action.SUMMARISE, "all_previous_outputs", round_number, summary_stage),
+                ProtocolStep("party-1", Action.REVISE, "all_previous_outputs", round_number, revision_stage),
+                ProtocolStep("party-2", Action.REVISE, "all_previous_outputs", round_number, revision_stage),
+            ))
+            visibility[round_number] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
 
     elif sid is StrategyId.S10:
@@ -293,7 +300,7 @@ def build_strategy_blueprint(
     blueprint = _make(
         sid, tuple(ids), models, roles, tuple(p),
         DecisionRule(get_strategy(sid).decision_rule),
-        (3 if sid in {StrategyId.S1, StrategyId.S7} else T if sid in {StrategyId.S4, StrategyId.S10} else 4 if sid is StrategyId.S8 else 2 if sid in {StrategyId.S2, StrategyId.S3, StrategyId.S9, StrategyId.S12, StrategyId.S13} else 1),
+        (3 if sid in {StrategyId.S1, StrategyId.S7} else T if sid in {StrategyId.S4, StrategyId.S10, StrategyId.S11} else 4 if sid is StrategyId.S8 else 2 if sid in {StrategyId.S2, StrategyId.S3, StrategyId.S9, StrategyId.S12, StrategyId.S13} else 1),
         visibility, views, agent_contexts,
     )
     expected_calls = get_strategy(sid).calls(n=n, k=k, T=T)
