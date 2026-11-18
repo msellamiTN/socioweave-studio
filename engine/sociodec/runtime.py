@@ -59,6 +59,8 @@ class StrategyRun:
     depth_executed: int
     seeded_agents: tuple[str, ...]
     expected_agent_ids: tuple[str, ...] | None = None
+    scheduled_steps: int | None = None
+    scheduled_depth: int | None = None
 
     @property
     def output_refs(self) -> dict[str, str]:
@@ -82,9 +84,29 @@ class StrategyRun:
         return sum(not item.model_invoked and not item.from_seed for item in self.outputs)
 
     @property
+    def skipped_steps(self) -> int | None:
+        if self.scheduled_steps is None:
+            return None
+        return self.scheduled_steps - self.protocol_steps
+
+    @property
+    def skipped_stages(self) -> int | None:
+        if self.scheduled_depth is None:
+            return None
+        return self.scheduled_depth - self.depth_executed
+
+    @property
     def accounting_reconciles(self) -> bool:
+        if self.scheduled_steps is None or self.scheduled_depth is None:
+            return False
+        skipped = self.skipped_steps
+        skipped_stages = self.skipped_stages
         return (
-            self.protocol_steps
+            skipped is not None and skipped >= 0
+            and skipped_stages is not None and skipped_stages >= 0
+            and self.protocol_steps + skipped == self.scheduled_steps
+            and self.depth_executed + skipped_stages == self.scheduled_depth
+            and self.protocol_steps
             == self.model_invocations + self.seeded_steps + self.precomputed_steps
             and self.calls_made == self.model_invocations
         )
@@ -453,4 +475,6 @@ def run_strategy(
         depth_executed=len({item.stage for item in outputs}),
         seeded_agents=tuple(sorted(seeded_agents)),
         expected_agent_ids=tuple(agent.identifier for agent in strategy.agents),
+        scheduled_steps=len(strategy.protocol),
+        scheduled_depth=len(stages),
     )
