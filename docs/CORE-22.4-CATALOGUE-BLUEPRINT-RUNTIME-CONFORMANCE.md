@@ -1,6 +1,6 @@
 # Core 22.4 — Catalogue–Blueprint–Runtime Semantic Conformance
 
-**Status:** PASS — deterministic software conformance on commit `39d16c623e23b9e8d7ee77cdcf27c87024bfbe23`. This is not scientific validation or an empirical strategy comparison.
+**Status:** PASS — deterministic software conformance on commit `a28f8a26a1a8739bcae9018d3c9370da11092bef`. This is not scientific validation or an empirical strategy comparison.
 
 ## Source contract
 
@@ -17,7 +17,7 @@ The profile keeps paper-reported Table 4 cost separate from the concrete bounded
 `validate_blueprint()` compares the generated blueprint with an independent expected protocol signature. It checks:
 
 - exact ordered agent roster and prompt-view coverage;
-- role assignment for every agent and round;
+- exact declared role set and role assignment for every agent and round;
 - strategy round count and stage/action/input signature;
 - decision rule and anonymity flag;
 - exact visibility relation by round;
@@ -51,7 +51,7 @@ Negative mutations cover prompt-view roster, role assignment, visibility, decisi
 
 ## Acceptance evidence
 
-GitHub Actions run [44423378674](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423378674) on exact commit `39d16c623e23b9e8d7ee77cdcf27c87024bfbe23`: **447 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
+GitHub Actions run [44423563050](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423563050) on exact commit `a28f8a26a1a8739bcae9018d3c9370da11092bef`: **448 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
 
 ## Evidence boundary
 
