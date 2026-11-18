@@ -146,6 +146,10 @@ def test_runtime_execution_reconciles_with_blueprint_and_actual_output_accountin
     assert run.protocol_steps == len(run.outputs)
     assert run.depth_executed == len({item.stage for item in run.outputs})
     assert run.depth_executed <= blueprint.strategy.depth
+    assert run.skipped_steps == (1 if sid is StrategyId.S8 else 0)
+    assert run.skipped_stages == (1 if sid is StrategyId.S8 else 0)
+    assert run.scheduled_steps == len(blueprint.strategy.protocol)
+    assert run.scheduled_depth == blueprint.strategy.depth
     assert run.accounting_reconciles
 
 
