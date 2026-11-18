@@ -138,7 +138,7 @@ def test_s11_compromise_requires_explicit_negotiated_result():
     assert decoder(StrategyId.S11, run(*outputs)).decision.rule == "compromise"
 
 
-def test_s13_authority_choice_must_be_explicit_not_inferred_from_critique():
+def test_s13_rejects_empty_critique_instead_of_inventing_a_separate_judge():
     prompt, extraction, _, _ = fixture()
     outputs = (
         candidate_out(0, "agent-A"),
@@ -146,14 +146,8 @@ def test_s13_authority_choice_must_be_explicit_not_inferred_from_critique():
         candidate_out(2, "agent-B", "revise"),
         out(3, "agent-A", "critique", {"objections": []}),
     )
-    with pytest.raises(StrategyDecisionError, match="explicit external decision adjudication"):
-        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S13, run(*outputs))
-    decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
-        StrategyId.S13: DecisionAdjudication(
-            selected_candidate_id="agent-B", rationale="Agent A explicitly endorses the repaired draft",
-        ),
-    })
-    assert decoder(StrategyId.S13, run(*outputs)).decision.rule == "authority"
+    with pytest.raises(StrategyDecisionError, match="agent-B must provide typed objections"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S13, run_s13(*outputs))
 
 
 def test_s9_rejects_ballots_with_unknown_candidate_or_subproblem():
