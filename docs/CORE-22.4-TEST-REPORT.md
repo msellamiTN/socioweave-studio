@@ -1,8 +1,8 @@
 # Core 22.4 — Test and Conformance Report
 
-**Result:** PASS — deterministic software conformance tests on exact commit `92040644f7ffbbd7bf7774408864eeea724773d6`.  
-**GitHub Actions:** [Run 44423184541](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423184541).  
-**Result:** 447 passed in 0.62s; 0 failed; 0 skipped.
+**Result:** PASS — deterministic software conformance tests on exact commit `39d16c623e23b9e8d7ee77cdcf27c87024bfbe23`.  
+**GitHub Actions:** [Run 44423378674](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423378674).  
+**Result:** 447 passed in 0.49s; 0 failed; 0 skipped.
 
 ## Coverage delivered
 
@@ -18,7 +18,7 @@
 | Decision semantics and anonymity | Rule and anonymity compared to profile | PASS |
 | Call/depth formulas | Formula compared with generated protocol | PASS |
 | Step references | Prior-step existence, stage precedence and visibility | PASS |
-| Runtime accounting | Model, seeded and precomputed steps partition outputs | PASS |
+| Runtime accounting | Scheduled, executed, skipped, provider, seeded and precomputed steps reconcile; scheduled/executed depth reconciles | PASS |
 | Stage snapshot | Existing runtime regression confirms same-stage peer isolation | PASS |
 | Sequential composition | First phase receives no inherited drafts/seed; second phase receives first decomposition as chain seed | PASS |
 | Negative mutation tests | Roster, roles, visibility, decision, references and call-count mutations | PASS |
@@ -31,6 +31,14 @@ All thirteen strategies pass the independent blueprint oracle at:
 - ((5,4,3)): larger configuration.
 
 A second parameterized test executes all thirteen blueprints through the deterministic mock runtime at ((2,2,1)), then reconciles provider calls, executed outputs and actual depth. S8's ACCEPT branch correctly skips its conditional author revision and is checked against the reduced actual call count.
+
+## Runtime accounting identity
+
+Every runtime-produced run reports scheduled and executed protocol steps, skipped steps, scheduled and executed stages, provider invocations, seeded steps and precomputed steps. The checks enforce both identities:
+
+- scheduled steps = executed outputs + skipped steps;
+- executed outputs = provider invocations + seeded outputs + precomputed outputs;
+- scheduled stages = executed stages + skipped stages.
 
 ## Important correctness fix: Definition 12
 
