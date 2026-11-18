@@ -141,6 +141,8 @@ def run_strategy(
     delphi_candidate_distance: Callable[[str, str], float] | None = None,
     consensus_epsilon: float | None = None,
     consensus_candidate_distance: Callable[[str, str], float] | None = None,
+    mediation_epsilon: float | None = None,
+    mediation_candidate_distance: Callable[[str, str], float] | None = None,
 ) -> StrategyRun:
     """Execute protocol steps with stage snapshots and per-agent visibility.
 
@@ -166,6 +168,13 @@ def run_strategy(
             raise ValueError("consensus_candidate_distance is required when consensus_epsilon is set")
     elif consensus_epsilon is not None or consensus_candidate_distance is not None:
         raise ValueError("Consensus stopping options are valid only for S10")
+    if strategy_id == "S11":
+        if mediation_epsilon is not None and not 0.0 <= mediation_epsilon <= 1.0:
+            raise ValueError("mediation_epsilon must be in [0, 1]")
+        if mediation_epsilon is not None and mediation_candidate_distance is None:
+            raise ValueError("mediation_candidate_distance is required when mediation_epsilon is set")
+    elif mediation_epsilon is not None or mediation_candidate_distance is not None:
+        raise ValueError("Mediation stopping options are valid only for S11")
     inputs = dict(initial_inputs or {})
     views = dict(prompt_views or {})
     seed_map = dict(seeds or {})
@@ -186,6 +195,7 @@ def run_strategy(
     calls_made = 0
     stages = sorted({step.stage for step in strategy.protocol})
     consensus_stopped_after: int | None = None
+    mediation_stopped_after: int | None = None
 
     def canonical_candidate(record: ProtocolOutput) -> str:
         try:
@@ -206,6 +216,8 @@ def run_strategy(
             # retains the single final moderator closure step in the blueprint.
             if (strategy_id == "S10" and consensus_stopped_after is not None
                     and step.action.value != "judge" and step.round > consensus_stopped_after):
+                continue
+            if strategy_id == "S11" and mediation_stopped_after is not None and step.round > mediation_stopped_after:
                 continue
             if strategy_id == "S8" and step.action.value == "revise":
                 if not _s8_revision_required(outputs):
@@ -332,6 +344,33 @@ def run_strategy(
                         within_epsilon = distance <= consensus_epsilon
                     if unchanged or within_epsilon:
                         consensus_stopped_after = round_number
+
+        # Mediation compares the two parties' revised drafts at the end of
+        # each complete round. The mediator facilitates; it never selects a
+        # winner or manufactures the negotiated joint decomposition.
+        if strategy_id == "S11":
+            round_number = next(step.round for step in strategy.protocol if step.stage == stage)
+            round_stages = [step.stage for step in strategy.protocol if step.round == round_number]
+            if stage == max(round_stages):
+                revisions = {
+                    agent_id: [item for item in outputs
+                               if item.round == round_number and item.agent_id == agent_id
+                               and item.action == "revise"]
+                    for agent_id in ("party-1", "party-2")
+                }
+                if any(len(items) != 1 for items in revisions.values()):
+                    raise ValueError("S11 convergence requires exactly one revision from each party per round")
+                left = canonical_candidate(revisions["party-1"][0])
+                right = canonical_candidate(revisions["party-2"][0])
+                agreed = left == right
+                within_epsilon = False
+                if mediation_epsilon is not None:
+                    distance = mediation_candidate_distance(left, right)
+                    if not isinstance(distance, (int, float)) or not 0.0 <= distance <= 1.0:
+                        raise ValueError("Mediation candidate distance must return a value in [0, 1]")
+                    within_epsilon = distance <= mediation_epsilon
+                if agreed or within_epsilon:
+                    mediation_stopped_after = round_number
 
         # Delphi stopping is evaluated only after the facilitator has completed
         # the round. Each expert is compared with their own previous draft.
