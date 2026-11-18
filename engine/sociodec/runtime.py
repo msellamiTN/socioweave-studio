@@ -59,6 +59,26 @@ class StrategyRun:
     seeded_agents: tuple[str, ...]
 
     @property
+    def protocol_steps(self) -> int:
+        """Total executed protocol steps, including seeded and precomputed steps."""
+        return len(self.outputs)
+
+    @property
+    def model_invocations(self) -> int:
+        """Provider/model calls made by the runtime."""
+        return self.calls_made
+
+    @property
+    def seeded_steps(self) -> int:
+        """Protocol steps supplied by a seed and therefore not invoking a model."""
+        return sum(item.from_seed for item in self.outputs)
+
+    @property
+    def precomputed_steps(self) -> int:
+        """Non-model steps supplied by precomputed outputs (excluding seeds)."""
+        return sum(not item.model_invoked and not item.from_seed for item in self.outputs)
+
+    @property
     def output_refs(self) -> dict[str, str]:
         return {f"step:{item.step_index}": item.text for item in self.outputs}
 
