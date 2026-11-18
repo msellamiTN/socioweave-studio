@@ -517,7 +517,60 @@ class ProtocolDecisionDecoder:
             decision = authority((chosen,), judge_id="editor",
                                 selected_candidate_id="author", rationale=rationale)
         elif strategy_id is StrategyId.S10:
-            participant_ids = tuple(sorted(x for x in pool if x.startswith("participant-")))
+            # Consensus deliberation is shared, sequential revision: every
+            # participant receives the preceding turns, then the moderator
+            # closes the exchange once the deliberation rounds are complete.
+            participant_ids = tuple(
+                agent_id for agent_id in (
+                    run.expected_agent_ids or tuple(dict.fromkeys(
+                        output.agent_id for output in run.outputs
+                        if output.agent_id.startswith("participant-")
+                    ))
+                ) if agent_id.startswith("participant-")
+            )
+            if not participant_ids:
+                raise StrategyDecisionError("S10 requires at least one configured participant")
+            if len(participant_ids) != len(set(participant_ids)):
+                raise StrategyDecisionError("S10 configured participant roster contains duplicates")
+            if run.expected_agent_ids is not None and "moderator" not in run.expected_agent_ids:
+                raise StrategyDecisionError("S10 configured roster must include the moderator")
+            participant_turns = [
+                output for output in run.outputs
+                if output.agent_id.startswith("participant-")
+            ]
+            moderator_turns = [
+                output for output in run.outputs
+                if output.agent_id == "moderator" and output.action == "judge"
+            ]
+            if not participant_turns or len(moderator_turns) != 1:
+                raise StrategyDecisionError(
+                    "S10 requires sequential participant revisions and exactly one final moderator closure"
+                )
+            if any(output.action != "revise" for output in participant_turns):
+                raise StrategyDecisionError("S10 participant turns must all revise the shared draft")
+            observed_rounds = sorted({output.round for output in participant_turns})
+            if observed_rounds != list(range(1, max(observed_rounds) + 1)):
+                raise StrategyDecisionError("S10 deliberation rounds must be contiguous from round 1")
+            expected_turn_order = tuple(
+                (round_number, participant_id)
+                for round_number in observed_rounds
+                for participant_id in participant_ids
+            )
+            observed_turn_order = tuple(
+                (output.round, output.agent_id) for output in participant_turns
+            )
+            if observed_turn_order != expected_turn_order:
+                raise StrategyDecisionError(
+                    "S10 requires exactly one sequential revision from every participant in each round"
+                )
+            final_judge = moderator_turns[0]
+            if run.outputs[-1] != final_judge:
+                raise StrategyDecisionError("S10 moderator must close after all participant turns")
+            if final_judge.round != observed_rounds[-1]:
+                raise StrategyDecisionError("S10 moderator closure must follow the final deliberation round")
+            expected_stages = tuple(range(1, len(run.outputs) + 1))
+            if tuple(output.stage for output in run.outputs) != expected_stages:
+                raise StrategyDecisionError("S10 all turns must occupy strictly sequential stages")
             selected = _required_candidates(pool, participant_ids)
             moderator = _judge_message(messages, "moderator")
             candidate_id = moderator.selected_candidate_id

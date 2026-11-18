@@ -873,3 +873,72 @@ def test_s11_requires_mediator_summary_to_state_agreements_or_disagreements():
         decoder(StrategyId.S11, StrategyRun(
             "S11", outputs, 5, 3, (), ("party-1", "party-2", "mediator"),
         ))
+
+
+
+def _s10_round_trace(rounds=1, participants=("participant-1", "participant-2")):
+    outputs = []
+    index = 0
+    for round_number in range(1, rounds + 1):
+        for participant in participants:
+            outputs.append(ProtocolOutput(
+                index, participant, round_number, index + 1, "revise",
+                json.dumps({"candidate": fixture()[3]}), True, False,
+            ))
+            index += 1
+    outputs.append(ProtocolOutput(
+        index, "moderator", rounds, index + 1, "judge",
+        json.dumps({"selected_candidate_id": participants[0],
+                    "rationale": "No participant objects to the shared draft."}),
+        True, False,
+    ))
+    return tuple(outputs)
+
+
+def test_s10_validates_sequential_shared_deliberation_rounds_and_final_closure():
+    prompt, extraction, _, _ = fixture()
+    outputs = _s10_round_trace(rounds=2)
+    strategy_run = StrategyRun(
+        "S10", outputs, len(outputs), len(outputs), (),
+        ("participant-1", "participant-2", "moderator"),
+    )
+    result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S10, strategy_run)
+    assert result.decision.rule == "consensus"
+    assert result.decision.selected_candidate_id == "participant-1"
+
+
+@pytest.mark.parametrize("mutation", ["missing_turn", "reordered", "early_moderator", "wrong_stage"])
+def test_s10_rejects_incomplete_or_nonsequential_deliberation(mutation):
+    prompt, extraction, _, _ = fixture()
+    outputs = list(_s10_round_trace(rounds=1))
+    if mutation == "missing_turn":
+        outputs.pop(1)
+    elif mutation == "reordered":
+        outputs[0], outputs[1] = outputs[1], outputs[0]
+    elif mutation == "early_moderator":
+        outputs.insert(1, outputs.pop())
+    else:
+        item = outputs[1]
+        outputs[1] = ProtocolOutput(item.step_index, item.agent_id, item.round, 1,
+                                    item.action, item.text, item.model_invoked, item.from_seed)
+    run_value = StrategyRun(
+        "S10", tuple(outputs), len(outputs), len({x.stage for x in outputs}), (),
+        ("participant-1", "participant-2", "moderator"),
+    )
+    with pytest.raises(StrategyDecisionError):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S10, run_value)
+
+
+def test_s10_rejects_missing_moderator_or_wrong_configured_roster():
+    prompt, extraction, _, _ = fixture()
+    outputs = _s10_round_trace()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    with pytest.raises(StrategyDecisionError, match="final moderator closure"):
+        decoder(StrategyId.S10, StrategyRun(
+            "S10", outputs[:-1], len(outputs) - 1, 2, (),
+            ("participant-1", "participant-2", "moderator"),
+        ))
+    with pytest.raises(StrategyDecisionError, match="include the moderator"):
+        decoder(StrategyId.S10, StrategyRun(
+            "S10", outputs, len(outputs), 3, (), ("participant-1", "participant-2"),
+        ))
