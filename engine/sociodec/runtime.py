@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 from sociodec.extraction import Hypothesis
 from sociodec.models.prompt import Prompt
@@ -137,6 +137,8 @@ def run_strategy(
     hypotheses: tuple[Hypothesis, ...] = (),
     seeds: Mapping[str, str] | None = None,
     precomputed_outputs: Mapping[str, str] | None = None,
+    delphi_epsilon: float | None = None,
+    delphi_candidate_distance: Callable[[str, str], float] | None = None,
 ) -> StrategyRun:
     """Execute protocol steps with stage snapshots and per-agent visibility.
 
@@ -148,6 +150,13 @@ def run_strategy(
     """
     if not strategy_id.strip():
         raise ValueError("strategy_id must not be empty")
+    if strategy_id == "S4":
+        if delphi_epsilon is not None and not 0.0 <= delphi_epsilon <= 1.0:
+            raise ValueError("delphi_epsilon must be in [0, 1]")
+        if delphi_epsilon is not None and delphi_candidate_distance is None:
+            raise ValueError("delphi_candidate_distance is required when delphi_epsilon is set")
+    elif delphi_epsilon is not None or delphi_candidate_distance is not None:
+        raise ValueError("Delphi stopping options are valid only for S4")
     inputs = dict(initial_inputs or {})
     views = dict(prompt_views or {})
     seed_map = dict(seeds or {})
@@ -268,6 +277,49 @@ def run_strategy(
             )
             stage_outputs.append(record)
         outputs.extend(stage_outputs)
+
+        # Delphi stopping is evaluated only after the facilitator has completed
+        # the round. Each expert is compared with their own previous draft.
+        if strategy_id == "S4":
+            round_number = next(step.round for step in strategy.protocol if step.stage == stage)
+            round_stages = [step.stage for step in strategy.protocol if step.round == round_number]
+            if stage == max(round_stages) and round_number > 1:
+                def candidate_payload(record: ProtocolOutput) -> str:
+                    try:
+                        payload = json.loads(record.text)
+                    except json.JSONDecodeError as exc:
+                        raise ValueError("S4 expert output must be valid JSON for convergence checks") from exc
+                    if not isinstance(payload, dict):
+                        raise ValueError("S4 expert output must be a JSON object")
+                    candidate = payload.get("candidate", payload)
+                    return json.dumps(candidate, sort_keys=True, separators=(",", ":"))
+
+                experts = tuple(agent.identifier for agent in strategy.agents
+                                if agent.identifier.startswith("expert-"))
+                previous = {}
+                current = {}
+                for expert in experts:
+                    history = [item for item in outputs if item.agent_id == expert
+                               and item.action in {"draft", "revise"}
+                               and item.round in {round_number - 1, round_number}]
+                    prior = [item for item in history if item.round == round_number - 1]
+                    latest = [item for item in history if item.round == round_number]
+                    if len(prior) != 1 or len(latest) != 1:
+                        raise ValueError(f"S4 convergence requires one draft per expert in rounds {round_number - 1} and {round_number}")
+                    previous[expert] = candidate_payload(prior[0])
+                    current[expert] = candidate_payload(latest[0])
+
+                unchanged = all(previous[expert] == current[expert] for expert in experts)
+                within_epsilon = False
+                if delphi_epsilon is not None:
+                    distances = [delphi_candidate_distance(previous[expert], current[expert])
+                                 for expert in experts]
+                    if any(not isinstance(value, (int, float)) or not 0.0 <= value <= 1.0
+                           for value in distances):
+                        raise ValueError("Delphi candidate distance must return values in [0, 1]")
+                    within_epsilon = max(distances) <= delphi_epsilon
+                if unchanged or within_epsilon:
+                    break
 
     return StrategyRun(
         strategy_id=strategy_id,

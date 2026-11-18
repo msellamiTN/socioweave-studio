@@ -329,3 +329,70 @@ def test_s9_runtime_persists_exact_expected_voter_roster():
         prompt_views=blueprint.prompt_views,
     )
     assert result.expected_agent_ids == ("voter-1", "voter-2", "voter-3", "voter-4")
+
+
+class DelphiInvoker:
+    def __init__(self, revisions):
+        self.revisions = revisions
+        self.calls = []
+
+    def invoke(self, agent, step, context):
+        self.calls.append((agent.identifier, step.round, step.action.value))
+        if step.action.value in {"draft", "revise"}:
+            value = 0 if step.round == 1 else self.revisions.get(agent.identifier, 0)
+            return json.dumps({"candidate": {"value": value}})
+        return json.dumps({"summary": f"Round {step.round} divergences"})
+
+
+def test_s4_stops_after_exact_per_expert_stability():
+    blueprint = build_strategy_blueprint("S4", n=2, T=4)
+    invoker = DelphiInvoker({"expert-1": 0, "expert-2": 0})
+    run = run_strategy("S4", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views)
+    assert {item.round for item in run.outputs} == {1, 2}
+    assert run.calls_made == 6
+    assert run.depth_executed == 4
+    assert sum(1 for _, _, action in invoker.calls if action == "summarise") == 2
+
+
+def test_s4_epsilon_stopping_uses_each_experts_successive_drafts():
+    blueprint = build_strategy_blueprint("S4", n=2, T=4)
+    invoker = DelphiInvoker({"expert-1": 1, "expert-2": 2})
+    distances = []
+    def distance(previous, current):
+        distances.append((previous, current))
+        return 0.05
+    run = run_strategy("S4", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views,
+                       delphi_epsilon=0.1,
+                       delphi_candidate_distance=distance)
+    assert {item.round for item in run.outputs} == {1, 2}
+    assert run.calls_made == 6
+    assert len(distances) == 2
+    assert all(previous == '{"value":0}' for previous, _ in distances)
+
+
+def test_s4_continues_when_not_stable_and_distance_exceeds_epsilon():
+    blueprint = build_strategy_blueprint("S4", n=2, T=3)
+    invoker = DelphiInvoker({"expert-1": 1, "expert-2": 2})
+    run = run_strategy("S4", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views,
+                       delphi_epsilon=0.01,
+                       delphi_candidate_distance=lambda previous, current: 0.5)
+    assert {item.round for item in run.outputs} == {1, 2, 3}
+    assert run.calls_made == 9
+    assert run.depth_executed == 6
+
+
+def test_s4_requires_explicit_distance_when_epsilon_is_configured():
+    blueprint = build_strategy_blueprint("S4", n=2, T=2)
+    with pytest.raises(ValueError, match="delphi_candidate_distance is required"):
+        run_strategy("S4", prompt(), blueprint.strategy, DelphiInvoker({}),
+                     prompt_views=blueprint.prompt_views, delphi_epsilon=0.1)
+
+
+def test_s4_rejects_delphi_options_for_other_strategies():
+    blueprint = build_strategy_blueprint("S5")
+    with pytest.raises(ValueError, match="only for S4"):
+        run_strategy("S5", prompt(), blueprint.strategy, RecordingInvoker(),
+                     prompt_views=blueprint.prompt_views, delphi_epsilon=0.1)
