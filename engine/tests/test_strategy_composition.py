@@ -90,6 +90,7 @@ def test_sequential_composition_seeds_second_phase_and_accumulates_calls_and_evi
         (None, None), None, 10,
     )
     assert adapter.calls[0][0] is PlanItem.S2
+    assert adapter.calls[0][1] is None  # first phase must not consume any external seed
     assert adapter.calls[1][0] is PlanItem.S8
     assert adapter.calls[1][1] == result.decomposition
     assert [x[2] for x in adapter.calls] == [4, 6]
