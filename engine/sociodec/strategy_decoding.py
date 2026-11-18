@@ -594,29 +594,33 @@ class ProtocolDecisionDecoder:
                 f"Moderator closed the shared draft: {moderator_message.rationale}",
             )
         elif strategy_id is StrategyId.S11:
-            # Each mediation round is: parallel party drafts, neutral mediator
-            # summary, then parallel party revisions. The mediator never chooses.
-            if not run.outputs or len(run.outputs) % 5:
-                raise StrategyDecisionError("S11 requires complete five-call mediation rounds")
+            # Initial independent drafts are made once. Each subsequent
+            # mediation round is a neutral summary followed by parallel revisions.
+            if len(run.outputs) < 5 or (len(run.outputs) - 2) % 3:
+                raise StrategyDecisionError("S11 requires two initial drafts and complete three-call mediation rounds")
             observed_rounds = sorted({output.round for output in run.outputs})
             if observed_rounds != list(range(1, max(observed_rounds) + 1)):
                 raise StrategyDecisionError("S11 mediation rounds must be contiguous from round 1")
-            expected_trace = (
-                ("party-1", "draft"), ("party-2", "draft"),
-                ("mediator", "summarise"),
-                ("party-1", "revise"), ("party-2", "revise"),
-            )
+            initial = run.outputs[:2]
+            if tuple((output.agent_id, output.action, output.round, output.stage) for output in initial) != (
+                ("party-1", "draft", 1, 1), ("party-2", "draft", 1, 1)
+            ):
+                raise StrategyDecisionError("S11 requires exactly two parallel initial party drafts")
             for round_number in observed_rounds:
-                round_outputs = [output for output in run.outputs if output.round == round_number]
-                if tuple((output.agent_id, output.action) for output in round_outputs) != expected_trace:
-                    raise StrategyDecisionError(
-                        f"S11 round {round_number} requires parallel drafts, mediator summary, and parallel revisions"
-                    )
-                first_stage = (round_number - 1) * 3 + 1
-                if tuple(output.stage for output in round_outputs) != (
-                    first_stage, first_stage, first_stage + 1, first_stage + 2, first_stage + 2
+                offset = 2 + (round_number - 1) * 3
+                round_outputs = run.outputs[offset:offset + 3]
+                if tuple((output.agent_id, output.action, output.round) for output in round_outputs) != (
+                    ("mediator", "summarise", round_number),
+                    ("party-1", "revise", round_number),
+                    ("party-2", "revise", round_number),
                 ):
-                    raise StrategyDecisionError("S11 requires parallel stages 1/3 around mediator stage 2 in every round")
+                    raise StrategyDecisionError(
+                        f"S11 round {round_number} requires one mediator summary and two parallel party revisions"
+                    )
+                if tuple(output.stage for output in round_outputs) != (
+                    2 * round_number, 2 * round_number + 1, 2 * round_number + 1
+                ):
+                    raise StrategyDecisionError("S11 requires one summary stage followed by parallel revision stage in every round")
             if run.expected_agent_ids is not None and set(run.expected_agent_ids) != {
                 "party-1", "party-2", "mediator"
             }:
@@ -624,7 +628,7 @@ class ProtocolDecisionDecoder:
                     "S11 configured roster must contain exactly party-1, party-2, and mediator"
                 )
             for round_number in observed_rounds:
-                summary_index = (round_number - 1) * 5 + 2
+                summary_index = 2 + (round_number - 1) * 3
                 summary = messages[summary_index][1]
                 if not summary.summary.strip():
                     raise StrategyDecisionError(f"S11 mediator summary in round {round_number} must be non-empty")
