@@ -545,3 +545,20 @@ def test_s11_rejects_mediation_options_for_other_strategies():
     with pytest.raises(ValueError, match="only for S11"):
         run_strategy("S10", prompt(), blueprint.strategy, RecordingInvoker(),
                      prompt_views=blueprint.prompt_views, mediation_epsilon=0.1)
+
+
+def test_runtime_accounting_partitions_model_seeded_and_precomputed_steps():
+    invoker = RecordingInvoker()
+    blueprint = build_strategy_blueprint("S5")
+    result = run_strategy(
+        "S5", prompt(), blueprint.strategy, invoker,
+        prompt_views=blueprint.prompt_views,
+        seeds={"author": "seeded author draft"},
+        precomputed_outputs={"step:3": "precomputed judge decision"},
+    )
+    assert result.protocol_steps == 4
+    assert result.model_invocations == 2
+    assert result.seeded_steps == 1
+    assert result.precomputed_steps == 1
+    assert result.calls_made == 2
+    assert result.accounting_reconciles
