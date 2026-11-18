@@ -128,12 +128,16 @@ def test_sequential_composition_rejects_conflicting_hypothesis_verdicts():
 
 
 
-@pytest.mark.parametrize("item,expected_first,expected_second,expected_calls", [
-    (PlanItem.C8_BRAINSTORM_THEN_REVIEW, PlanItem.S2, PlanItem.S8, 7),
-    (PlanItem.COMBO_JIGSAW_THEN_CRITIC, PlanItem.S12, PlanItem.S5, 6),
-])
+@pytest.mark.parametrize(
+    "item,expected_first,expected_second,theoretical_first,theoretical_second,actual_first,actual_second,expected_calls",
+    [
+        (PlanItem.C8_BRAINSTORM_THEN_REVIEW, PlanItem.S2, PlanItem.S8, 3, 5, 3, 4, 7),
+        (PlanItem.COMBO_JIGSAW_THEN_CRITIC, PlanItem.S12, PlanItem.S5, 3, 4, 3, 3, 6),
+    ],
+)
 def test_provider_backed_sequential_compositions_execute_through_real_adapter_runtime(
-    item, expected_first, expected_second, expected_calls,
+    item, expected_first, expected_second, theoretical_first, theoretical_second,
+    actual_first, actual_second, expected_calls,
 ):
     from sociodec.decisions import DecisionResult
     from sociodec.models.decomposition import Decomposition, Subproblem
@@ -191,6 +195,14 @@ def test_provider_backed_sequential_compositions_execute_through_real_adapter_ru
     assert result.calls_made == expected_calls
     assert len(provider.calls) == expected_calls
     assert len(invoker.traces) == expected_calls
+    # Catalogue (unseeded) phase budgets vs actual provider calls.
+    # Exactly one second-phase draft is seeded from the first decomposition.
+    assert theoretical_first + theoretical_second == (8 if item is PlanItem.C8_BRAINSTORM_THEN_REVIEW else 7)
+    assert actual_first == theoretical_first
+    assert actual_second == theoretical_second - 1
+    assert len(invoker.traces[:actual_first]) == actual_first
+    assert len(invoker.traces[actual_first:]) == actual_second
+    assert actual_first + actual_second == expected_calls
     assert [entry[0] for entry in decoder_runs] == [
         StrategyId(expected_first.value), StrategyId(expected_second.value)
     ]
