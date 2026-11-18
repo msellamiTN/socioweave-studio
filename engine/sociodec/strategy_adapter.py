@@ -159,9 +159,10 @@ class ConcreteStrategyAdapter:
                 f"{sid.value} requires an explicit prompt_view_factory; "
                 "full-prompt fallback is forbidden for partitioned strategies"
             )
+        partitioned_strategy = sid in {StrategyId.S1, StrategyId.S12}
         views = (
             self.prompt_view_factory(sid, prompt, extraction, agent_ids)
-            if self.prompt_view_factory is not None else
+            if partitioned_strategy and self.prompt_view_factory is not None else
             {agent_id: prompt.text for agent_id in agent_ids}
         )
         if sid in {StrategyId.S1, StrategyId.S12}:
