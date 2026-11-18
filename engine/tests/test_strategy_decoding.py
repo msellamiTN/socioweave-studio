@@ -49,6 +49,19 @@ def run(*outputs):
     return StrategyRun("test", tuple(outputs), len(outputs), len(outputs), ())
 
 
+def _s7_complete_trace():
+    raw = fixture()[3]
+    return (
+        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(2, "party-1", 1, 2, "defend", json.dumps({"defence": "This plan maximises deliverable coverage."}), True, False),
+        ProtocolOutput(3, "party-2", 1, 2, "defend", json.dumps({"defence": "This plan minimises duplicated subproblems."}), True, False),
+        ProtocolOutput(4, "judge", 1, 3, "judge", json.dumps({
+            "selected_candidate_id": "party-1", "rationale": "Coverage takes precedence under the rubric."
+        }), True, False),
+    )
+
+
 @pytest.mark.parametrize(
     "sid,outputs,expected",
     [
@@ -83,10 +96,7 @@ def run(*outputs):
             candidate_out(0, "decomposer-1"), candidate_out(1, "decomposer-2", "counter_plan"),
             candidate_out(2, "synthesizer", "merge"),
         ), "synthesis"),
-        (StrategyId.S7, (
-            candidate_out(0, "party-1"), candidate_out(1, "party-2"),
-            out(2, "judge", "judge", {"selected_candidate_id": "party-1", "rationale": "Stronger defence"}),
-        ), "authority"),
+        (StrategyId.S7, _s7_complete_trace(), "authority"),
         (StrategyId.S8, (
             candidate_out(0, "author"),
             out(1, "reviewer-1", "critique", {"objections": []}),
@@ -102,7 +112,8 @@ def run(*outputs):
 def test_strategy_decision_assembly_applies_paper_operator(sid, outputs, expected):
     prompt, extraction, _, _ = fixture()
     decoder = ProtocolDecisionDecoder(prompt, extraction)
-    result = decoder(sid, run(*outputs))
+    strategy_run = run_s7(*outputs) if sid is StrategyId.S7 else run(*outputs)
+    result = decoder(sid, strategy_run)
     assert result.decision.rule == expected
     assert len(result.decision.decomposition.kappa["Service plan"]) == 1
     assert result.decision.decomposition.subproblems[0].question == "Create service"
@@ -618,3 +629,47 @@ def test_s6_counter_plan_is_a_typed_candidate_action():
     prompt, extraction, _, _ = fixture()
     result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S6, run(*_s6_complete_trace()))
     assert result.decision.rule == "synthesis"
+
+
+def test_s7_requires_both_independent_drafts_defences_and_judge():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = _s7_complete_trace()
+    assert decoder(StrategyId.S7, run_s7(*complete)).decision.rule == "authority"
+    for invalid in (complete[:4], complete[:3] + complete[4:],
+                    complete[:2] + complete[3:4] + complete[4:],
+                    complete[:2] + complete[3:4] + complete[2:3] + complete[4:]):
+        with pytest.raises(StrategyDecisionError):
+            decoder(StrategyId.S7, run_s7(*invalid))
+
+
+def run_s7(*outputs):
+    return StrategyRun("S7", tuple(outputs), len(outputs), 3, (),
+                       ("party-1", "party-2", "judge"))
+
+
+def test_s7_rejects_wrong_parallel_stage_structure_and_non_neutral_roster():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = list(_s7_complete_trace())
+    complete[1] = ProtocolOutput(1, "party-2", 1, 2, "draft",
+                                 complete[1].text, True, False)
+    with pytest.raises(StrategyDecisionError, match="parallel draft/defence stages"):
+        decoder(StrategyId.S7, run_s7(*complete))
+    with pytest.raises(StrategyDecisionError, match="configured roster"):
+        decoder(StrategyId.S7, StrategyRun(
+            "S7", _s7_complete_trace(), 5, 3, (),
+            ("party-1", "party-2", "party-3"),
+        ))
+
+
+def test_s7_judge_must_select_one_of_the_two_submitted_cases():
+    prompt, extraction, _, _ = fixture()
+    outputs = list(_s7_complete_trace())
+    outputs[-1] = ProtocolOutput(
+        4, "judge", 1, 3, "judge",
+        json.dumps({"selected_candidate_id": "outsider", "rationale": "Outside case"}),
+        True, False,
+    )
+    with pytest.raises(StrategyDecisionError, match="may select only a supplied candidate"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S7, run_s7(*outputs))
