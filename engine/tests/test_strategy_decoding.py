@@ -122,11 +122,18 @@ def test_strategy_decision_assembly_applies_paper_operator(sid, outputs, expecte
 def test_s11_compromise_requires_explicit_negotiated_result():
     prompt, extraction, d, _ = fixture()
     outputs = (
-        candidate_out(0, "party-1"),
-        candidate_out(1, "party-2"),
-        out(2, "mediator", "summarise", {"summary": "Balance cost and access"}),
-        candidate_out(3, "party-1", "revise"),
-        candidate_out(4, "party-2", "revise"),
+        ProtocolOutput(0, "party-1", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(2, "mediator", 1, 2, "summarise",
+                       json.dumps({"summary": "Balance cost and access",
+                                   "agreements": ["access"],
+                                   "disagreements": ["cost"]}), True, False),
+        ProtocolOutput(3, "party-1", 1, 3, "revise",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(4, "party-2", 1, 3, "revise",
+                       json.dumps({"candidate": fixture()[3]}), True, False),
     )
     configured = StrategyRun("S11", outputs, len(outputs), 3, (),
                               ("party-1", "party-2", "mediator"))
@@ -813,12 +820,14 @@ def test_s13_requires_typed_objections_in_both_roles_and_exact_roster():
 def test_s11_rejects_invalid_stage_order_round_and_roster():
     prompt, extraction, d, _ = fixture()
     outputs = (
-        candidate_out(0, "party-1"), candidate_out(1, "party-2"),
-        out(2, "mediator", "summarise", {
+        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(2, "mediator", 1, 2, "summarise", json.dumps({
             "summary": "Both want reliable access but disagree on cost.",
             "agreements": ["reliable access"], "disagreements": ["cost allocation"],
-        }),
-        candidate_out(3, "party-1", "revise"), candidate_out(4, "party-2", "revise"),
+        }), True, False),
+        ProtocolOutput(3, "party-1", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
+        ProtocolOutput(4, "party-2", 1, 3, "revise", json.dumps({"candidate": fixture()[3]}), True, False),
     )
     decoder = ProtocolDecisionDecoder(prompt, extraction, adjudications={
         StrategyId.S11: DecisionAdjudication(
