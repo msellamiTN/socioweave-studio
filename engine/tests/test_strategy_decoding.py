@@ -84,7 +84,8 @@ def run(*outputs):
         ), "authority"),
         (StrategyId.S8, (
             candidate_out(0, "author"),
-            out(1, "editor", "judge", {"verdict": "accept", "rationale": "Reviews addressed"}),
+            out(1, "reviewer-1", "critique", {"objections": []}),
+            out(2, "editor", "judge", {"verdict": "accept", "rationale": "Reviews addressed"}),
         ), "authority"),
         (StrategyId.S10, (
             candidate_out(0, "participant-1", "revise"),
@@ -212,8 +213,8 @@ def test_s8_typed_verdict_assembles_original_d0_or_revised_d1(
 
 
 @pytest.mark.parametrize("verdict,outputs,match", [
-    ("accept", (distinct_candidate_out(0, "author", "draft", "D0", "D0"), out(1, "editor", "judge", {"verdict":"accept","rationale":"ok"}), distinct_candidate_out(2, "author", "revise", "D1","D1")), "ACCEPT branch"),
-    ("revise", (distinct_candidate_out(0, "author", "draft", "D0", "D0"), out(1, "editor", "judge", {"verdict":"revise","rationale":"fix"})), "REVISE verdict"),
+    ("accept", (distinct_candidate_out(0, "author", "draft", "D0", "D0"), out(1, "reviewer-1", "critique", {"objections": []}), out(2, "editor", "judge", {"verdict":"accept","rationale":"ok"}), distinct_candidate_out(3, "author", "revise", "D1","D1")), "ACCEPT branch"),
+    ("revise", (distinct_candidate_out(0, "author", "draft", "D0", "D0"), out(1, "reviewer-1", "critique", {"objections": []}), out(2, "editor", "judge", {"verdict":"revise","rationale":"fix"})), "REVISE verdict"),
 ])
 def test_s8_rejects_inconsistent_branch_evidence(verdict, outputs, match):
     prompt, extraction, _, _ = fixture()
