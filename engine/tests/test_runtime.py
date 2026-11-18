@@ -492,7 +492,7 @@ class MediationInvoker:
 
 def test_s11_stops_after_party_revisions_agree_and_preserves_parallel_stages():
     blueprint = build_strategy_blueprint("S11", n=2, T=4)
-    invoker = MediationInvoker(lambda round_number, party: 0 if round_number == 1 else 1)
+    invoker = MediationInvoker(lambda round_number, party: 0 if round_number == 1 and party == "party-1" else 1)
     run = run_strategy("S11", prompt(), blueprint.strategy, invoker,
                        prompt_views=blueprint.prompt_views)
     assert {item.round for item in run.outputs} == {1, 2}
