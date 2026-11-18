@@ -33,6 +33,27 @@ class ProtocolCallTrace:
     input_sha256: str
     output_sha256: str
 
+    def privacy_redacted(self) -> "ProtocolCallTrace":
+        """Return an export-safe view with correlation/identity fields masked.
+
+        This is opt-in; the original trace remains unchanged for operational
+        use. The redacted record preserves action, token counts and latency.
+        """
+        return ProtocolCallTrace(
+            agent_id="[REDACTED]",
+            model_id="[REDACTED]",
+            model_family="[REDACTED]",
+            provider="[REDACTED]",
+            returned_model="[REDACTED]",
+            action=self.action,
+            request_id=None,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            latency_ms=self.latency_ms,
+            input_sha256="[REDACTED]",
+            output_sha256="[REDACTED]",
+        )
+
 
 class ProviderProtocolInvoker:
     """Route each protocol step to the provider selected by Agent.model_id.
