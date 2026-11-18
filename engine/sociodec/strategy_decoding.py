@@ -206,6 +206,25 @@ class ProtocolDecisionDecoder:
                 raise StrategyDecisionError("S8 requires at least one named reviewer critique")
             if len(reviewer_ids) != len(set(reviewer_ids)):
                 raise StrategyDecisionError("S8 must contain exactly one critique per reviewer")
+            if run.expected_agent_ids is not None:
+                expected_reviewers = {
+                    agent_id for agent_id in run.expected_agent_ids
+                    if agent_id.startswith("reviewer-")
+                }
+                observed_reviewers = set(reviewer_ids)
+                if not expected_reviewers:
+                    raise StrategyDecisionError("S8 expected roster must include at least one reviewer")
+                if observed_reviewers != expected_reviewers:
+                    missing = sorted(expected_reviewers - observed_reviewers)
+                    unexpected = sorted(observed_reviewers - expected_reviewers)
+                    details = []
+                    if missing:
+                        details.append("missing: " + ", ".join(missing))
+                    if unexpected:
+                        details.append("unexpected: " + ", ".join(unexpected))
+                    raise StrategyDecisionError(
+                        "S8 reviewer critiques do not match expected roster (" + "; ".join(details) + ")"
+                    )
             if len(author_drafts) != 1 or len(editor_messages) != 1:
                 raise StrategyDecisionError("S8 requires exactly one original author draft and editor verdict")
             editor = editor_messages[0]

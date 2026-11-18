@@ -58,6 +58,7 @@ class StrategyRun:
     calls_made: int
     depth_executed: int
     seeded_agents: tuple[str, ...]
+    expected_agent_ids: tuple[str, ...] | None = None
 
     @property
     def output_refs(self) -> dict[str, str]:
@@ -274,4 +275,5 @@ def run_strategy(
         calls_made=calls_made,
         depth_executed=len({item.stage for item in outputs}),
         seeded_agents=tuple(sorted(seeded_agents)),
+        expected_agent_ids=tuple(agent.identifier for agent in strategy.agents),
     )

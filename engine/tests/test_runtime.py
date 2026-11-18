@@ -304,3 +304,19 @@ def test_s8_runtime_routes_all_reviews_to_editor_and_editor_verdict_to_author(re
     }
     assert result.calls_made == reviewer_count + 3
     assert result.depth_executed == 4
+
+@pytest.mark.parametrize("reviewer_count", [1, 3, 5])
+def test_s8_runtime_persists_exact_expected_agent_roster(reviewer_count):
+    blueprint = build_strategy_blueprint("S8", k=reviewer_count)
+    result = run_strategy(
+        "S8", prompt(), blueprint.strategy, S8VerdictInvoker("accept"),
+        prompt_views=blueprint.prompt_views,
+    )
+    assert result.expected_agent_ids == tuple(
+        agent.identifier for agent in blueprint.strategy.agents
+    )
+    assert result.expected_agent_ids == (
+        "author",
+        *(f"reviewer-{i}" for i in range(1, reviewer_count + 1)),
+        "editor",
+    )

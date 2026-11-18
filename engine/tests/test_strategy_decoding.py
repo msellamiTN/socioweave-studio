@@ -256,3 +256,51 @@ def test_s8_revise_requires_exactly_one_author_revision():
     )
     with pytest.raises(StrategyDecisionError, match="exactly one author D1 revision"):
         ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+
+@pytest.mark.parametrize("reviewer_count", [1, 3, 5])
+def test_s8_requires_complete_configured_reviewer_roster(reviewer_count):
+    prompt, extraction, _, _ = fixture()
+    expected = ("author", *(f"reviewer-{i}" for i in range(1, reviewer_count + 1)), "editor")
+    complete = [candidate_out(0, "author")]
+    complete.extend(out(i, f"reviewer-{i}", "critique", {"objections": []})
+                    for i in range(1, reviewer_count + 1))
+    complete.append(out(reviewer_count + 1, "editor", "judge",
+                        {"verdict": "accept", "rationale": "Reviewed"}))
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    assert decoder(StrategyId.S8, StrategyRun(
+        "S8", tuple(complete), len(complete), 3, (), expected,
+    )).decision.rule == "authority"
+    for missing_id in (f"reviewer-{i}" for i in range(1, reviewer_count + 1)):
+        incomplete = tuple(item for item in complete if item.agent_id != missing_id)
+        with pytest.raises(StrategyDecisionError, match="do not match expected roster"):
+            decoder(StrategyId.S8, StrategyRun(
+                "S8", incomplete, len(incomplete), 3, (), expected,
+            ))
+
+
+def test_s8_rejects_unexpected_reviewer_when_roster_is_known():
+    prompt, extraction, _, _ = fixture()
+    outputs = (
+        candidate_out(0, "author"),
+        out(1, "reviewer-1", "critique", {"objections": []}),
+        out(2, "reviewer-2", "critique", {"objections": []}),
+        out(3, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
+    )
+    known_roster = StrategyRun(
+        "S8", outputs, len(outputs), 3, (),
+        ("author", "reviewer-1", "editor"),
+    )
+    with pytest.raises(StrategyDecisionError, match="unexpected: reviewer-2"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, known_roster)
+
+
+def test_s8_legacy_run_without_roster_retains_minimum_reviewer_validation():
+    prompt, extraction, _, _ = fixture()
+    outputs = (
+        candidate_out(0, "author"),
+        out(1, "reviewer-1", "critique", {"objections": []}),
+        out(2, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
+    )
+    assert ProtocolDecisionDecoder(prompt, extraction)(
+        StrategyId.S8, run(*outputs),
+    ).decision.rule == "authority"
