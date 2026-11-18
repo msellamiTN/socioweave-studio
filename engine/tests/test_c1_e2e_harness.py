@@ -24,46 +24,46 @@ def build_harness(*, n=3, T=2, epsilon=0.0, distances=None, judge=("accept",),
             raise RuntimeError(f"injected failure at {name}")
 
     def draft(actor):
-        inject("gen")
         state["phase_order"].append("gen")
+        inject("gen")
         state["drafts"].append(actor)
         return {"actor": actor, "draft": len(state["drafts"])}
 
     def compare(pool):
-        inject("exa")
         state["phase_order"].append("exa")
+        inject("exa")
         state["compare"] += 1
         return AnonymousObjections((AnonymousObjection("gap", "A required step is missing"),))
 
     def revise(actor, own, objections):
-        inject("rev")
         state["phase_order"].append("rev")
+        inject("rev")
         state["revisions"].append((actor, own, objections))
         return {"actor": actor, "revision": len(state["revisions"])}
 
     def merge(pool):
-        inject("merge")
         state["phase_order"].append("merge")
+        inject("merge")
         state["merge"] += 1
         return {"merged": list(pool.values())}
 
     def adjudicate(candidate, pool):
-        inject("dec")
         state["phase_order"].append("dec")
+        inject("dec")
         state["judge"] += 1
         verdict = next(verdicts)
         typed = AnonymousObjections((AnonymousObjection("repair", "Clarify a missing step"),))
         return verdict, typed if verdict == "reject" else None
 
     def judge_revise(candidate, objections):
-        inject("judge-revision")
         state["phase_order"].append("judge-revision")
+        inject("judge-revision")
         state["judge_revise"] += 1
         return {"judge-revised": candidate}
 
     def check(candidate):
-        inject("algorithm1")
         state["phase_order"].append("algorithm1")
+        inject("algorithm1")
         state["check"] += 1
         return {"validated": candidate}, ()
 
