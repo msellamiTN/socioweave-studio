@@ -245,3 +245,62 @@ def test_s8_reviewers_are_independent_and_table4_profile_is_preserved():
         assert context.input_content == "stub:draft"
         assert "reviewer-" not in context.input_content
         assert all(item.author == "author" for item in context.visible_history)
+
+
+@pytest.mark.parametrize("reviewer_count", [1, 3, 5])
+def test_s8_runtime_routes_all_reviews_to_editor_and_editor_verdict_to_author(reviewer_count):
+    class EvidenceInvoker:
+        def __init__(self):
+            self.calls = []
+
+        def invoke(self, agent, step, context):
+            self.calls.append((agent.identifier, step.action.value, context))
+            if step.action.value == "draft":
+                return "AUTHOR_DRAFT"
+            if step.action.value == "critique":
+                return f"REVIEW_FROM_{agent.identifier}"
+            if step.action.value == "judge":
+                return json.dumps({"verdict": "revise", "rationale": "Revise using all reviews."})
+            if step.action.value == "revise":
+                return "AUTHOR_REVISION"
+            raise AssertionError(f"Unexpected S8 action: {step.action.value}")
+
+    blueprint = build_strategy_blueprint("S8", k=reviewer_count)
+    invoker = EvidenceInvoker()
+    result = run_strategy(
+        "S8", prompt(), blueprint.strategy, invoker,
+        prompt_views=blueprint.prompt_views,
+    )
+
+    reviews = {f"REVIEW_FROM_reviewer-{i}" for i in range(1, reviewer_count + 1)}
+    by_action = {
+        (agent, action): context
+        for agent, action, context in invoker.calls
+    }
+    editor_context = by_action[("editor", "judge")]
+    revision_context = by_action[("author", "revise")]
+
+    # Every reviewer receives D0, but no other reviewer's critique.
+    for i in range(1, reviewer_count + 1):
+        reviewer_context = by_action[(f"reviewer-{i}", "critique")]
+        assert reviewer_context.input_content == "AUTHOR_DRAFT"
+        assert all(
+            item.author == "author" and item.action == "draft"
+            for item in reviewer_context.visible_history
+        )
+
+    # The editor receives D0 and the complete set of independent critiques.
+    assert "AUTHOR_DRAFT" in editor_context.input_content
+    assert all(review in editor_context.input_content for review in reviews)
+    assert {item.author for item in editor_context.visible_history} == {
+        "author", *(f"reviewer-{i}" for i in range(1, reviewer_count + 1))
+    }
+
+    # The author receives all critiques plus the editor's typed verdict for D1.
+    assert all(review in revision_context.input_content for review in reviews)
+    assert '"verdict": "revise"' in revision_context.input_content
+    assert {item.author for item in revision_context.visible_history} == {
+        "author", "editor", *(f"reviewer-{i}" for i in range(1, reviewer_count + 1))
+    }
+    assert result.calls_made == reviewer_count + 3
+    assert result.depth_executed == 4
