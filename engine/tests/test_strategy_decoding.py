@@ -74,8 +74,10 @@ def run(*outputs):
             out(3, "voter-2", "vote", {"endorsed_subproblems": [{"candidate_id": "voter-2", "subproblem_id": "s1"}]}),
         ), "majority"),
         (StrategyId.S5, (
-            candidate_out(0, "author"), candidate_out(1, "author", "revise"),
-            out(2, "judge", "judge", {"selected_candidate_id": "author", "rationale": "Accepted after critique"}),
+            candidate_out(0, "author"),
+            out(1, "critic", "critique", {"objections": [{"kind": "missing_subproblem", "subject": "as-is analysis", "rationale": "The target cannot be planned without the current-state analysis."}]}),
+            candidate_out(2, "author", "revise"),
+            out(3, "judge", "judge", {"selected_candidate_id": "author", "rationale": "The revision addresses the objection."}),
         ), "authority"),
         (StrategyId.S6, (
             candidate_out(0, "decomposer-1"), candidate_out(1, "decomposer-2"),
@@ -541,3 +543,44 @@ def test_s4_legacy_run_validates_observed_expert_roster_per_round():
         "S4", outputs, len(outputs), 4, (),
     ))
     assert result.decision.rule == "consensus-medoid"
+
+
+
+def _s5_complete_trace():
+    return (
+        candidate_out(0, "author"),
+        out(1, "critic", "critique", {"objections": [{"kind": "hidden_dependency", "subject": "data-sharing agreement", "rationale": "Interoperability depends on permission to exchange data."}]}),
+        candidate_out(2, "author", "revise"),
+        out(3, "judge", "judge", {"selected_candidate_id": "author", "rationale": "The revision answers the objection."}),
+    )
+
+
+def test_s5_rejects_missing_critic_or_revision_or_judge_steps():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = _s5_complete_trace()
+    for incomplete in (complete[:1] + complete[2:], complete[:2] + complete[3:], complete[:3]):
+        with pytest.raises(StrategyDecisionError, match="ordered four-step trace"):
+            decoder(StrategyId.S5, run(*incomplete))
+
+
+def test_s5_rejects_reordered_or_duplicate_critic_trace():
+    prompt, extraction, _, _ = fixture()
+    decoder = ProtocolDecisionDecoder(prompt, extraction)
+    complete = _s5_complete_trace()
+    reordered = (complete[0], complete[2], complete[1], complete[3])
+    with pytest.raises(StrategyDecisionError, match="ordered four-step trace"):
+        decoder(StrategyId.S5, run(*reordered))
+    duplicated = (complete[0], complete[1], complete[1], complete[2], complete[3])
+    with pytest.raises(StrategyDecisionError, match="ordered four-step trace"):
+        decoder(StrategyId.S5, run(*duplicated))
+
+
+def test_s5_judge_must_select_the_revised_author_candidate():
+    prompt, extraction, _, _ = fixture()
+    outputs = list(_s5_complete_trace())
+    outputs[-1] = out(3, "judge", "judge", {
+        "selected_candidate_id": "other", "rationale": "Select another candidate."
+    })
+    with pytest.raises(StrategyDecisionError, match="may select only a supplied candidate"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S5, run(*outputs))

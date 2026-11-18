@@ -329,11 +329,37 @@ class ProtocolDecisionDecoder:
                 ballots[agent] = frozenset(signatures)
             decision = majority(selected, ballots)
         elif strategy_id is StrategyId.S5:
-            selected = _required_candidates(pool, ("author",))
+            # The paper's four-call sequence is author draft, critic objections,
+            # author revision, then judge authority. Do not silently accept a
+            # draft-only trace or let the pre-critique draft become the result.
+            expected_trace = (
+                ("author", "draft"),
+                ("critic", "critique"),
+                ("author", "revise"),
+                ("judge", "judge"),
+            )
+            observed_trace = tuple(
+                (output.agent_id, output.action) for output in run.outputs
+            )
+            if observed_trace != expected_trace:
+                raise StrategyDecisionError(
+                    "S5 requires the ordered four-step trace: author draft, critic critique, "
+                    "author revision, judge decision"
+                )
+            revisions = [
+                message.candidate for agent, message in messages
+                if agent == "author" and message.action == "revise"
+                and message.candidate is not None
+            ]
+            if len(revisions) != 1:
+                raise StrategyDecisionError("S5 requires exactly one typed author revision")
             judge = _judge_message(messages, "judge")
-            decision = authority(selected, judge_id="judge",
-                                 selected_candidate_id=judge.selected_candidate_id,
-                                 rationale=judge.rationale)
+            decision = authority(
+                (Candidate("author", revisions[0].decomposition),),
+                judge_id="judge",
+                selected_candidate_id=judge.selected_candidate_id,
+                rationale=judge.rationale,
+            )
         elif strategy_id is StrategyId.S6:
             selected = _required_candidates(pool, ("decomposer-1", "decomposer-2"))
             synthesized = [message.candidate for agent, message in messages
