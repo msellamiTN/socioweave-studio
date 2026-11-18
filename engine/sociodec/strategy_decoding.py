@@ -430,6 +430,34 @@ class ProtocolDecisionDecoder:
             except ValueError as exc:
                 raise StrategyDecisionError(f"S7 judge decision is invalid: {exc}") from exc
         elif strategy_id is StrategyId.S8:
+            # One author draft, isolated parallel reviewer reports, editor
+            # verdict, and a conditional final author revision.
+            trace = tuple((output.agent_id, output.action) for output in run.outputs)
+            has_revision = bool(trace and trace[-1] == ("author", "revise"))
+            editor_index = len(trace) - (2 if has_revision else 1)
+            reviewer_trace = trace[1:editor_index] if editor_index >= 1 else ()
+            if (not trace or trace[0] != ("author", "draft")
+                    or not reviewer_trace
+                    or any(action != "critique" or not agent.startswith("reviewer-")
+                           for agent, action in reviewer_trace)
+                    or len({agent for agent, _ in reviewer_trace}) != len(reviewer_trace)
+                    or trace[editor_index] != ("editor", "judge")
+                    or len(trace) != editor_index + 1 + int(has_revision)):
+                raise StrategyDecisionError(
+                    "S8 requires author draft, parallel reviewer critiques, editor verdict, "
+                    "and a conditional author revision"
+                )
+            expected_stages = ((1,) + (2,) * len(reviewer_trace) + (3,)
+                               + ((4,) if has_revision else ()))
+            if tuple(output.stage for output in run.outputs) != expected_stages:
+                raise StrategyDecisionError("S8 requires draft/review/editor/revision stages 1/2/3/4")
+            if any(output.round != 1 for output in run.outputs):
+                raise StrategyDecisionError("S8 peer review is a single-round procedure")
+            if run.expected_agent_ids is not None:
+                expected_roster = set(run.expected_agent_ids)
+                observed_roster = {"author", "editor", *(agent for agent, _ in reviewer_trace)}
+                if expected_roster != observed_roster:
+                    raise StrategyDecisionError("S8 configured roster must exactly match author, reviewers, and editor")
             author_drafts = [
                 message.candidate for agent, message in messages
                 if agent == "author" and message.action == "draft" and message.candidate is not None
