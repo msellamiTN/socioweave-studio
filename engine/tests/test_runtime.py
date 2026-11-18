@@ -229,3 +229,19 @@ def test_runtime_rejects_empty_invoker_or_precomputed_output():
     )
     with pytest.raises(ValueError, match="requires precomputed output"):
         run_strategy("missing-precomputed", prompt(), strat, RecordingInvoker())
+
+
+
+def test_s8_reviewers_are_independent_and_table4_profile_is_preserved():
+    blueprint = build_strategy_blueprint("S8", k=3)
+    assert blueprint.strategy.calls == 6  # k + 3 worst-case
+    assert blueprint.strategy.depth == 4
+    invoker = S8VerdictInvoker("revise")
+    run = run_strategy("S8", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views)
+    reviewer_contexts = [context for action, context in invoker.calls if action == "critique"]
+    assert len(reviewer_contexts) == 3
+    for context in reviewer_contexts:
+        assert "[author:draft]" in context.input_content
+        assert "[reviewer-" not in context.input_content
+        assert all(item.author == "author" for item in context.visible_history)
