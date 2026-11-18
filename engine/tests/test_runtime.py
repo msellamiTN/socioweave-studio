@@ -303,6 +303,11 @@ def test_real_s3_s4_blueprints_preserve_anonymity_and_peer_visibility_in_provide
         assert all({v["author"] for v in p["visible_history"]} == {"anonymous"} for p in rankings)
         assert all("anonymous" in p["input_content"] for p in rankings)
         assert all("member-1" not in p["input_content"] and "member-2" not in p["input_content"] for p in rankings)
+        for p in payloads:
+            actor = p["agent_id"]
+            assert actor in {"member-1", "member-2"}
+            other = "member-2" if actor == "member-1" else "member-1"
+            assert other not in p["agent_context"]
     else:
         # Delphi: first-round expert drafts remain independent. Facilitator
         # summaries and second-round revisions serialize anonymous author labels.
@@ -316,3 +321,8 @@ def test_real_s3_s4_blueprints_preserve_anonymity_and_peer_visibility_in_provide
         assert all(p["visible_history"] for p in revisions)
         assert all({v["author"] for v in p["visible_history"]} == {"anonymous"} for p in revisions)
         assert all("expert-1" not in p["input_content"] and "expert-2" not in p["input_content"] for p in payloads)
+        for p in payloads:
+            actor = p["agent_id"]
+            assert actor in {"expert-1", "expert-2", "facilitator"}
+            peer_ids = {"expert-1", "expert-2"} - {actor}
+            assert all(peer not in p["agent_context"] for peer in peer_ids)
