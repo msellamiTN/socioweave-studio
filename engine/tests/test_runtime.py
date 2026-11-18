@@ -470,3 +470,78 @@ def test_s10_rejects_consensus_options_for_other_strategies():
     with pytest.raises(ValueError, match="only for S10"):
         run_strategy("S5", prompt(), blueprint.strategy, RecordingInvoker(),
                      prompt_views=blueprint.prompt_views, consensus_epsilon=0.1)
+
+
+
+class MediationInvoker:
+    def __init__(self, candidate_values):
+        self.candidate_values = candidate_values
+        self.calls = []
+
+    def invoke(self, agent, step, context):
+        self.calls.append((agent.identifier, step.round, step.action.value, context))
+        if step.action.value == "summarise":
+            return json.dumps({
+                "summary": f"Round {step.round}: neutral agreements and differences",
+                "agreements": ["Both parties cover the required objective"],
+                "disagreements": ["The ordering of two tasks differs"],
+            })
+        value = self.candidate_values(step.round, agent.identifier)
+        return json.dumps({"candidate": {"value": value}})
+
+
+def test_s11_stops_after_party_revisions_agree_and_preserves_parallel_stages():
+    blueprint = build_strategy_blueprint("S11", n=2, T=4)
+    invoker = MediationInvoker(lambda round_number, party: 0 if round_number == 1 else 1)
+    run = run_strategy("S11", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views)
+    assert {item.round for item in run.outputs} == {1, 2}
+    assert run.calls_made == 10
+    assert run.depth_executed == 6
+    assert [(item.stage, item.round) for item in run.outputs] == [
+        (1, 1), (1, 1), (2, 1), (3, 1), (3, 1),
+        (4, 2), (4, 2), (5, 2), (6, 2), (6, 2),
+    ]
+
+
+def test_s11_epsilon_stopping_compares_two_party_revised_decompositions():
+    blueprint = build_strategy_blueprint("S11", n=2, T=4)
+    invoker = MediationInvoker(lambda round_number, party: 0 if party == "party-1" else 1)
+    compared = []
+    def distance(left, right):
+        compared.append((left, right))
+        return 0.03
+    run = run_strategy("S11", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views,
+                       mediation_epsilon=0.05,
+                       mediation_candidate_distance=distance)
+    assert {item.round for item in run.outputs} == {1}
+    assert run.calls_made == 5
+    assert run.depth_executed == 3
+    assert compared == [('{"value":0}', '{"value":1}')]
+
+
+def test_s11_runs_through_T_when_party_revisions_remain_different():
+    blueprint = build_strategy_blueprint("S11", n=2, T=3)
+    invoker = MediationInvoker(lambda round_number, party: round_number + (party == "party-2"))
+    run = run_strategy("S11", prompt(), blueprint.strategy, invoker,
+                       prompt_views=blueprint.prompt_views,
+                       mediation_epsilon=0.01,
+                       mediation_candidate_distance=lambda left, right: 0.5)
+    assert {item.round for item in run.outputs} == {1, 2, 3}
+    assert run.calls_made == 15
+    assert run.depth_executed == 9
+
+
+def test_s11_requires_explicit_distance_when_epsilon_is_configured():
+    blueprint = build_strategy_blueprint("S11", n=2, T=2)
+    with pytest.raises(ValueError, match="mediation_candidate_distance is required"):
+        run_strategy("S11", prompt(), blueprint.strategy, MediationInvoker(lambda r, p: r),
+                     prompt_views=blueprint.prompt_views, mediation_epsilon=0.1)
+
+
+def test_s11_rejects_mediation_options_for_other_strategies():
+    blueprint = build_strategy_blueprint("S10", n=2, T=2)
+    with pytest.raises(ValueError, match="only for S11"):
+        run_strategy("S10", prompt(), blueprint.strategy, RecordingInvoker(),
+                     prompt_views=blueprint.prompt_views, mediation_epsilon=0.1)
