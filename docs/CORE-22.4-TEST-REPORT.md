@@ -1,8 +1,8 @@
 # Core 22.4 — Test and Conformance Report
 
-**Result:** PASS — deterministic software conformance tests on exact commit `39d16c623e23b9e8d7ee77cdcf27c87024bfbe23`.  
-**GitHub Actions:** [Run 44423378674](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423378674).  
-**Result:** 447 passed in 0.49s; 0 failed; 0 skipped.
+**Result:** PASS — deterministic software conformance tests on exact commit `a28f8a26a1a8739bcae9018d3c9370da11092bef`.  
+**GitHub Actions:** [Run 44423563050](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423563050).  
+**Result:** 448 passed in 0.92s; 0 failed; 0 skipped.
 
 ## Coverage delivered
 
@@ -12,7 +12,7 @@
 | Candidate strategies kept separate | C1–C5 excluded from established profiles and factory | PASS |
 | Independent catalogue-to-blueprint oracle | `test_all_thirteen_profiles_conform_to_blueprints_at_boundary_configurations` | PASS |
 | Agent roster and prompt views | `test_conformance_detects_prompt_view_roster_leak_or_omission` | PASS |
-| Roles and rounds | `test_conformance_detects_role_assignment_drift`; `test_all_thirteen_profiles_conform_to_blueprints_at_boundary_configurations` | PASS |
+| Roles and rounds | `test_conformance_detects_role_assignment_drift`; `test_conformance_detects_unused_or_unexpected_declared_role`; `test_all_thirteen_profiles_conform_to_blueprints_at_boundary_configurations` | PASS |
 | Action/input/stage sequence | `test_conformance_detects_protocol_input_reference_mutation` | PASS |
 | Visibility relations | `test_conformance_detects_visibility_mutation`; `test_conformance_detects_step_reference_that_violates_visibility` | PASS |
 | Decision semantics and anonymity | `test_conformance_detects_wrong_decision_rule`; all-strategy oracle test | PASS |
@@ -31,6 +31,10 @@ All thirteen strategies pass the independent blueprint oracle at:
 - ((5,4,3)): larger configuration.
 
 A second parameterized test executes all thirteen blueprints through the deterministic mock runtime at ((2,2,1)), then reconciles provider calls, executed outputs and actual depth. S8's ACCEPT branch correctly skips its conditional author revision and is checked against the reduced actual call count.
+
+## Formula oracle
+
+A finite, reviewed expression evaluator checks each profile's agent-cardinality, round, runtime-call and runtime-depth formula against the independently generated expected roster and protocol. It does not use Python `eval`; unsupported formula strings fail closed.
 
 ## Runtime accounting identity
 
