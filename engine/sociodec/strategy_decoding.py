@@ -430,6 +430,35 @@ class ProtocolDecisionDecoder:
             except ValueError as exc:
                 raise StrategyDecisionError(f"S7 judge decision is invalid: {exc}") from exc
         elif strategy_id is StrategyId.S8:
+            # One author draft, isolated parallel reviewer reports, editor
+            # verdict, and a conditional final author revision.
+            trace = tuple((output.agent_id, output.action) for output in run.outputs)
+            editor_positions = [
+                index for index, item in enumerate(trace)
+                if item == ("editor", "judge")
+            ]
+            editor_index = editor_positions[0] if len(editor_positions) == 1 else -1
+            reviewer_trace = trace[1:editor_index] if editor_index > 1 else ()
+            revision_trace = trace[editor_index + 1:] if editor_index >= 0 else ()
+            if (not trace or trace[0] != ("author", "draft")
+                    or editor_index < 0
+                    or (not reviewer_trace and run.expected_agent_ids is None)
+                    or any(action != "critique" for _, action in reviewer_trace)
+                    or any(item != ("author", "revise") for item in revision_trace)):
+                raise StrategyDecisionError(
+                    "S8 requires author draft, parallel reviewer critiques, editor verdict, "
+                    "and a conditional author revision"
+                )
+            expected_stages = ((1,) + (2,) * len(reviewer_trace) + (3,)
+                               + (4,) * len(revision_trace))
+            if tuple(output.stage for output in run.outputs) != expected_stages:
+                raise StrategyDecisionError("S8 requires draft/review/editor/revision stages 1/2/3/4")
+            if any(output.round != 1 for output in run.outputs):
+                raise StrategyDecisionError("S8 peer review is a single-round procedure")
+            if run.expected_agent_ids is not None:
+                expected_roster = set(run.expected_agent_ids)
+                if not {"author", "editor"}.issubset(expected_roster):
+                    raise StrategyDecisionError("S8 configured roster must include author and editor")
             author_drafts = [
                 message.candidate for agent, message in messages
                 if agent == "author" and message.action == "draft" and message.candidate is not None
@@ -488,39 +517,165 @@ class ProtocolDecisionDecoder:
             decision = authority((chosen,), judge_id="editor",
                                 selected_candidate_id="author", rationale=rationale)
         elif strategy_id is StrategyId.S10:
-            participant_ids = tuple(sorted(x for x in pool if x.startswith("participant-")))
-            selected = _required_candidates(pool, participant_ids)
-            moderator = _judge_message(messages, "moderator")
-            candidate_id = moderator.selected_candidate_id
-            if candidate_id not in {item.identifier for item in selected}:
-                raise StrategyDecisionError("Moderator selected a candidate outside the deliberation pool")
-            decision = DecisionResult(
-                next(item.decomposition for item in selected if item.identifier == candidate_id),
-                "consensus", candidate_id, f"Moderator: {moderator.rationale}",
+            # Consensus deliberation is shared, sequential revision: every
+            # participant receives the preceding turns, then the moderator
+            # closes the exchange once the deliberation rounds are complete.
+            participant_ids = tuple(
+                agent_id for agent_id in (
+                    run.expected_agent_ids or tuple(dict.fromkeys(
+                        output.agent_id for output in run.outputs
+                        if output.agent_id.startswith("participant-")
+                    ))
+                ) if agent_id.startswith("participant-")
             )
-        elif strategy_id in {StrategyId.S11, StrategyId.S13}:
-            if adjudication is None or not adjudication.rationale.strip():
+            if not participant_ids:
+                raise StrategyDecisionError("S10 requires at least one configured participant")
+            if len(participant_ids) != len(set(participant_ids)):
+                raise StrategyDecisionError("S10 configured participant roster contains duplicates")
+            if run.expected_agent_ids is not None and "moderator" not in run.expected_agent_ids:
+                raise StrategyDecisionError("S10 configured roster must include the moderator")
+            participant_turns = [
+                output for output in run.outputs
+                if output.agent_id.startswith("participant-")
+            ]
+            moderator_turns = [
+                output for output in run.outputs
+                if output.agent_id == "moderator" and output.action == "judge"
+            ]
+            if not participant_turns or len(moderator_turns) != 1:
                 raise StrategyDecisionError(
-                    f"{strategy_id.value} requires explicit external decision adjudication; "
-                    "the protocol outputs do not contain a negotiated/final selection"
+                    "S10 requires sequential participant revisions and exactly one final moderator closure"
                 )
-            if strategy_id is StrategyId.S11:
-                selected = _required_candidates(pool, ("party-1", "party-2"))
-                if adjudication.negotiated_decomposition is None:
-                    raise StrategyDecisionError("S11 adjudication must supply negotiated_decomposition")
-                decision = compromise(
-                    selected, adjudication.negotiated_decomposition,
-                    mediator_id="mediator", rationale=adjudication.rationale,
+            if any(output.action != "revise" for output in participant_turns):
+                raise StrategyDecisionError("S10 participant turns must all revise the shared draft")
+            observed_rounds = sorted({output.round for output in participant_turns})
+            if observed_rounds != list(range(1, max(observed_rounds) + 1)):
+                raise StrategyDecisionError("S10 deliberation rounds must be contiguous from round 1")
+            expected_turn_order = tuple(
+                (round_number, participant_id)
+                for round_number in observed_rounds
+                for participant_id in participant_ids
+            )
+            observed_turn_order = tuple(
+                (output.round, output.agent_id) for output in participant_turns
+            )
+            if observed_turn_order != expected_turn_order:
+                raise StrategyDecisionError(
+                    "S10 requires exactly one sequential revision from every participant in each round"
                 )
-            else:
-                selected = tuple(pool.values())
-                if adjudication.selected_candidate_id is None:
-                    raise StrategyDecisionError("S13 adjudication must select a candidate explicitly")
-                decision = authority(
-                    selected, judge_id="agent-A",
-                    selected_candidate_id=adjudication.selected_candidate_id,
-                    rationale=adjudication.rationale,
+            final_judge = moderator_turns[0]
+            if run.outputs[-1] != final_judge:
+                raise StrategyDecisionError("S10 moderator must close after all participant turns")
+            if final_judge.round != observed_rounds[-1]:
+                raise StrategyDecisionError("S10 moderator closure must follow the final deliberation round")
+            expected_stages = tuple(range(1, len(run.outputs) + 1))
+            if tuple(output.stage for output in run.outputs) != expected_stages:
+                raise StrategyDecisionError("S10 all turns must occupy strictly sequential stages")
+            final_message = next(
+                message for output, (_, message) in reversed(tuple(zip(run.outputs, messages)))
+                if output.agent_id.startswith("participant-") and message.candidate is not None
+            )
+            final_candidate_id = next(
+                output.agent_id for output in reversed(run.outputs)
+                if output.agent_id.startswith("participant-")
+            )
+            moderator = moderator_turns[0]
+            moderator_message = next(
+                message for output, (_, message) in zip(run.outputs, messages)
+                if output is moderator
+            )
+            if moderator_message.consensus_no_objection is not True:
+                raise StrategyDecisionError(
+                    "S10 moderator must explicitly report no_objection=true to close consensus"
                 )
+            decision = DecisionResult(
+                final_message.candidate.decomposition,
+                "consensus", final_candidate_id,
+                f"Moderator closed the shared draft: {moderator_message.rationale}",
+            )
+        elif strategy_id is StrategyId.S11:
+            # Initial independent drafts are made once. Each subsequent
+            # mediation round is a neutral summary followed by parallel revisions.
+            if len(run.outputs) < 5 or (len(run.outputs) - 2) % 3:
+                raise StrategyDecisionError("S11 requires two initial drafts and complete three-call mediation rounds")
+            observed_rounds = sorted({output.round for output in run.outputs})
+            if observed_rounds != list(range(1, max(observed_rounds) + 1)):
+                raise StrategyDecisionError("S11 mediation rounds must be contiguous from round 1")
+            initial = run.outputs[:2]
+            if tuple((output.agent_id, output.action, output.round, output.stage) for output in initial) != (
+                ("party-1", "draft", 1, 1), ("party-2", "draft", 1, 1)
+            ):
+                raise StrategyDecisionError("S11 requires exactly two parallel initial party drafts")
+            for round_number in observed_rounds:
+                offset = 2 + (round_number - 1) * 3
+                round_outputs = run.outputs[offset:offset + 3]
+                if tuple((output.agent_id, output.action, output.round) for output in round_outputs) != (
+                    ("mediator", "summarise", round_number),
+                    ("party-1", "revise", round_number),
+                    ("party-2", "revise", round_number),
+                ):
+                    raise StrategyDecisionError(
+                        f"S11 round {round_number} requires one mediator summary and two parallel party revisions"
+                    )
+                if tuple(output.stage for output in round_outputs) != (
+                    2 * round_number, 2 * round_number + 1, 2 * round_number + 1
+                ):
+                    raise StrategyDecisionError("S11 requires one summary stage followed by parallel revision stage in every round")
+            if run.expected_agent_ids is not None and set(run.expected_agent_ids) != {
+                "party-1", "party-2", "mediator"
+            }:
+                raise StrategyDecisionError(
+                    "S11 configured roster must contain exactly party-1, party-2, and mediator"
+                )
+            for round_number in observed_rounds:
+                summary_index = 2 + (round_number - 1) * 3
+                summary = messages[summary_index][1]
+                if not summary.summary.strip():
+                    raise StrategyDecisionError(f"S11 mediator summary in round {round_number} must be non-empty")
+                if not summary.agreements and not summary.disagreements:
+                    raise StrategyDecisionError(
+                        f"S11 mediator summary in round {round_number} must identify agreements or disagreements"
+                    )
+            if adjudication is None or adjudication.negotiated_decomposition is None:
+                raise StrategyDecisionError(
+                    "S11 requires an explicit negotiated joint decomposition; the mediator cannot choose a party draft"
+                )
+            if not adjudication.rationale.strip():
+                raise StrategyDecisionError("S11 negotiated joint decomposition requires acceptance rationale")
+            selected = _required_candidates(pool, ("party-1", "party-2"))
+            decision = compromise(
+                selected, adjudication.negotiated_decomposition,
+                mediator_id="mediator", rationale=adjudication.rationale,
+            )
+        elif strategy_id is StrategyId.S13:
+            trace = tuple((agent, message.action) for agent, message in messages)
+            expected_trace = (
+                ("agent-A", "draft"),
+                ("agent-B", "critique"),
+                ("agent-B", "revise"),
+                ("agent-A", "critique"),
+            )
+            if trace != expected_trace:
+                raise StrategyDecisionError(
+                    "S13 requires the ordered role-reversal trace A draft, B critique, "
+                    "B revision, A critique"
+                )
+            if tuple(output.stage for output in run.outputs) != (1, 2, 3, 4):
+                raise StrategyDecisionError("S13 requires four sequential stages")
+            if any(output.round != 1 for output in run.outputs):
+                raise StrategyDecisionError("S13 role reversal is a single-round procedure")
+            if run.expected_agent_ids is not None and set(run.expected_agent_ids) != {"agent-A", "agent-B"}:
+                raise StrategyDecisionError("S13 configured roster must contain exactly agent-A and agent-B")
+            first_critique, final_critique = messages[1][1], messages[3][1]
+            if not first_critique.objections:
+                raise StrategyDecisionError("S13 agent-B must provide typed objections before repairing D1")
+            if not final_critique.objections:
+                raise StrategyDecisionError("S13 agent-A must critique the repaired D2")
+            repaired = _required_candidates(pool, ("agent-B",))[0]
+            decision = DecisionResult(
+                repaired.decomposition, "authority", "agent-B",
+                "Role reversal returns agent-B's repaired D2 after agent-A's final critique.",
+            )
         else:
             raise StrategyDecisionError(f"No decision assembly for {strategy_id.value}")
 
