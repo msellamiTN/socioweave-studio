@@ -390,11 +390,45 @@ class ProtocolDecisionDecoder:
             except ValueError as exc:
                 raise StrategyDecisionError(f"S6 synthesis decision is invalid: {exc}") from exc
         elif strategy_id is StrategyId.S7:
+            # Table 4: two parallel drafts, two parallel defences, then one
+            # neutral judge decision (five calls, three sequential stages).
+            expected_trace = (
+                ("party-1", "draft"),
+                ("party-2", "draft"),
+                ("party-1", "defend"),
+                ("party-2", "defend"),
+                ("judge", "judge"),
+            )
+            observed_trace = tuple((output.agent_id, output.action) for output in run.outputs)
+            if observed_trace != expected_trace:
+                raise StrategyDecisionError(
+                    "S7 requires two independent drafts, two defences, and one judge decision"
+                )
+            stages = tuple(output.stage for output in run.outputs)
+            if stages != (stages[0], stages[0], stages[0] + 1, stages[0] + 1, stages[0] + 2):
+                raise StrategyDecisionError("S7 requires parallel draft/defence stages followed by the judge")
+            if any(output.round != 1 for output in run.outputs):
+                raise StrategyDecisionError("S7 is a single-round procedure")
+            if run.expected_agent_ids is not None:
+                expected = set(run.expected_agent_ids)
+                if expected != {"party-1", "party-2", "judge"}:
+                    raise StrategyDecisionError("S7 configured roster must contain two parties and one neutral judge")
+            defences = [
+                message for agent, message in messages
+                if agent in {"party-1", "party-2"} and message.action == "defend"
+            ]
+            if len(defences) != 2 or any(not message.rationale.strip() for message in defences):
+                raise StrategyDecisionError("S7 requires one non-empty defence from each party")
             selected = _required_candidates(pool, ("party-1", "party-2"))
             judge = _judge_message(messages, "judge")
-            decision = authority(selected, judge_id="judge",
-                                 selected_candidate_id=judge.selected_candidate_id,
-                                 rationale=judge.rationale)
+            try:
+                decision = authority(
+                    selected, judge_id="judge",
+                    selected_candidate_id=judge.selected_candidate_id,
+                    rationale=judge.rationale,
+                )
+            except ValueError as exc:
+                raise StrategyDecisionError(f"S7 judge decision is invalid: {exc}") from exc
         elif strategy_id is StrategyId.S8:
             author_drafts = [
                 message.candidate for agent, message in messages
