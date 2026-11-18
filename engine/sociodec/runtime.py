@@ -330,7 +330,7 @@ def run_strategy(
                     current_round = [item for item in outputs
                                      if item.round == round_number and item.agent_id in participants]
                     if len(prior_round) != len(participants) or len(current_round) != len(participants):
-                        raise ValueError("S10 convergence requires one completed shared-draft turn per participant in adjacent rounds")
+                        raise ValueError(f"S10 convergence requires one completed shared-draft turn per participant in adjacent rounds (participants={participants}, prior={[item.agent_id for item in prior_round]}, current={[item.agent_id for item in current_round]})")
                     # The last participant's revision is the shared draft after
                     # the full turn; compare that state across adjacent rounds.
                     previous = canonical_candidate(max(prior_round, key=lambda item: item.step_index))
