@@ -197,6 +197,15 @@ class ProtocolDecisionDecoder:
                 message for agent, message in messages
                 if agent == "editor" and message.action == "judge"
             ]
+            reviewer_messages = [
+                (agent, message) for agent, message in messages
+                if message.action == "critique"
+            ]
+            reviewer_ids = [agent for agent, _ in reviewer_messages]
+            if not reviewer_ids or any(not agent.startswith("reviewer-") for agent in reviewer_ids):
+                raise StrategyDecisionError("S8 requires at least one named reviewer critique")
+            if len(reviewer_ids) != len(set(reviewer_ids)):
+                raise StrategyDecisionError("S8 must contain exactly one critique per reviewer")
             if len(author_drafts) != 1 or len(editor_messages) != 1:
                 raise StrategyDecisionError("S8 requires exactly one original author draft and editor verdict")
             editor = editor_messages[0]

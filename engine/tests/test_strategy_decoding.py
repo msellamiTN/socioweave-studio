@@ -219,3 +219,39 @@ def test_s8_rejects_inconsistent_branch_evidence(verdict, outputs, match):
     prompt, extraction, _, _ = fixture()
     with pytest.raises(StrategyDecisionError, match=match):
         ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+
+
+def test_s8_rejects_duplicate_reviewer_critiques():
+    prompt, extraction, _, _ = fixture()
+    outputs = (
+        candidate_out(0, "author"),
+        out(1, "reviewer-1", "critique", {"objections": []}),
+        out(2, "reviewer-1", "critique", {"objections": []}),
+        out(3, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
+    )
+    with pytest.raises(StrategyDecisionError, match="exactly one critique per reviewer"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+
+
+def test_s8_rejects_critique_from_unregistered_role_name():
+    prompt, extraction, _, _ = fixture()
+    outputs = (
+        candidate_out(0, "author"),
+        out(1, "critic", "critique", {"objections": []}),
+        out(2, "editor", "judge", {"verdict": "accept", "rationale": "Reviewed"}),
+    )
+    with pytest.raises(StrategyDecisionError, match="named reviewer critique"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
+
+
+def test_s8_revise_requires_exactly_one_author_revision():
+    prompt, extraction, _, _ = fixture()
+    outputs = (
+        candidate_out(0, "author"),
+        out(1, "reviewer-1", "critique", {"objections": []}),
+        out(2, "editor", "judge", {"verdict": "revise", "rationale": "Please revise"}),
+        candidate_out(3, "author", "revise"),
+        candidate_out(4, "author", "revise"),
+    )
+    with pytest.raises(StrategyDecisionError, match="exactly one author D1 revision"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S8, run(*outputs))
