@@ -7,7 +7,7 @@ is implementation-conformance evidence, not a proof of strategy correctness.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Iterable
 
 from sociodec.catalogue import STRATEGIES, StrategyId, get_strategy
@@ -423,3 +423,13 @@ def build_and_validate_all(*, n: int = 3, k: int = 3, T: int = 2) -> tuple[Confo
         blueprint = build_strategy_blueprint(sid, n=n, k=k, T=T, prompt_views=views)
         reports.append(validate_blueprint(blueprint, n=n, k=k, T=T))
     return tuple(reports)
+
+
+def profile_as_dict(identifier: StrategyId | str) -> dict[str, object]:
+    """Return a JSON-serializable, machine-readable paper strategy profile."""
+    profile = PROFILE_BY_ID[StrategyId(identifier)]
+    payload = asdict(profile)
+    payload["strategy_id"] = profile.strategy_id.value
+    payload["roles"] = [role.value for role in profile.roles]
+    payload["decision_rule"] = profile.decision_rule.value
+    return payload
