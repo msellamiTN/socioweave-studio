@@ -49,6 +49,19 @@ def run(*outputs):
     return StrategyRun("test", tuple(outputs), len(outputs), len(outputs), ())
 
 
+def _s7_complete_trace():
+    raw = fixture()[3]
+    return (
+        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(2, "party-1", 1, 2, "defend", json.dumps({"defence": "This plan maximises deliverable coverage."}), True, False),
+        ProtocolOutput(3, "party-2", 1, 2, "defend", json.dumps({"defence": "This plan minimises duplicated subproblems."}), True, False),
+        ProtocolOutput(4, "judge", 1, 3, "judge", json.dumps({
+            "selected_candidate_id": "party-1", "rationale": "Coverage takes precedence under the rubric."
+        }), True, False),
+    )
+
+
 @pytest.mark.parametrize(
     "sid,outputs,expected",
     [
@@ -99,7 +112,8 @@ def run(*outputs):
 def test_strategy_decision_assembly_applies_paper_operator(sid, outputs, expected):
     prompt, extraction, _, _ = fixture()
     decoder = ProtocolDecisionDecoder(prompt, extraction)
-    result = decoder(sid, run(*outputs))
+    strategy_run = run_s7(*outputs) if sid is StrategyId.S7 else run(*outputs)
+    result = decoder(sid, strategy_run)
     assert result.decision.rule == expected
     assert len(result.decision.decomposition.kappa["Service plan"]) == 1
     assert result.decision.decomposition.subproblems[0].question == "Create service"
@@ -615,19 +629,6 @@ def test_s6_counter_plan_is_a_typed_candidate_action():
     prompt, extraction, _, _ = fixture()
     result = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S6, run(*_s6_complete_trace()))
     assert result.decision.rule == "synthesis"
-
-
-def _s7_complete_trace():
-    raw = fixture()[3]
-    return (
-        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
-        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
-        ProtocolOutput(2, "party-1", 1, 2, "defend", json.dumps({"defence": "This plan maximises deliverable coverage."}), True, False),
-        ProtocolOutput(3, "party-2", 1, 2, "defend", json.dumps({"defence": "This plan minimises duplicated subproblems."}), True, False),
-        ProtocolOutput(4, "judge", 1, 3, "judge", json.dumps({
-            "selected_candidate_id": "party-1", "rationale": "Coverage takes precedence under the rubric."
-        }), True, False),
-    )
 
 
 def test_s7_requires_both_independent_drafts_defences_and_judge():
