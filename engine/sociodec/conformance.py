@@ -127,7 +127,7 @@ def _formula_value(expression: str, n: int, k: int, T: int) -> int:
         "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
         "n": n, "k": k, "T": T,
         "n+1": n + 1, "n+2": n + 2, "k+2": k + 2, "k+3": k + 3,
-        "2n": 2 * n, "T(n+1)": T * (n + 1), "nT+1": n * T + 1,
+        "2n": 2 * n, "2T": 2 * T, "T(n+1)": T * (n + 1), "nT+1": n * T + 1,
         "2+3T": 2 + 3 * T, "1+2T": 1 + 2 * T,
     }
     try:
