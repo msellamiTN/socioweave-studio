@@ -161,3 +161,10 @@ def test_conformance_detects_step_reference_that_violates_visibility():
     strategy = replace(blueprint.strategy, protocol=tuple(steps))
     report = validate_blueprint(replace(blueprint, strategy=strategy))
     assert any(f.invariant == "input-visibility" for f in report.findings)
+
+
+def test_conformance_detects_unused_or_unexpected_declared_role():
+    blueprint = _blueprint(StrategyId.S3)
+    strategy = replace(blueprint.strategy, roles=(*blueprint.strategy.roles, Role.JUDGE))
+    report = validate_blueprint(replace(blueprint, strategy=strategy))
+    assert any(f.invariant == "role-set" for f in report.findings)
