@@ -15,9 +15,40 @@ from sociodec.phase_composition import (
 )
 
 Candidate = TypeVar("Candidate")
-Objections = TypeVar("Objections")
 Merged = TypeVar("Merged")
 Decomposition = TypeVar("Decomposition")
+
+
+@dataclass(frozen=True, slots=True)
+class AnonymousObjection:
+    """One objection without author, voter, or candidate attribution."""
+    code: str
+    statement: str
+    evidence: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.code.strip() or not self.statement.strip():
+            raise ValueError("Objection code and statement must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class AnonymousObjections:
+    """Immutable author-anonymous objection collection."""
+    items: tuple[AnonymousObjection, ...]
+
+    def __post_init__(self) -> None:
+        if not self.items:
+            raise ValueError("Anonymous objections must not be empty")
+        if len(set(self.items)) != len(self.items):
+            raise ValueError("Anonymous objections must be unique")
+
+    def validate_no_author_ids(self, author_ids: Sequence[str]) -> None:
+        text = " ".join(
+            part for item in self.items
+            for part in (item.code, item.statement, item.evidence)
+        ).casefold()
+        if any(author.casefold() in text for author in author_ids):
+            raise ValueError("Objections contain author attribution")
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,9 +64,9 @@ class C1Call:
 class C1Result(Generic[Decomposition]):
     decomposition: Decomposition | None
     candidates: Mapping[str, Candidate]
-    objections: Objections | None
+    objections: AnonymousObjections | None
     verdict: str
-    judge_objections: Objections | None
+    judge_objections: AnonymousObjections | None
     failures: tuple[str, ...]
     calls: tuple[C1Call, ...]
     revisions: int
@@ -48,18 +79,18 @@ class C1Result(Generic[Decomposition]):
 
 
 @dataclass(frozen=True, slots=True)
-class C1Callbacks(Generic[Candidate, Objections, Merged, Decomposition]):
+class C1Callbacks(Generic[Candidate, Merged, Decomposition]):
     draft: Callable[[str], Candidate]
-    compare: Callable[[Mapping[str, Candidate]], Objections]
-    revise: Callable[[str, Candidate, Objections], Candidate]
+    compare: Callable[[Mapping[str, Candidate]], AnonymousObjections]
+    revise: Callable[[str, Candidate, AnonymousObjections], Candidate]
     merge: Callable[[Mapping[str, Candidate]], Merged]
-    judge: Callable[[Merged | Decomposition, Mapping[str, Candidate]], tuple[str, Objections | None]]
-    judge_revise: Callable[[Merged | Decomposition, Objections], Decomposition]
+    judge: Callable[[Merged | Decomposition, Mapping[str, Candidate]], tuple[str, AnonymousObjections | None]]
+    judge_revise: Callable[[Merged | Decomposition, AnonymousObjections], Decomposition]
     check_and_repair: Callable[[Merged | Decomposition], tuple[Decomposition, Sequence[str]]]
     distance: Callable[[Candidate, Candidate], float]
 
 
-class Algorithm3C1Executor(Generic[Candidate, Objections, Merged, Decomposition]):
+class Algorithm3C1Executor(Generic[Candidate, Merged, Decomposition]):
     """Run Algorithm 3 with explicit model-family and bounded-call controls."""
 
     def __init__(
@@ -69,7 +100,7 @@ class Algorithm3C1Executor(Generic[Candidate, Objections, Merged, Decomposition]
         comparator_model: tuple[str, str],
         synthesizer_model: tuple[str, str],
         judge_model: tuple[str, str],
-        callbacks: C1Callbacks[Candidate, Objections, Merged, Decomposition],
+        callbacks: C1Callbacks[Candidate, Merged, Decomposition],
         epsilon: float,
         T: int,
     ) -> None:
@@ -116,7 +147,7 @@ class Algorithm3C1Executor(Generic[Candidate, Objections, Merged, Decomposition]
             candidates[agent_id] = self.callbacks.draft(agent_id)
 
         state = CandidateState(size=n, independent=True)
-        last_objections: Objections | None = None
+        last_objections: AnonymousObjections | None = None
         revisions = 0
         early_agreement = False
 
@@ -141,6 +172,9 @@ class Algorithm3C1Executor(Generic[Candidate, Objections, Merged, Decomposition]
             record("exa", "comparator", self.comparator)
             # Comparator sees candidate set; authors do not see each other's drafts.
             last_objections = self.callbacks.compare(dict(candidates))
+            if not isinstance(last_objections, AnonymousObjections):
+                raise TypeError("Comparator must return AnonymousObjections")
+            last_objections.validate_no_author_ids(tuple(self.decomposers))
 
             rev = PhaseContract(
                 PhaseKind.REVISION, f"anonymous-revision-{round_index}",
@@ -150,7 +184,7 @@ class Algorithm3C1Executor(Generic[Candidate, Objections, Merged, Decomposition]
             )
             validate_phase_preconditions(
                 rev, state,
-                objections_nonempty=bool(last_objections),
+                objections_nonempty=bool(last_objections.items),
             )
             revised: dict[str, Candidate] = {}
             for agent_id, old_candidate in candidates.items():
@@ -175,8 +209,9 @@ class Algorithm3C1Executor(Generic[Candidate, Objections, Merged, Decomposition]
         judge_revisions = 0
         judged_candidate: Merged | Decomposition = merged
         if verdict == "reject":
-            if not judge_objections:
-                raise ValueError("A rejecting judge must provide non-empty objections")
+            if not isinstance(judge_objections, AnonymousObjections):
+                raise ValueError("A rejecting judge must provide AnonymousObjections")
+            judge_objections.validate_no_author_ids(tuple(self.decomposers))
             # Algorithm 3 permits exactly one aggregator revision and one last verdict.
             record("judge-revision", "synthesizer", self.synthesizer)
             judged_candidate = self.callbacks.judge_revise(merged, judge_objections)
@@ -187,6 +222,10 @@ class Algorithm3C1Executor(Generic[Candidate, Objections, Merged, Decomposition]
             )
             if verdict not in {"accept", "reject"}:
                 raise ValueError("Second judge verdict must be exactly 'accept' or 'reject'")
+            if second_objections is not None:
+                if not isinstance(second_objections, AnonymousObjections):
+                    raise TypeError("Judge must return AnonymousObjections")
+                second_objections.validate_no_author_ids(tuple(self.decomposers))
             judge_objections = second_objections
 
         # Algorithm 1 check/repair is delegated as one typed operation. Its
