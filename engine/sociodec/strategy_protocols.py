@@ -264,14 +264,19 @@ def build_strategy_blueprint(
     elif sid is StrategyId.S11:
         ids = ("party-1", "party-2", "mediator")
         add_roles(ids, T, {"party-1": Role.DECOMPOSER, "party-2": Role.DECOMPOSER, "mediator": Role.MEDIATOR})
+        # The initial round drafts independently once. Every mediation round
+        # thereafter is one mediator summary followed by parallel revisions.
+        p.extend((
+            ProtocolStep("party-1", Action.DRAFT, "prompt", 1, 1),
+            ProtocolStep("party-2", Action.DRAFT, "prompt", 1, 1),
+        ))
         for round_number in range(1, T + 1):
-            first_stage = (round_number - 1) * 3 + 1
+            summary_stage = 2 * round_number
+            revision_stage = summary_stage + 1
             p.extend((
-                ProtocolStep("party-1", Action.DRAFT, "prompt", round_number, first_stage),
-                ProtocolStep("party-2", Action.DRAFT, "prompt", round_number, first_stage),
-                ProtocolStep("mediator", Action.SUMMARISE, "all_previous_outputs", round_number, first_stage + 1),
-                ProtocolStep("party-1", Action.REVISE, "all_previous_outputs", round_number, first_stage + 2),
-                ProtocolStep("party-2", Action.REVISE, "all_previous_outputs", round_number, first_stage + 2),
+                ProtocolStep("mediator", Action.SUMMARISE, "all_previous_outputs", round_number, summary_stage),
+                ProtocolStep("party-1", Action.REVISE, "all_previous_outputs", round_number, revision_stage),
+                ProtocolStep("party-2", Action.REVISE, "all_previous_outputs", round_number, revision_stage),
             ))
             visibility[round_number] = _pairs(ids, full=True)
         views = prompt_views or {a: "FULL_PROMPT" for a in ids}
