@@ -331,16 +331,17 @@ def _aggregate_frequent_subproblems(
                     edges.add((a, b))
     deliverables = []
     for deliverable in prompt.iota.deliverables:
-        contributors = tuple(
-            s.identifier for s in subproblems
-            if any(r.statement.lower() == deliverable.lower() for r in s.covered_requirements)
-        )
+        contributors = set()
+        for sample in samples:
+            for old_id in sample.kappa.get(deliverable, frozenset()):
+                if old_id in old_to_new:
+                    contributors.add(old_to_new[old_id])
         if not contributors:
-            # Preserve a valid typed composition: every declared deliverable
-            # must have an explicit contributor. This fallback is a profile
-            # choice and will be visible to structural validation.
-            contributors = (subproblems[0].identifier,)
-        deliverables.append(DeliverableComposition(deliverable, contributors))
+            raise ValueError(
+                f"Self-consistency profile could not reconstruct contributors for declared deliverable {deliverable!r}; "
+                "it will not invent a composition edge"
+            )
+        deliverables.append(DeliverableComposition(deliverable, tuple(sorted(contributors))))
     return Decomposition(
         subproblems,
         tuple(Dependency(a, b) for a, b in sorted(edges)),
