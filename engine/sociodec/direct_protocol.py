@@ -44,16 +44,20 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                  agent_contexts: Mapping[str, str] | None = None,
                  adjudications: Mapping[StrategyId | str, DecisionAdjudication] | None = None,
                  n: int = 3, k: int = 3, T: int = 2,
+                 delphi_epsilon: float = 0.1,
                  mediation_epsilon: float = 0.1,
                  consensus_epsilon: float = 0.1):
         if min(n, k, T) < 1: raise ValueError("n, k and T must be >= 1")
         self.extraction, self.model_resolver, self.invoker_factory = extraction, model_resolver, invoker_factory
         self.prompt_view_factory, self.agent_contexts = prompt_view_factory, dict(agent_contexts or {})
+        if not 0.0 <= delphi_epsilon <= 1.0:
+            raise ValueError("delphi_epsilon must be in [0, 1]")
         if not 0.0 <= mediation_epsilon <= 1.0:
             raise ValueError("mediation_epsilon must be in [0, 1]")
         if not 0.0 <= consensus_epsilon <= 1.0:
             raise ValueError("consensus_epsilon must be in [0, 1]")
         self.adjudications, self.n, self.k, self.T = dict(adjudications or {}), n, k, T
+        self.delphi_epsilon = delphi_epsilon
         self.mediation_epsilon = mediation_epsilon
         self.consensus_epsilon = consensus_epsilon
 
@@ -86,7 +90,7 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         routes = {a.identifier: self.invoker_factory(a, seed) for a in blueprint.strategy.agents}
         invoker = _RoutedInvoker(routes)
         run_options = {}
-        if sid in {StrategyId.S10, StrategyId.S11}:
+        if sid in {StrategyId.S4, StrategyId.S10, StrategyId.S11}:
             def candidate_distance(left_json: str, right_json: str) -> float:
                 # runtime passes canonical candidate JSON (without the outer
                 # protocol envelope); reconstruct typed decompositions and
@@ -102,7 +106,12 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 ).decomposition
                 return decomposition_distance(left_d, right_d)
 
-            if sid is StrategyId.S10:
+            if sid is StrategyId.S4:
+                run_options = {
+                    "delphi_epsilon": self.delphi_epsilon,
+                    "delphi_candidate_distance": candidate_distance,
+                }
+            elif sid is StrategyId.S10:
                 run_options = {
                     "consensus_epsilon": self.consensus_epsilon,
                     "consensus_candidate_distance": candidate_distance,
@@ -131,6 +140,8 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 "strategy_base_depth": 3 if sid is StrategyId.S11 else blueprint.strategy.depth,
                 "strategy_max_calls": 2 + 3 * self.T if sid is StrategyId.S11 else blueprint.strategy.calls,
                 "strategy_max_depth": 1 + 2 * self.T if sid is StrategyId.S11 else blueprint.strategy.depth,
+                "delphi_epsilon": self.delphi_epsilon if sid is StrategyId.S4 else None,
+                "delphi_distance_matcher": "exact-output-local-constraints-v1" if sid is StrategyId.S4 else None,
                 "mediation_epsilon": self.mediation_epsilon if sid is StrategyId.S11 else None,
                 "mediation_distance_matcher": "exact-output-local-constraints-v1" if sid is StrategyId.S11 else None,
                 "consensus_epsilon": self.consensus_epsilon if sid is StrategyId.S10 else None,
