@@ -24,6 +24,12 @@ class EchoInvoker:
         self.calls.append((agent.identifier, step.action.value, context))
         if agent.identifier == "editor" and step.action.value == "judge":
             return json.dumps({"verdict": "accept", "rationale": "Echo test accepts draft."})
+        if step.action.value == "split":
+            return json.dumps({"partitions": {
+                "specialist-1": "coordinator:legal",
+                "specialist-2": "coordinator:technical",
+                "specialist-3": "coordinator:organisation",
+            }})
         return f"{step.action.value}:{context.input_content}"
 
 
@@ -62,14 +68,20 @@ def test_runtime_executes_every_concrete_protocol_with_table4_call_count(sid):
     assert run.depth_executed == expected_depth
 
 
-def test_s1_specialists_receive_only_their_domain_view_not_coordinator_split():
+def test_s1_specialists_receive_coordinator_generated_partitions_not_static_views():
     invoker = EchoInvoker()
-    views = {"coordinator": "full prompt", "specialist-1": "legal",
-             "specialist-2": "technical", "specialist-3": "organisation"}
+    views = {"coordinator": "full prompt", "specialist-1": "STATIC_LEAK_1",
+             "specialist-2": "STATIC_LEAK_2", "specialist-3": "STATIC_LEAK_3"}
     blueprint = build_strategy_blueprint("S1", prompt_views=views)
     run_strategy("S1", _prompt(), blueprint.strategy, invoker, prompt_views=views)
-    specialist_inputs = [context.prompt_view for agent, action, context in invoker.calls if action == "draft"]
-    assert specialist_inputs == ["legal", "technical", "organisation"]
+    specialist_contexts = [context for agent, action, context in invoker.calls if action == "draft"]
+    assert [context.prompt_view for context in specialist_contexts] == [
+        "coordinator:legal", "coordinator:technical", "coordinator:organisation",
+    ]
+    assert [context.input_content for context in specialist_contexts] == [
+        "coordinator:legal", "coordinator:technical", "coordinator:organisation",
+    ]
+    assert all("STATIC_LEAK" not in context.prompt_view for context in specialist_contexts)
 
 
 def test_anonymous_delphi_aggregate_input_does_not_leak_author_ids():

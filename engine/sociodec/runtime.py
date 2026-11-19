@@ -224,6 +224,8 @@ def run_strategy(
                     continue
             agent = known_agents[step.agent_id]
             prompt_view = views.get(step.agent_id, prompt.text)
+            if prompt_view == "FULL_PROMPT":
+                prompt_view = prompt.text
             if step.input_ref == "prompt":
                 input_content = prompt_view
             elif step.input_ref == "all_previous_outputs":
@@ -235,6 +237,46 @@ def run_strategy(
                 )
                 if not input_content:
                     input_content = inputs.get("all_previous_outputs", "")
+            elif step.input_ref.startswith("partition:step:"):
+                referenced_ref = step.input_ref.removeprefix("partition:")
+                referenced = next(
+                    (item for item in stage_snapshot
+                     if f"step:{item.step_index}" == referenced_ref),
+                    None,
+                )
+                if referenced is None:
+                    raise ValueError(
+                        f"Protocol partition input {referenced_ref!r} is not available before stage {stage}"
+                    )
+                visibility_round = next(item for item in strategy.visibility if item.round == step.round)
+                if (step.agent_id, referenced.agent_id) not in visibility_round.visible_pairs:
+                    raise ValueError("Coordinator partition output is not visible to the acting specialist")
+                if referenced.action != "split" or referenced.agent_id != "coordinator":
+                    raise ValueError("Partition input must reference the coordinator's split output")
+                try:
+                    split_payload = json.loads(referenced.text)
+                except (TypeError, json.JSONDecodeError) as exc:
+                    raise ValueError("Coordinator split output must be valid JSON") from exc
+                partitions = split_payload.get("partitions") if isinstance(split_payload, dict) else None
+                if not isinstance(partitions, dict):
+                    raise ValueError("Coordinator split output must contain a partitions object")
+                expected_specialists = {
+                    agent.identifier for agent in strategy.agents
+                    if agent.identifier.startswith("specialist-")
+                }
+                if set(partitions) != expected_specialists:
+                    raise ValueError(
+                        "Coordinator partitions must map exactly the configured specialists; "
+                        f"expected={sorted(expected_specialists)}, received={sorted(partitions)}"
+                    )
+                if any(not isinstance(value, str) or not value.strip() for value in partitions.values()):
+                    raise ValueError("Every coordinator partition must be a non-empty string")
+                input_content = partitions.get(step.agent_id)
+                if input_content is None:
+                    raise ValueError(f"No coordinator partition assigned to {step.agent_id}")
+                # The prompt view is also restricted: no full prompt or sibling
+                # partition may leak through the second context channel.
+                prompt_view = input_content
             elif step.input_ref in inputs:
                 input_content = inputs[step.input_ref]
             elif step.input_ref.startswith("step:"):

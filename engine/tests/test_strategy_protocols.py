@@ -39,8 +39,12 @@ def test_division_of_labour_requires_and_preserves_domain_restricted_views():
     blueprint = build_strategy_blueprint("S1", prompt_views=views)
     assert blueprint.prompt_views == views
     specialists = [step for step in blueprint.strategy.protocol if step.action is Action.DRAFT]
-    assert [step.input_ref for step in specialists] == ["prompt"] * 3
+    assert [step.input_ref for step in specialists] == ["partition:step:0"] * 3
     assert [step.round for step in specialists] == [2, 2, 2]
+    pairs = set(blueprint.strategy.visibility[1].visible_pairs)
+    assert all((f"specialist-{i}", "coordinator") in pairs for i in range(1, 4))
+    assert ("specialist-1", "specialist-2") not in pairs
+    assert ("specialist-2", "specialist-3") not in pairs
 
 
 def test_jigsaw_integrator_can_see_all_expert_outputs_but_experts_are_isolated():
@@ -124,9 +128,11 @@ def test_consensus_deliberation_is_sequential_and_starts_from_empty_shared_draft
     assert blueprint.strategy.protocol[-1].action is Action.JUDGE
 
 
-def test_partitioned_strategies_fail_closed_without_explicit_prompt_views():
-    with pytest.raises(ValueError, match="explicit prompt_views"):
-        build_strategy_blueprint("S1")
+def test_s1_uses_dynamic_coordinator_partitions_while_s12_requires_facet_views():
+    s1 = build_strategy_blueprint("S1")
+    assert s1.prompt_views["coordinator"] == "FULL_PROMPT"
+    assert all(s1.prompt_views[f"specialist-{i}"] == "PARTITION_ASSIGNED_AT_RUNTIME"
+               for i in range(1, 4))
     with pytest.raises(ValueError, match="explicit prompt_views"):
         build_strategy_blueprint("S12")
 

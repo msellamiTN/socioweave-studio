@@ -545,3 +545,64 @@ def test_s11_rejects_mediation_options_for_other_strategies():
     with pytest.raises(ValueError, match="only for S11"):
         run_strategy("S10", prompt(), blueprint.strategy, RecordingInvoker(),
                      prompt_views=blueprint.prompt_views, mediation_epsilon=0.1)
+
+
+def test_s1_routes_coordinator_partitions_to_isolated_specialists_without_prompt_leakage():
+    class PartitionInvoker:
+        def __init__(self):
+            self.calls = []
+
+        def invoke(self, agent, step, context):
+            self.calls.append((agent.identifier, step.action.value, context))
+            if step.action.value == "split":
+                return json.dumps({"partitions": {
+                    "specialist-1": "LEGAL_ONLY",
+                    "specialist-2": "TECHNICAL_ONLY",
+                    "specialist-3": "OPERATIONS_ONLY",
+                }})
+            return "candidate-output"
+
+    blueprint = build_strategy_blueprint("S1", n=3)
+    invoker = PartitionInvoker()
+    run = run_strategy(
+        "S1", prompt(), blueprint.strategy, invoker,
+        prompt_views=blueprint.prompt_views,
+    )
+
+    assert run.calls_made == 5
+    coordinator_split = invoker.calls[0][2]
+    assert coordinator_split.input_content == prompt().text
+    assert coordinator_split.prompt_view == prompt().text
+    specialist_calls = [item for item in invoker.calls if item[1] == "draft"]
+    assert [agent for agent, _, _ in specialist_calls] == [
+        "specialist-1", "specialist-2", "specialist-3",
+    ]
+    expected = {
+        "specialist-1": "LEGAL_ONLY",
+        "specialist-2": "TECHNICAL_ONLY",
+        "specialist-3": "OPERATIONS_ONLY",
+    }
+    for agent, _, context in specialist_calls:
+        assert context.input_content == expected[agent]
+        assert context.prompt_view == expected[agent]
+        assert "Improve the permit service" not in context.prompt_view
+        assert all(item.author == "coordinator" for item in context.visible_history)
+        assert all(value not in context.input_content for key, value in expected.items() if key != agent)
+
+    coordinator_check = [context for agent, action, context in invoker.calls
+                         if agent == "coordinator" and action == "check"][0]
+    assert all(value in coordinator_check.input_content for value in expected.values())
+
+
+def test_s1_rejects_missing_or_extra_coordinator_partitions():
+    blueprint = build_strategy_blueprint("S1", n=2)
+
+    class InvalidPartitionInvoker:
+        def invoke(self, agent, step, context):
+            if step.action.value == "split":
+                return json.dumps({"partitions": {"specialist-1": "ONLY_ONE"}})
+            return "candidate-output"
+
+    with pytest.raises(ValueError, match="map exactly the configured specialists"):
+        run_strategy("S1", prompt(), blueprint.strategy, InvalidPartitionInvoker(),
+                     prompt_views=blueprint.prompt_views)
