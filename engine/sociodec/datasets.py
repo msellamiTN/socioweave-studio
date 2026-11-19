@@ -7,7 +7,7 @@ and selected splits before the E1 condition grid can be built.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
@@ -48,7 +48,7 @@ class E1FrozenSnapshot:
     manifest: Mapping[str, object]
 
     def manifest_json(self) -> str:
-        return json.dumps(self.manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\\n"
+        return json.dumps(self.manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
 
 
 def load_jsonl_dataset(
