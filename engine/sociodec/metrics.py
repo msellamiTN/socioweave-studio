@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from statistics import median
 from typing import Hashable, Iterable, Mapping, Sequence
 
+from sociodec.equivalence import DEFAULT_MATCHER, SubproblemMatcher, equivalence_classes
+from sociodec.models.decomposition import Subproblem
+
 @dataclass(frozen=True, slots=True)
 class PRF:
     precision: float
@@ -37,13 +40,31 @@ class DecompositionMetrics:
     utility: float | None
 
 def decomposition_metrics(*, requirements: Iterable[Hashable], covered_requirements: Iterable[Hashable],
-    subproblem_signatures: Sequence[Hashable], edges: Iterable[tuple[Hashable, Hashable]],
+    subproblem_signatures: Sequence[Hashable] | None = None,
+    edges: Iterable[tuple[Hashable, Hashable]],
     acyclic: bool, composition_complete: bool, subproblem_solved: Sequence[bool] | None = None,
-    utility: float | None = None, depth: int | None = None) -> DecompositionMetrics:
+    utility: float | None = None, depth: int | None = None,
+    subproblem_items: Sequence[Subproblem] | None = None,
+    matcher: SubproblemMatcher = DEFAULT_MATCHER) -> DecompositionMetrics:
+    """Compute Table 9 metrics.
+
+    Pass subproblem_items to compute Definition 8 redundancy with the same
+    Definition 7 matcher used by distance and union. subproblem_signatures
+    remains a legacy precomputed-key path and is not semantic matching.
+    """
     req, covered = set(requirements), set(covered_requirements)
     if not req: raise ValueError("coverage is undefined for an empty requirement set")
-    sigs = list(subproblem_signatures)
-    if not sigs: raise ValueError("decomposition must contain a subproblem")
+    if subproblem_items is not None:
+        items = list(subproblem_items)
+        if not items: raise ValueError("decomposition must contain a subproblem")
+        if subproblem_signatures is not None and len(subproblem_signatures) != len(items):
+            raise ValueError("subproblem_signatures and subproblem_items must have equal length")
+        sigs = list(equivalence_classes(items, matcher))
+    else:
+        if subproblem_signatures is None:
+            raise ValueError("provide subproblem_items or legacy subproblem_signatures")
+        sigs = list(subproblem_signatures)
+        if not sigs: raise ValueError("decomposition must contain a subproblem")
     if type(acyclic) is not bool or type(composition_complete) is not bool:
         raise TypeError("acyclic and composition_complete must be booleans")
     counts = {}
