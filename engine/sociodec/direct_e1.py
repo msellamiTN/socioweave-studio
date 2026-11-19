@@ -163,11 +163,15 @@ def run_direct_e1_condition(
     if executor_run.execution.executor_id != expected_executor_id:
         raise ValueError("ExecutionRun executor identity differs from the preregistered executor")
 
-    calls_total = method_run.calls_made + executor_run.calls_made
-    if calls_total > condition.call_budget:
+    # Table 13 budget matching applies to the strategy/baseline procedure.
+    # The fixed executor ME is a common downstream evaluation stage and its
+    # calls are reported separately; they must not consume the method budget.
+    if method_run.calls_made > condition.call_budget:
         raise RuntimeError(
-            f"E1 call budget exceeded: {calls_total} actual calls > {condition.call_budget} registered calls"
+            f"E1 method-call budget exceeded: {method_run.calls_made} actual method calls "
+            f"> {condition.call_budget} registered method calls"
         )
+    calls_total = method_run.calls_made + executor_run.calls_made
     execution = assess_execution(prompt, method_run.decomposition, executor_run.execution)
     full = combine_validity(structural, execution)
     obligations = e1_metric_obligations(condition.dataset)
@@ -225,6 +229,8 @@ def run_direct_e1_condition(
         "hypothesis_verdicts": structural.hypothesis_verdicts.status.value,
         "trace_entries": len(trace),
         "trace_is_complete": bool(trace) and len(trace) >= calls_total,
+        "method_call_budget": condition.call_budget,
+        "executor_calls_excluded_from_method_budget": executor_run.calls_made,
     }
     return DirectE1Result(
         condition.dataset, example_id, condition.method_id, condition.model_mode,
