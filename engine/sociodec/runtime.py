@@ -6,7 +6,7 @@ selects a provider or changes the strategy's declared decision rule.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from typing import Callable, Mapping, Protocol
 
@@ -222,6 +222,17 @@ def run_strategy(
             if strategy_id == "S8" and step.action.value == "revise":
                 if not _s8_revision_required(outputs):
                     continue
+            # The moderator's single closure call follows the actual final
+            # participant turn, not the unused maximum-round slot. This keeps
+            # the recorded trace sequential and makes early stopping auditable.
+            if (strategy_id == "S10" and step.action.value == "judge"
+                    and consensus_stopped_after is not None):
+                completed_stage = max((item.stage for item in outputs), default=0)
+                step = replace(
+                    step,
+                    round=consensus_stopped_after,
+                    stage=completed_stage + 1,
+                )
             agent = known_agents[step.agent_id]
             prompt_view = views.get(step.agent_id, prompt.text)
             if prompt_view == "FULL_PROMPT":
