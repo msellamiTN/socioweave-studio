@@ -171,6 +171,8 @@ def test_direct_s11_uses_definition7_distance_for_epsilon_stopping():
         (), (DeliverableComposition("Report", ("s1",)),),
     )
     assert decomposition_distance(left, right) == 0.0
+    # The response callback records draft/revision candidate comparisons;
+    # the traced provider separately records the mediator summary call.
     assert [action for _, action, _ in calls] == [
-        "draft", "draft", "summarise", "revise", "revise",
+        "draft", "draft", "revise", "revise",
     ]
