@@ -128,9 +128,11 @@ def test_consensus_deliberation_is_sequential_and_starts_from_empty_shared_draft
     assert blueprint.strategy.protocol[-1].action is Action.JUDGE
 
 
-def test_partitioned_strategies_fail_closed_without_explicit_prompt_views():
-    with pytest.raises(ValueError, match="explicit prompt_views"):
-        build_strategy_blueprint("S1")
+def test_s1_uses_dynamic_coordinator_partitions_while_s12_requires_facet_views():
+    s1 = build_strategy_blueprint("S1")
+    assert s1.prompt_views["coordinator"] == "FULL_PROMPT"
+    assert all(s1.prompt_views[f"specialist-{i}"] == "PARTITION_ASSIGNED_AT_RUNTIME"
+               for i in range(1, 4))
     with pytest.raises(ValueError, match="explicit prompt_views"):
         build_strategy_blueprint("S12")
 
