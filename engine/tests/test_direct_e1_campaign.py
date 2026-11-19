@@ -147,7 +147,7 @@ def test_direct_campaign_rejects_tampered_checkpoint_rows(tmp_path: Path, mutati
         row["example_id"] = "not-in-campaign"
     else:
         row["prompt_hash"] = "0" * 64
-    checkpoint.write_text(json.dumps(row) + "\\n", encoding="utf-8")
+    checkpoint.write_text(json.dumps(row) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match=match):
         runner.run(checkpoint)
 
