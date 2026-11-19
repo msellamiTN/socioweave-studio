@@ -1,6 +1,6 @@
 import pytest
 from sociodec.e1_protocol import E1Condition
-from sociodec.extraction import AggregatedExtraction
+from sociodec.extraction import aggregate_extractions
 from sociodec.models.prompt import Interpretation, Prompt
 from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
 from sociodec.e1_runtime import build_direct_e1_runtime
@@ -44,7 +44,7 @@ def condition(method, mode="homogeneous"):
 def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
     prompt = Prompt("Make a plan.", Interpretation("Make a plan"))
-    extraction = AggregatedExtraction((), ())
+    extraction = aggregate_extractions(())
     method = runtime.build_method(condition("single_plan_and_solve"), prompt, extraction)
     assert isinstance(method, DirectBaselineAdapter)
     assert runtime.executor.executor_id == "executor-fixed"
