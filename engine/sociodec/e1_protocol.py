@@ -5,7 +5,7 @@ Validates experiment manifests only; it does not run models or claim results.
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
-from sociodec.catalogue import STRATEGIES
+from sociodec.catalogue import STRATEGIES, get_strategy
 from sociodec.dataset_metrics import get_metric_profile
 
 PUBLIC_DATASETS = ("BREAK", "StrategyQA", "TaskBench", "TravelPlanner")
@@ -65,6 +65,50 @@ def validate_e1_manifest(conditions: Iterable[E1Condition], *, expected_prompt_i
                         elif strategy is not None and baseline.call_budget != strategy.call_budget: errors.append(f"baseline {bid} budget {baseline.call_budget} does not match {sid} budget {strategy.call_budget}")
     if errors and require_complete_grid: raise ValueError("Incomplete or invalid E1 grid: " + "; ".join(errors[:12]))
     return tuple(errors)
+
+
+def build_e1_conditions(
+    *,
+    expected_prompt_ids: Mapping[str, tuple[str, ...]],
+    n: int = 3,
+    k: int = 3,
+    T: int = 2,
+) -> tuple[E1Condition, ...]:
+    """Build the complete paper E1 grid from caller-supplied frozen prompt IDs.
+
+    This creates condition metadata only. It does not fabricate benchmark
+    examples, download datasets, choose providers, or execute model calls.
+    Every baseline inherits the exact method-call budget of its matched
+    strategy for the same dataset, model mode, seed, and prompt set.
+    """
+    if min(n, k, T) < 1:
+        raise ValueError("n, k and T must be >= 1")
+    if set(expected_prompt_ids) != set(ALL_DATASETS):
+        raise ValueError("expected_prompt_ids must declare all five paper datasets")
+
+    conditions: list[E1Condition] = []
+    for dataset in ALL_DATASETS:
+        prompt_ids = tuple(expected_prompt_ids[dataset])
+        for model_mode in MODEL_MODES:
+            for seed in range(EXPECTED_SEEDS):
+                for strategy in STRATEGIES:
+                    strategy_id = strategy.identifier.value
+                    budget = strategy.calls(n=n, k=k, T=T)
+                    conditions.append(E1Condition(
+                        dataset, strategy_id, model_mode, seed, prompt_ids, budget,
+                    ))
+                    for baseline_id in BASELINES:
+                        conditions.append(E1Condition(
+                            dataset, baseline_id, model_mode, seed, prompt_ids,
+                            budget, matched_strategy_id=strategy_id,
+                        ))
+
+    validate_e1_manifest(
+        conditions,
+        expected_prompt_ids=expected_prompt_ids,
+        require_complete_grid=True,
+    )
+    return tuple(conditions)
 
 def e1_metric_obligations(dataset: str) -> frozenset[str]:
     profile=get_metric_profile(dataset)
