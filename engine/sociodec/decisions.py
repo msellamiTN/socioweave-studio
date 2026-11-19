@@ -178,13 +178,16 @@ def union(candidates: Sequence[Candidate], *, matcher: SubproblemMatcher = DEFAU
 
 def majority(
     candidates: Sequence[Candidate],
-    ballots: Mapping[str, frozenset[tuple]],
+    ballots: Mapping[str, frozenset[tuple] | Sequence[Subproblem]],
+    *,
+    matcher: SubproblemMatcher = DEFAULT_MATCHER,
 ) -> DecisionResult:
     """Keep pooled subproblems endorsed by strictly more than n/2 voters.
 
-    Ballots are keyed by the canonical subproblem_signature. Dependencies and
-    deliverable contributors are retained from the union only when both
-    endpoint/contributor subproblems survive the vote.
+    Preferred ballots contain Subproblem objects and are resolved through
+    Definition 7 equivalence classes. Tuple-keyed legacy ballots remain
+    supported for compatibility, but use exact legacy signatures rather than
+    semantic equivalence.
     """
     pool = _candidate_map(candidates)
     if not ballots:
@@ -192,50 +195,121 @@ def majority(
     if any(not voter.strip() for voter in ballots):
         raise ValueError("Voter identifiers must not be empty")
 
-    all_items: dict[tuple, Subproblem] = {}
-    all_edges: set[tuple[tuple, tuple]] = set()
-    all_composition: dict[str, set[tuple]] = {}
-    for candidate in pool.values():
-        d = candidate.decomposition
-        for item in d.subproblems:
-            all_items.setdefault(subproblem_signature(item), item)
-        by_id = {item.identifier: subproblem_signature(item) for item in d.subproblems}
-        all_edges.update((by_id[a], by_id[b]) for a, b in d.E)
-        for entry in d.composition:
-            all_composition.setdefault(entry.deliverable, set()).update(
-                by_id[item] for item in entry.contributor_ids
-            )
+    ballot_values = [item for ballot in ballots.values() for item in ballot]
+    semantic_mode = all(isinstance(item, Subproblem) for item in ballot_values)
+    legacy_mode = all(not isinstance(item, Subproblem) for item in ballot_values)
+    if not semantic_mode and not legacy_mode:
+        raise TypeError("Do not mix Subproblem ballots and legacy signature ballots")
 
-    unknown = set().union(*ballots.values()) - set(all_items)
-    if unknown:
-        raise ValueError("Ballot contains a subproblem absent from the pooled candidate list")
-    kept = {
-        signature for signature in all_items
-        if sum(signature in ballot for ballot in ballots.values()) > len(ballots) / 2
-    }
-    ordered = sorted(kept, key=repr)
-    ids = {signature: f"majority-{i + 1}" for i, signature in enumerate(ordered)}
-    subproblems = tuple(
-        replace(all_items[signature], identifier=ids[signature])
-        for signature in ordered
-    )
-    edges = tuple(
-        Dependency(ids[a], ids[b])
-        for a, b in sorted(all_edges, key=repr)
-        if a in kept and b in kept
-    )
-    composition = tuple(
-        DeliverableComposition(
-            deliverable,
-            tuple(sorted(ids[item] for item in contributors if item in kept)),
+    if semantic_mode:
+        pooled_items = [
+            item for candidate in pool.values()
+            for item in candidate.decomposition.subproblems
+        ]
+        all_items = pooled_items + ballot_values
+        labels = equivalence_classes(all_items, matcher)
+        pooled_labels = labels[:len(pooled_items)]
+        ballot_labels = labels[len(pooled_items):]
+
+        representatives: dict[int, Subproblem] = {}
+        item_label: dict[int, int] = {}
+        cursor = 0
+        for candidate in pool.values():
+            for item in candidate.decomposition.subproblems:
+                label = pooled_labels[cursor]
+                cursor += 1
+                representatives.setdefault(label, item)
+                item_label[id(item)] = label
+        pooled_classes = set(representatives)
+        ballot_class_sets: dict[str, set[int]] = {}
+        cursor = 0
+        for voter, ballot in ballots.items():
+            voted = set()
+            for _ in ballot:
+                label = ballot_labels[cursor]
+                cursor += 1
+                if label not in pooled_classes:
+                    raise ValueError("Ballot contains a subproblem absent from the pooled candidate list")
+                voted.add(label)
+            ballot_class_sets[voter] = voted
+
+        all_edges: set[tuple[int, int]] = set()
+        all_composition: dict[str, set[int]] = {}
+        for candidate in pool.values():
+            d = candidate.decomposition
+            by_id = {item.identifier: item_label[id(item)] for item in d.subproblems}
+            all_edges.update((by_id[a], by_id[b]) for a, b in d.E)
+            for entry in d.composition:
+                all_composition.setdefault(entry.deliverable, set()).update(
+                    by_id[item] for item in entry.contributor_ids
+                )
+
+        kept = {
+            label for label in pooled_classes
+            if sum(label in ballot for ballot in ballot_class_sets.values()) > len(ballots) / 2
+        }
+        ordered = sorted(kept)
+        ids = {label: f"majority-{i + 1}" for i, label in enumerate(ordered)}
+        subproblems = tuple(
+            replace(representatives[label], identifier=ids[label]) for label in ordered
         )
-        for deliverable, contributors in sorted(all_composition.items())
-    )
+        edges = tuple(
+            Dependency(ids[a], ids[b])
+            for a, b in sorted(all_edges)
+            if a in kept and b in kept
+        )
+        composition = tuple(
+            DeliverableComposition(
+                deliverable,
+                tuple(sorted(ids[item] for item in contributors if item in kept)),
+            )
+            for deliverable, contributors in sorted(all_composition.items())
+        )
+        rationale = "Subproblems retained only when endorsed by strictly more than half of voters using Definition 7 matcher classes."
+    else:
+        all_items: dict[tuple, Subproblem] = {}
+        all_edges: set[tuple[tuple, tuple]] = set()
+        all_composition: dict[str, set[tuple]] = {}
+        for candidate in pool.values():
+            d = candidate.decomposition
+            for item in d.subproblems:
+                all_items.setdefault(subproblem_signature(item), item)
+            by_id = {item.identifier: subproblem_signature(item) for item in d.subproblems}
+            all_edges.update((by_id[a], by_id[b]) for a, b in d.E)
+            for entry in d.composition:
+                all_composition.setdefault(entry.deliverable, set()).update(
+                    by_id[item] for item in entry.contributor_ids
+                )
+
+        unknown = set().union(*ballots.values()) - set(all_items)
+        if unknown:
+            raise ValueError("Ballot contains a subproblem absent from the pooled candidate list")
+        kept = {
+            signature for signature in all_items
+            if sum(signature in ballot for ballot in ballots.values()) > len(ballots) / 2
+        }
+        ordered = sorted(kept, key=repr)
+        ids = {signature: f"majority-{i + 1}" for i, signature in enumerate(ordered)}
+        subproblems = tuple(
+            replace(all_items[signature], identifier=ids[signature])
+            for signature in ordered
+        )
+        edges = tuple(
+            Dependency(ids[a], ids[b])
+            for a, b in sorted(all_edges, key=repr)
+            if a in kept and b in kept
+        )
+        composition = tuple(
+            DeliverableComposition(
+                deliverable,
+                tuple(sorted(ids[item] for item in contributors if item in kept)),
+            )
+            for deliverable, contributors in sorted(all_composition.items())
+        )
+        rationale = "Subproblems retained by strict majority using legacy exact signatures."
+
     result = Decomposition(subproblems, edges, composition)
-    return DecisionResult(
-        result, "majority", None,
-        "Subproblems retained only when endorsed by strictly more than half of voters.",
-    )
+    return DecisionResult(result, "majority", None, rationale)
 
 
 def synthesis(
