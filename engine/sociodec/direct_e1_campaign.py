@@ -192,7 +192,7 @@ class DirectE1CampaignRunner:
             for condition in self.conditions
             for prompt_id in condition.prompt_ids
         }
-        completed: set[tuple[str, str, str, int, str | None]] = set()
+        completed: set[tuple] = set()
         records: list[dict[str, object]] = []
         if target.exists():
             with target.open("r", encoding="utf-8") as stream:
