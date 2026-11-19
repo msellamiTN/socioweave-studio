@@ -6,12 +6,11 @@ trials. Every condition is executed independently through direct_e1.py.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Mapping
+from typing import Callable, Iterable
 
 from sociodec.direct_e1 import (
     DirectE1Result, DirectMethodAdapter, E1FixedExecutor, run_direct_e1_condition,
@@ -173,7 +172,25 @@ class DirectE1CampaignRunner:
             "executor_id": self.config.executor_id,
             "protocol_profile": self.config.protocol_profile,
             "conditions": [_condition_key(x) for x in self.conditions],
+            # Prompt IDs alone do not freeze benchmark content. Bind the
+            # checkpoint to the exact prompt snapshots used by this campaign.
+            "prompt_snapshot": sorted(
+                (dataset, example_id, example.prompt_hash)
+                for (dataset, example_id), example in self.examples.items()
+                if any(
+                    condition.dataset == dataset and example_id in condition.prompt_ids
+                    for condition in self.conditions
+                )
+            ),
         })
+        expected_rows = {
+            (
+                condition.dataset, prompt_id, condition.method_id,
+                condition.seed, condition.matched_strategy_id,
+            )
+            for condition in self.conditions
+            for prompt_id in condition.prompt_ids
+        }
         completed: set[tuple[str, str, str, int, str | None]] = set()
         records: list[dict[str, object]] = []
         if target.exists():
@@ -185,12 +202,21 @@ class DirectE1CampaignRunner:
                         row = json.loads(line)
                     except json.JSONDecodeError as exc:
                         raise ValueError(f"Invalid checkpoint JSON on line {line_number}") from exc
+                    if not isinstance(row, dict):
+                        raise ValueError(f"Checkpoint row on line {line_number} must be a JSON object")
                     if row.get("campaign_config_hash") != config_hash:
                         raise ValueError("Checkpoint campaign hash differs from requested campaign")
                     key = (
                         row.get("dataset"), row.get("example_id"), row.get("method_id"),
                         row.get("seed"), row.get("matched_strategy_id"),
                     )
+                    if key not in expected_rows:
+                        raise ValueError(f"Checkpoint row is not part of the frozen campaign: {key}")
+                    expected_prompt_hash = self.examples[(key[0], key[1])].prompt_hash
+                    if row.get("prompt_hash") != expected_prompt_hash:
+                        raise ValueError(f"Checkpoint prompt hash differs from frozen prompt snapshot: {key}")
+                    if row.get("status") not in {"success", "failed"}:
+                        raise ValueError(f"Checkpoint row has invalid status: {key}")
                     if key in completed:
                         raise ValueError(f"Duplicate checkpoint row: {key}")
                     completed.add(key)
