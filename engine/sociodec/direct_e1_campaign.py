@@ -186,7 +186,8 @@ class DirectE1CampaignRunner:
         expected_rows = {
             (
                 condition.dataset, prompt_id, condition.method_id,
-                condition.seed, condition.matched_strategy_id,
+                condition.model_mode, condition.seed, condition.matched_strategy_id,
+                condition.call_budget,
             )
             for condition in self.conditions
             for prompt_id in condition.prompt_ids
@@ -208,7 +209,8 @@ class DirectE1CampaignRunner:
                         raise ValueError("Checkpoint campaign hash differs from requested campaign")
                     key = (
                         row.get("dataset"), row.get("example_id"), row.get("method_id"),
-                        row.get("seed"), row.get("matched_strategy_id"),
+                        row.get("model_mode"), row.get("seed"), row.get("matched_strategy_id"),
+                        row.get("method_call_budget"),
                     )
                     if key not in expected_rows:
                         raise ValueError(f"Checkpoint row is not part of the frozen campaign: {key}")
@@ -226,7 +228,8 @@ class DirectE1CampaignRunner:
                 for prompt_id in condition.prompt_ids:
                     key = (
                         condition.dataset, prompt_id, condition.method_id,
-                        condition.seed, condition.matched_strategy_id,
+                        condition.model_mode, condition.seed, condition.matched_strategy_id,
+                        condition.call_budget,
                     )
                     if key in completed:
                         continue
