@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from typing import Mapping, Sequence
 
 from sociodec.extraction import _normalise
+from sociodec.equivalence import DEFAULT_MATCHER, SubproblemMatcher, equivalence_classes
 from sociodec.models.decomposition import (
     Decomposition, DeliverableComposition, Dependency, Subproblem,
 )
@@ -33,27 +34,22 @@ def subproblem_signature(item: Subproblem) -> tuple:
     )
 
 
-def _edge_signature(
-    decomposition: Decomposition,
-    source: str,
-    target: str,
-) -> tuple:
-    by_id = {item.identifier: item for item in decomposition.subproblems}
-    return (subproblem_signature(by_id[source]), subproblem_signature(by_id[target]))
-
-
-def _jaccard(left: frozenset, right: frozenset) -> float:
-    if not left and not right:
-        return 1.0
-    return len(left & right) / len(left | right)
-
-
-def decomposition_distance(left: Decomposition, right: Decomposition) -> float:
-    """Paper distance: 1 - 1/2(J([S],[S']) + J([E],[E']))."""
-    left_s = frozenset(subproblem_signature(item) for item in left.subproblems)
-    right_s = frozenset(subproblem_signature(item) for item in right.subproblems)
-    left_e = frozenset(_edge_signature(left, a, b) for a, b in left.E)
-    right_e = frozenset(_edge_signature(right, a, b) for a, b in right.E)
+def decomposition_distance(
+    left: Decomposition,
+    right: Decomposition,
+    *,
+    matcher: SubproblemMatcher = DEFAULT_MATCHER,
+) -> float:
+    """Definition 7 distance over matcher-defined equivalence classes."""
+    items = tuple(left.subproblems) + tuple(right.subproblems)
+    labels = equivalence_classes(items, matcher)
+    split = len(left.subproblems)
+    left_labels, right_labels = labels[:split], labels[split:]
+    left_by_id = {item.identifier: label for item, label in zip(left.subproblems, left_labels)}
+    right_by_id = {item.identifier: label for item, label in zip(right.subproblems, right_labels)}
+    left_s, right_s = frozenset(left_labels), frozenset(right_labels)
+    left_e = frozenset((left_by_id[a], left_by_id[b]) for a, b in left.E)
+    right_e = frozenset((right_by_id[a], right_by_id[b]) for a, b in right.E)
     return 1.0 - 0.5 * (_jaccard(left_s, right_s) + _jaccard(left_e, right_e))
 
 
@@ -127,30 +123,31 @@ def rank_sum(
     )
 
 
-def union(candidates: Sequence[Candidate]) -> DecisionResult:
+def union(candidates: Sequence[Candidate], *, matcher: SubproblemMatcher = DEFAULT_MATCHER) -> DecisionResult:
     """Union candidate subproblems/edges/composition, merging exact equivalents.
 
     The paper's coverage-preserving union is not a validity guarantee:
     cycles can be introduced and are left for the common structural checker.
     """
     pool = _candidate_map(candidates)
-    by_signature: dict[tuple, Subproblem] = {}
-    for candidate in pool.values():
-        for item in candidate.decomposition.subproblems:
-            by_signature.setdefault(subproblem_signature(item), item)
-
-    signatures = sorted(by_signature, key=repr)
-    canonical_id = {signature: f"union-{index + 1}" for index, signature in enumerate(signatures)}
+    all_items = [item for candidate in pool.values() for item in candidate.decomposition.subproblems]
+    labels = equivalence_classes(all_items, matcher)
+    representatives: dict[int, Subproblem] = {}
+    for item, label in zip(all_items, labels):
+        representatives.setdefault(label, item)
+    ordered_labels = sorted(representatives)
+    canonical_id = {label: f"union-{index + 1}" for index, label in enumerate(ordered_labels)}
+    item_label = {id(item): label for item, label in zip(all_items, labels)}
     merged_subproblems = tuple(
-        replace(by_signature[signature], identifier=canonical_id[signature])
-        for signature in signatures
+        replace(representatives[label], identifier=canonical_id[label])
+        for label in ordered_labels
     )
 
     merged_edges: set[tuple[str, str]] = set()
     merged_composition: dict[str, set[str]] = {}
     for candidate in pool.values():
         decomposition = candidate.decomposition
-        local = {item.identifier: subproblem_signature(item) for item in decomposition.subproblems}
+        local = {item.identifier: item_label[id(item)] for item in decomposition.subproblems}
         for source, target in decomposition.E:
             merged_edges.add((canonical_id[local[source]], canonical_id[local[target]]))
         for entry in decomposition.composition:
@@ -270,7 +267,7 @@ def compromise(
     )
 
 
-def consensus_medoid(candidates: Sequence[Candidate]) -> DecisionResult:
+def consensus_medoid(candidates: Sequence[Candidate], *, matcher: SubproblemMatcher = DEFAULT_MATCHER) -> DecisionResult:
     """Return the medoid candidate for Delphi-style consensus (Table 4 S4)."""
     pool = _candidate_map(candidates)
     if len(pool) == 1:
@@ -279,7 +276,7 @@ def consensus_medoid(candidates: Sequence[Candidate]) -> DecisionResult:
                               "Only one candidate; it is the medoid.")
     totals = {
         identifier: sum(
-            decomposition_distance(candidate.decomposition, other.decomposition)
+            decomposition_distance(candidate.decomposition, other.decomposition, matcher=matcher)
             for other_id, other in pool.items()
             if other_id != identifier
         )
