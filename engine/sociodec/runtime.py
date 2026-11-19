@@ -224,6 +224,8 @@ def run_strategy(
                     continue
             agent = known_agents[step.agent_id]
             prompt_view = views.get(step.agent_id, prompt.text)
+            if prompt_view == "FULL_PROMPT":
+                prompt_view = prompt.text
             if step.input_ref == "prompt":
                 input_content = prompt_view
             elif step.input_ref == "all_previous_outputs":
