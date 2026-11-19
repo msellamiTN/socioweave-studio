@@ -58,11 +58,11 @@ def validate_e1_manifest(conditions: Iterable[E1Condition], *, expected_prompt_i
                 for sid in strategy_ids:
                     strategy=strategies.get((dataset,sid,mode,seed))
                     if strategy is None:
-                        errors.append(f"missing strategy condition {(dataset,sid,mode,seed)}"); continue
+                        errors.append(f"missing strategy condition {(dataset,sid,mode,seed)}")
                     for bid in BASELINES:
                         baseline=baselines.get((dataset,sid,mode,seed,bid))
                         if baseline is None: errors.append(f"missing budget-matched baseline {(dataset,sid,mode,seed,bid)}")
-                        elif baseline.call_budget != strategy.call_budget: errors.append(f"baseline {bid} budget {baseline.call_budget} does not match {sid} budget {strategy.call_budget}")
+                        elif strategy is not None and baseline.call_budget != strategy.call_budget: errors.append(f"baseline {bid} budget {baseline.call_budget} does not match {sid} budget {strategy.call_budget}")
     if errors and require_complete_grid: raise ValueError("Incomplete or invalid E1 grid: " + "; ".join(errors[:12]))
     return tuple(errors)
 
