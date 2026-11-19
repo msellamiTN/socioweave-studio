@@ -1,5 +1,5 @@
 import pytest
-from sociodec.e1_protocol import ALL_DATASETS, BASELINES, EXPECTED_PROMPTS, E1Condition, e1_metric_obligations, validate_e1_manifest
+from sociodec.e1_protocol import ALL_DATASETS, BASELINES, EXPECTED_PROMPTS, E1Condition, e1_metric_obligations, validate_e1_manifest, build_e1_conditions
 from sociodec.catalogue import STRATEGIES
 
 def frozen_ids():
@@ -42,3 +42,30 @@ def test_e1_reports_missing_grid_cells():
 def test_e1_requires_all_five_datasets():
     with pytest.raises(ValueError, match="all five paper datasets"):
         validate_e1_manifest([],expected_prompt_ids={"BREAK":frozen_ids()["BREAK"]},require_complete_grid=False)
+
+
+def test_build_e1_conditions_creates_complete_budget_matched_paper_grid():
+    conditions = build_e1_conditions(expected_prompt_ids=frozen_ids())
+    assert len(conditions) == 5 * 2 * 5 * len(STRATEGIES) * (1 + len(BASELINES))
+    errors = validate_e1_manifest(
+        conditions, expected_prompt_ids=frozen_ids(), require_complete_grid=True,
+    )
+    assert errors == ()
+    by_key = {
+        (row.dataset, row.method_id, row.model_mode, row.seed, row.matched_strategy_id): row
+        for row in conditions
+    }
+    for row in conditions:
+        if row.method_id in BASELINES:
+            matched = by_key[(
+                row.dataset, row.matched_strategy_id, row.model_mode,
+                row.seed, None,
+            )]
+            assert row.call_budget == matched.call_budget
+            assert row.prompt_ids == matched.prompt_ids
+
+
+@pytest.mark.parametrize("n,k,T", [(0, 3, 2), (3, 0, 2), (3, 3, 0)])
+def test_build_e1_conditions_rejects_invalid_strategy_parameters(n, k, T):
+    with pytest.raises(ValueError, match="n, k and T"):
+        build_e1_conditions(expected_prompt_ids=frozen_ids(), n=n, k=k, T=T)
