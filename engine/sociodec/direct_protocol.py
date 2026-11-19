@@ -1,13 +1,16 @@
 """Direct non-adaptive E1 execution of one paper strategy."""
 from __future__ import annotations
+import json
 from typing import Callable, Mapping
 from sociodec.catalogue import StrategyId
+from sociodec.decisions import decomposition_distance
 from sociodec.direct_e1 import DirectMethodAdapter, MethodRun
 from sociodec.e1_protocol import E1Condition, BASELINES
 from sociodec.extraction import AggregatedExtraction
 from sociodec.models.prompt import Prompt
 from sociodec.models.strategy import Agent, ProtocolStep
 from sociodec.runtime import ProtocolContext, ProtocolInvoker, run_strategy
+from sociodec.protocol_decoding import parse_candidate
 from sociodec.strategy_decoding import DecisionAdjudication, ProtocolDecisionDecoder
 from sociodec.strategy_protocols import build_strategy_blueprint
 
@@ -40,11 +43,15 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                  invoker_factory: InvokerFactory, prompt_view_factory: PromptViewFactory | None = None,
                  agent_contexts: Mapping[str, str] | None = None,
                  adjudications: Mapping[StrategyId | str, DecisionAdjudication] | None = None,
-                 n: int = 3, k: int = 3, T: int = 2):
+                 n: int = 3, k: int = 3, T: int = 2,
+                 mediation_epsilon: float = 0.1):
         if min(n, k, T) < 1: raise ValueError("n, k and T must be >= 1")
         self.extraction, self.model_resolver, self.invoker_factory = extraction, model_resolver, invoker_factory
         self.prompt_view_factory, self.agent_contexts = prompt_view_factory, dict(agent_contexts or {})
+        if not 0.0 <= mediation_epsilon <= 1.0:
+            raise ValueError("mediation_epsilon must be in [0, 1]")
         self.adjudications, self.n, self.k, self.T = dict(adjudications or {}), n, k, T
+        self.mediation_epsilon = mediation_epsilon
 
     def run(self, *, condition: E1Condition, prompt: Prompt, seed: int) -> MethodRun:
         if condition.method_id in BASELINES: raise ValueError("Strategy adapter cannot execute a baseline")
@@ -74,8 +81,30 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
             agent_contexts=self.agent_contexts, n=self.n, k=self.k, T=self.T)
         routes = {a.identifier: self.invoker_factory(a, seed) for a in blueprint.strategy.agents}
         invoker = _RoutedInvoker(routes)
+        run_options = {}
+        if sid is StrategyId.S11:
+            def mediation_distance(left_json: str, right_json: str) -> float:
+                # runtime passes canonical candidate JSON (without the outer
+                # protocol envelope); reconstruct typed decompositions and
+                # apply Definition 7's matcher-based distance.
+                left_data, right_data = json.loads(left_json), json.loads(right_json)
+                left_d = parse_candidate(
+                    left_data, prompt=prompt, extraction=self.extraction,
+                    candidate_id="party-1",
+                ).decomposition
+                right_d = parse_candidate(
+                    right_data, prompt=prompt, extraction=self.extraction,
+                    candidate_id="party-2",
+                ).decomposition
+                return decomposition_distance(left_d, right_d)
+
+            run_options = {
+                "mediation_epsilon": self.mediation_epsilon,
+                "mediation_candidate_distance": mediation_distance,
+            }
         run = run_strategy(sid.value, prompt, blueprint.strategy, invoker,
-            prompt_views=blueprint.prompt_views, hypotheses=self.extraction.hypotheses)
+            prompt_views=blueprint.prompt_views, hypotheses=self.extraction.hypotheses,
+            **run_options)
         if run.seeded_agents: raise RuntimeError("Direct E1 must not contain seeded agents")
         traces = invoker.trace_dicts()
         if run.calls_made != len(traces):
@@ -88,6 +117,12 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 "strategy_calls_executed": run.calls_made,
                 "strategy_depth_declared": blueprint.strategy.depth,
                 "strategy_depth_executed": run.depth_executed,
+                "strategy_base_calls": 5 if sid is StrategyId.S11 else blueprint.strategy.calls,
+                "strategy_base_depth": 3 if sid is StrategyId.S11 else blueprint.strategy.depth,
+                "strategy_max_calls": 2 + 3 * self.T if sid is StrategyId.S11 else blueprint.strategy.calls,
+                "strategy_max_depth": 1 + 2 * self.T if sid is StrategyId.S11 else blueprint.strategy.depth,
+                "mediation_epsilon": self.mediation_epsilon if sid is StrategyId.S11 else None,
+                "mediation_distance_matcher": "exact-output-local-constraints-v1" if sid is StrategyId.S11 else None,
                 "agent_model_ids": models, "seeded_agents": list(run.seeded_agents),
                 "output_count": len(run.outputs), "decision_rule": decoded.decision.rule,
                 "decision_selected_candidate": decoded.decision.selected_candidate_id,
