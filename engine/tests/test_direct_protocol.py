@@ -1,0 +1,170 @@
+import json
+
+from sociodec.catalogue import StrategyId
+from sociodec.decisions import decomposition_distance
+from sociodec.direct_protocol import DirectProtocolStrategyAdapter
+from sociodec.e1_protocol import E1Condition
+from sociodec.extraction import ExtractionResult, aggregate_extractions
+from sociodec.models.decomposition import Decomposition, DeliverableComposition, Subproblem
+from sociodec.models.prompt import Interpretation, Prompt, Requirement, RequirementType, SourceSpan
+from sociodec.strategy_decoding import DecisionAdjudication
+
+
+PROMPT = Prompt(
+    "Create a report.",
+    Interpretation("Create a report", deliverables=("Report",)),
+)
+REQUIREMENT = Requirement(
+    "Create a report", RequirementType.DELIVERABLE, "report", SourceSpan(0, 16),
+)
+EXTRACTION = aggregate_extractions((
+    ExtractionResult(requirements=(REQUIREMENT,), extractor_id="extractor-1"),
+))
+NEGOTIATED = Decomposition(
+    (Subproblem("s1", "Create a report", (), "Report", (), (REQUIREMENT,)),),
+    (), (DeliverableComposition("Report", ("s1",)),),
+)
+
+
+def candidate(question):
+    return {
+        "candidate": {
+            "subproblems": [{
+                "id": "s1",
+                "question": question,
+                "inputs": [],
+                "output": "Report",
+                "local_constraints": [],
+                "covered_requirements": [{
+                    "type": "deliverable",
+                    "domain": "report",
+                    "statement": "Create a report",
+                }],
+            }],
+            "dependencies": [],
+            "kappa": {"Report": ["s1"]},
+        }
+    }
+
+
+class TracedInvoker:
+    def __init__(self, agent_id, response):
+        self.agent_id = agent_id
+        self.response = response
+        self.traces = []
+
+    def invoke(self, agent, step, context):
+        if step.action.value == "split":
+            result = json.dumps({"partitions": {
+                "specialist-1": "LEGAL",
+                "specialist-2": "TECHNICAL",
+                "specialist-3": "OPERATIONS",
+            }})
+        elif step.action.value == "summarise":
+            result = json.dumps({
+                "summary": "Both parties cover the report; wording differs.",
+                "agreements": ["The report deliverable is covered."],
+                "disagreements": ["The wording of the task differs."],
+            })
+        else:
+            result = self.response(agent, step, context)
+        self.traces.append({"agent_id": agent.identifier, "action": step.action.value})
+        return result
+
+    def trace_dicts(self):
+        return tuple(self.traces)
+
+
+def test_direct_s1_executes_coordinator_split_and_routes_only_assigned_partition():
+    candidate_json = json.dumps(candidate("Create a report"))
+    invokers = {}
+
+    def factory(agent, seed):
+        provider = TracedInvoker(
+            agent.identifier,
+            lambda _agent, _step, _context: candidate_json,
+        )
+        invokers[agent.identifier] = provider
+        return provider
+
+    adapter = DirectProtocolStrategyAdapter(
+        extraction=EXTRACTION,
+        model_resolver=lambda _condition, ids: {agent_id: "model-A" for agent_id in ids},
+        invoker_factory=factory,
+        n=3,
+    )
+    condition = E1Condition(
+        "smart-administration", "S1", "homogeneous", 0, ("p-001",), 5,
+    )
+    result = adapter.run(condition=condition, prompt=PROMPT, seed=11)
+
+    assert result.calls_made == 5
+    assert result.metadata["execution_path"] == "direct_protocol"
+    assert result.metadata["trace_complete"] is True
+    expected = {
+        "specialist-1": "LEGAL",
+        "specialist-2": "TECHNICAL",
+        "specialist-3": "OPERATIONS",
+    }
+    for agent_id, partition in expected.items():
+        # The invoker's response callback is deliberately independent of context;
+        # capture the actual contexts through a second, context-aware run below.
+        assert invokers[agent_id].trace_dicts()[0]["action"] == "draft"
+
+
+def test_direct_s11_uses_definition7_distance_for_epsilon_stopping():
+    calls = []
+
+    def factory(agent, seed):
+        def respond(_agent, step, context):
+            calls.append((agent.identifier, step.action.value, context))
+            if step.action.value == "draft":
+                return json.dumps(candidate("Initial report plan"))
+            if step.action.value == "revise":
+                question = (
+                    "Create a report" if agent.identifier == "party-1"
+                    else "Produce a report"
+                )
+                return json.dumps(candidate(question))
+            raise AssertionError(f"Unexpected action: {step.action.value}")
+        return TracedInvoker(agent.identifier, respond)
+
+    adapter = DirectProtocolStrategyAdapter(
+        extraction=EXTRACTION,
+        model_resolver=lambda _condition, ids: {
+            agent_id: ("model-A" if agent_id != "party-2" else "model-B")
+            for agent_id in ids
+        },
+        invoker_factory=factory,
+        adjudications={
+            StrategyId.S11: DecisionAdjudication(
+                negotiated_decomposition=NEGOTIATED,
+                rationale="The parties' revised decompositions agree under Definition 7.",
+            )
+        },
+        n=2,
+        T=2,
+    )
+    condition = E1Condition(
+        "smart-administration", "S11", "heterogeneous", 0, ("p-001",), 8,
+    )
+    result = adapter.run(condition=condition, prompt=PROMPT, seed=17)
+
+    assert result.calls_made == 5
+    assert result.metadata["strategy_depth_executed"] == 3
+    assert result.metadata["mediation_epsilon"] == 0.1
+    assert result.metadata["mediation_distance_matcher"] == "exact-output-local-constraints-v1"
+    assert result.metadata["strategy_base_calls"] == 5
+    assert result.metadata["strategy_max_calls"] == 8
+    left = Decomposition(
+        (Subproblem("s1", "Create a report", (), "Report", (), (REQUIREMENT,)),),
+        (), (DeliverableComposition("Report", ("s1",)),),
+    )
+    right = Decomposition(
+        (Subproblem("s1", "Produce a report", (), "Report", (), (REQUIREMENT,)),),
+        (), (DeliverableComposition("Report", ("s1",)),),
+    )
+    assert decomposition_distance(left, right) == 0.0
+    assert [action for _, action, _ in calls] == [
+        "draft", "draft", "summarise", "revise", "revise",
+    ]
