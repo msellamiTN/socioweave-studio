@@ -34,6 +34,12 @@ def subproblem_signature(item: Subproblem) -> tuple:
     )
 
 
+def _jaccard(left: frozenset, right: frozenset) -> float:
+    if not left and not right:
+        return 1.0
+    return len(left & right) / len(left | right)
+
+
 def decomposition_distance(
     left: Decomposition,
     right: Decomposition,
@@ -124,7 +130,7 @@ def rank_sum(
 
 
 def union(candidates: Sequence[Candidate], *, matcher: SubproblemMatcher = DEFAULT_MATCHER) -> DecisionResult:
-    """Union candidate subproblems/edges/composition, merging exact equivalents.
+    """Union candidate subproblems/edges/composition by matcher equivalence.
 
     The paper's coverage-preserving union is not a validity guarantee:
     cycles can be introduced and are left for the common structural checker.
