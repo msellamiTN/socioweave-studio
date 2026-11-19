@@ -69,8 +69,10 @@ experiments or empirical results are claimed.
   and return `ExecutorRun` containing an `ExecutionRun`, actual executor call
   count and provider trace.
 - The executor identity is checked before and after execution.
-- Combined method + executor calls may not exceed the condition's registered
-  call budget.
+- The condition's registered call budget applies to strategy/baseline method
+  calls, as required for Table 13 budget matching. Fixed executor ME calls are
+  recorded separately and included in total observed cost, but do not consume
+  the method-call budget.
 - Utility is recorded only when an independent scorer is explicitly supplied.
 - Cross-condition metrics (stability, reference agreement and process gain)
   are not imputed by a single-condition run; they belong to the paired analysis

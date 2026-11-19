@@ -61,13 +61,26 @@ def test_direct_strategy_runs_without_adaptive_selector_and_uses_fixed_executor(
     assert result.metadata["trace_is_complete"] is True
 
 
-def test_actual_calls_must_fit_registered_budget():
-    with pytest.raises(RuntimeError, match="budget exceeded"):
+def test_method_calls_must_fit_registered_budget():
+    with pytest.raises(RuntimeError, match="method-call budget exceeded"):
         run_direct_e1_condition(
             condition=CONDITION, example_id="p-001", prompt=PROMPT,
-            requirements=(REQ,), method=Method(calls=4), executor=Executor(calls=1),
+            requirements=(REQ,), method=Method(calls=5), executor=Executor(calls=1),
             expected_executor_id="ME-fixed-v1", seed=17,
         )
+
+
+def test_fixed_executor_calls_are_reported_but_do_not_consume_strategy_budget():
+    result = run_direct_e1_condition(
+        condition=CONDITION, example_id="p-001", prompt=PROMPT,
+        requirements=(REQ,), method=Method(calls=4), executor=Executor(calls=3),
+        expected_executor_id="ME-fixed-v1", seed=17,
+    )
+    assert result.calls_method == 4
+    assert result.calls_executor == 3
+    assert result.calls_total == 7
+    assert result.metadata["method_call_budget"] == 4
+    assert result.metadata["executor_calls_excluded_from_method_budget"] == 3
 
 
 def test_executor_identity_is_fixed_and_verified():
