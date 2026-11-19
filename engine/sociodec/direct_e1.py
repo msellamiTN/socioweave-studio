@@ -187,9 +187,10 @@ def run_direct_e1_condition(
             raise ValueError("Coverage obligation exists but effective requirement set is empty")
         metrics["coverage"] = len(method_run.decomposition.cov & frozenset(effective)) / len(effective)
     if "redundancy" in obligations:
+        class_labels = equivalence_classes(method_run.decomposition.subproblems, matcher)
+        class_sizes = {label: class_labels.count(label) for label in set(class_labels)}
         metrics["redundancy"] = sum(
-            len(group) for group in equivalence_classes(method_run.decomposition.subproblems, matcher)
-            if len(group) > 1
+            size for size in class_sizes.values() if size > 1
         ) / len(method_run.decomposition.subproblems)
     if "coupling" in obligations:
         metrics["coupling"] = len(method_run.decomposition.E) / len(method_run.decomposition.subproblems)
