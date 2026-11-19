@@ -50,6 +50,7 @@ class ExecutorCall:
     output_sha256: str
     finish_reason: str | None
     seed: int
+    error: str | None = None
 
 
 class ProviderFixedExecutor:
@@ -80,16 +81,28 @@ class ProviderFixedExecutor:
         user = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         messages = [ChatMessage("system", system), ChatMessage("user", user)]
         started = time.perf_counter()
-        result = self.provider.generate(
-            messages,
-            GenerationConfig(temperature=0.0, max_new_tokens=self.max_new_tokens,
-                             seed=seed, response_format="json"),
-        )
-        elapsed = (time.perf_counter() - started) * 1000.0
-        if not isinstance(result, GenerationResult):
-            raise TypeError("LLMProvider.generate must return GenerationResult")
-        if not result.text.strip():
-            raise ValueError(f"executor returned empty output for {action}")
+        try:
+            result = self.provider.generate(
+                messages,
+                GenerationConfig(temperature=0.0, max_new_tokens=self.max_new_tokens,
+                                 seed=seed, response_format="json"),
+            )
+            elapsed = (time.perf_counter() - started) * 1000.0
+            if not isinstance(result, GenerationResult):
+                raise TypeError("LLMProvider.generate must return GenerationResult")
+            if not result.text.strip():
+                raise ValueError(f"executor returned empty output for {action}")
+        except Exception as exc:
+            elapsed = (time.perf_counter() - started) * 1000.0
+            self._traces.append(ExecutorCall(
+                sequence=len(self._traces), action=action,
+                provider=self.provider.provider_name, model=self.provider.model_name,
+                input_tokens=None, output_tokens=None, latency_ms=round(elapsed, 3),
+                request_id=None, prompt_sha256=_sha256(user), output_sha256="",
+                finish_reason="error", seed=seed,
+                error=f"{type(exc).__name__}: {exc}",
+            ))
+            raise
         self._traces.append(ExecutorCall(
             sequence=len(self._traces), action=action, provider=result.provider,
             model=result.model, input_tokens=result.input_tokens,
@@ -221,6 +234,12 @@ class ProviderFixedExecutor:
 
         assessments: list[ConstraintAssessment] = []
         for index, constraint in enumerate(prompt.iota.hard_constraints):
+            if composed.startswith("[COMPOSITION_FAILED:"):
+                assessments.append(ConstraintAssessment(
+                    constraint, False,
+                    "Constraint assessment skipped because deliverable composition failed.",
+                ))
+                continue
             payload = {
                 "original_prompt": prompt.text,
                 "composed_answer": composed,
