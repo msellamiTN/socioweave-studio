@@ -24,7 +24,7 @@ def test_majority_ballots_use_definition7_equivalence_across_paraphrases():
     result = majority(candidates, {
         "v1": [sp("v1-plan", "Write a report about risks", "Risk report"), rare],
         "v2": [sp("v2-plan", "Prepare risk summary", "risk report")],
-        "v3": [sp("v3-plan", "Build a dashboard", "Dashboard")],
+        "v3": [sp("v3-plan", "Summarise risks differently", "RISK REPORT")],
     })
     assert len(result.decomposition.subproblems) == 1
     assert result.rationale.endswith("Definition 7 matcher classes.")
