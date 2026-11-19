@@ -44,14 +44,18 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                  agent_contexts: Mapping[str, str] | None = None,
                  adjudications: Mapping[StrategyId | str, DecisionAdjudication] | None = None,
                  n: int = 3, k: int = 3, T: int = 2,
-                 mediation_epsilon: float = 0.1):
+                 mediation_epsilon: float = 0.1,
+                 consensus_epsilon: float = 0.1):
         if min(n, k, T) < 1: raise ValueError("n, k and T must be >= 1")
         self.extraction, self.model_resolver, self.invoker_factory = extraction, model_resolver, invoker_factory
         self.prompt_view_factory, self.agent_contexts = prompt_view_factory, dict(agent_contexts or {})
         if not 0.0 <= mediation_epsilon <= 1.0:
             raise ValueError("mediation_epsilon must be in [0, 1]")
+        if not 0.0 <= consensus_epsilon <= 1.0:
+            raise ValueError("consensus_epsilon must be in [0, 1]")
         self.adjudications, self.n, self.k, self.T = dict(adjudications or {}), n, k, T
         self.mediation_epsilon = mediation_epsilon
+        self.consensus_epsilon = consensus_epsilon
 
     def run(self, *, condition: E1Condition, prompt: Prompt, seed: int) -> MethodRun:
         if condition.method_id in BASELINES: raise ValueError("Strategy adapter cannot execute a baseline")
@@ -82,26 +86,32 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         routes = {a.identifier: self.invoker_factory(a, seed) for a in blueprint.strategy.agents}
         invoker = _RoutedInvoker(routes)
         run_options = {}
-        if sid is StrategyId.S11:
-            def mediation_distance(left_json: str, right_json: str) -> float:
+        if sid in {StrategyId.S10, StrategyId.S11}:
+            def candidate_distance(left_json: str, right_json: str) -> float:
                 # runtime passes canonical candidate JSON (without the outer
                 # protocol envelope); reconstruct typed decompositions and
                 # apply Definition 7's matcher-based distance.
                 left_data, right_data = json.loads(left_json), json.loads(right_json)
                 left_d = parse_candidate(
                     left_data, prompt=prompt, extraction=self.extraction,
-                    candidate_id="party-1",
+                    candidate_id="left-candidate",
                 ).decomposition
                 right_d = parse_candidate(
                     right_data, prompt=prompt, extraction=self.extraction,
-                    candidate_id="party-2",
+                    candidate_id="right-candidate",
                 ).decomposition
                 return decomposition_distance(left_d, right_d)
 
-            run_options = {
-                "mediation_epsilon": self.mediation_epsilon,
-                "mediation_candidate_distance": mediation_distance,
-            }
+            if sid is StrategyId.S10:
+                run_options = {
+                    "consensus_epsilon": self.consensus_epsilon,
+                    "consensus_candidate_distance": candidate_distance,
+                }
+            else:
+                run_options = {
+                    "mediation_epsilon": self.mediation_epsilon,
+                    "mediation_candidate_distance": candidate_distance,
+                }
         run = run_strategy(sid.value, prompt, blueprint.strategy, invoker,
             prompt_views=blueprint.prompt_views, hypotheses=self.extraction.hypotheses,
             **run_options)
@@ -123,6 +133,8 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 "strategy_max_depth": 1 + 2 * self.T if sid is StrategyId.S11 else blueprint.strategy.depth,
                 "mediation_epsilon": self.mediation_epsilon if sid is StrategyId.S11 else None,
                 "mediation_distance_matcher": "exact-output-local-constraints-v1" if sid is StrategyId.S11 else None,
+                "consensus_epsilon": self.consensus_epsilon if sid is StrategyId.S10 else None,
+                "consensus_distance_matcher": "exact-output-local-constraints-v1" if sid is StrategyId.S10 else None,
                 "agent_model_ids": models, "seeded_agents": list(run.seeded_agents),
                 "output_count": len(run.outputs), "decision_rule": decoded.decision.rule,
                 "decision_selected_candidate": decoded.decision.selected_candidate_id,

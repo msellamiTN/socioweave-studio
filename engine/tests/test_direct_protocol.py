@@ -176,3 +176,46 @@ def test_direct_s11_uses_definition7_distance_for_epsilon_stopping():
     assert [action for _, action, _ in calls] == [
         "draft", "draft", "revise", "revise",
     ]
+
+
+def test_direct_s10_applies_definition7_epsilon_and_reindexes_moderator_closure():
+    calls = []
+
+    def factory(agent, seed):
+        def respond(_agent, step, context):
+            calls.append((agent.identifier, step.round, step.action.value))
+            if step.action.value == "revise":
+                question = (
+                    "Initial report plan" if step.round == 1
+                    else "Produce a report" if agent.identifier == "participant-2"
+                    else "Revised report plan"
+                )
+                return json.dumps(candidate(question))
+            if step.action.value == "judge":
+                return json.dumps({
+                    "no_objection": True,
+                    "rationale": "No participant objection remains.",
+                })
+            raise AssertionError(f"Unexpected S10 action: {step.action.value}")
+        return TracedInvoker(agent.identifier, respond)
+
+    adapter = DirectProtocolStrategyAdapter(
+        extraction=EXTRACTION,
+        model_resolver=lambda _condition, ids: {agent_id: "model-A" for agent_id in ids},
+        invoker_factory=factory,
+        n=2,
+        T=3,
+    )
+    condition = E1Condition(
+        "smart-administration", "S10", "homogeneous", 0, ("p-001",), 7,
+    )
+    result = adapter.run(condition=condition, prompt=PROMPT, seed=23)
+
+    assert result.calls_made == 5
+    assert result.metadata["strategy_depth_executed"] == 5
+    assert result.metadata["consensus_epsilon"] == 0.1
+    assert result.metadata["consensus_distance_matcher"] == "exact-output-local-constraints-v1"
+    assert [round_number for _, round_number, action in calls if action == "revise"] == [
+        1, 1, 2, 2,
+    ]
+    assert calls[-1] == ("moderator", 2, "judge")
