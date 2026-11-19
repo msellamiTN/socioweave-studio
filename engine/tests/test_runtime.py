@@ -422,6 +422,9 @@ def test_s10_stops_after_stable_full_shared_draft_turn_and_keeps_moderator_closu
     assert run.depth_executed == 5
     assert run.outputs[-1].agent_id == "moderator"
     assert run.outputs[-1].action == "judge"
+    assert run.outputs[-1].round == 2
+    assert run.outputs[-1].stage == 5
+    assert tuple(item.stage for item in run.outputs) == (1, 2, 3, 4, 5)
     # Participant 2 sees participant 1's immediately preceding shared-draft turn.
     second_participant_call = next(call for call in invoker.calls
                                    if call[0] == "participant-2" and call[1] == 2)
