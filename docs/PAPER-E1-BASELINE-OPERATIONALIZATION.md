@@ -93,9 +93,14 @@ empirical run:
 - E1 condition manifest: baseline IDs and matched-strategy budget fields exist.
 - Direct method/executor runner: accepts a baseline adapter and enforces the
   registered upper call budget.
-- Executable adapters for the six baseline IDs: **not implemented**.
-- Baseline prompt templates and call-allocation contract: **not frozen**.
-- E1 empirical results: **none claimed**.
+- Six baseline adapters: implemented in `sociodec.direct_baselines.DirectBaselineAdapter`.
+- Operational profile: `e1-baselines-operational-profile-v1`; all choices above
+  remain labelled implementation choices, not paper-specified details.
+- Focused unit tests: cover all six methods, output decoding, call counts,
+  profile metadata, self-consistency aggregation and nominal selection without
+  gold labels.
+- Current suite result on implementation PR head: 464 tests passed.
+- Provider-backed E1 baseline runs and empirical results: **not executed**..
 
 ## Exit criteria
 
