@@ -78,6 +78,23 @@ experiments or empirical results are claimed.
   are not imputed by a single-condition run; they belong to the paired analysis
   layer.
 
+## Resumable campaign execution
+
+`sociodec.direct_e1_campaign.DirectE1CampaignRunner` executes a frozen set of
+`E1Condition` rows against an explicit prompt snapshot and injected prompt,
+extraction, method and fixed-executor adapters. It verifies baseline-to-strategy
+call-budget matching, preserves exact prompt text, records per-condition
+successes/failures, and fsyncs each JSONL record. Existing records are accepted
+only when the campaign configuration hash matches; failed rows are not silently
+retried in place.
+
+The runner is an orchestration seam, not a dataset loader or model deployment.
+Real provider credentials, dataset snapshots, prompt interpretation factories,
+extractors, model routing and executor ME must be supplied by the experiment
+operator. A complete paper grid can be represented as conditions, while smaller
+pilot subsets can be used for infrastructure validation without being reported
+as E1 results.
+
 ## Scientific boundary
 
 This is an executable harness contract, not an E1 result. It does not supply
