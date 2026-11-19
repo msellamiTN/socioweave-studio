@@ -95,6 +95,33 @@ operator. A complete paper grid can be represented as conditions, while smaller
 pilot subsets can be used for infrastructure validation without being reported
 as E1 results.
 
+## Frozen benchmark snapshot intake
+
+`sociodec.datasets.freeze_e1_benchmark_snapshot` is the fail-closed intake
+boundary for the five E1 datasets. The operator supplies one local JSONL file
+per dataset through `E1DatasetSource(path, source_version, split)`. The intake:
+
+- requires exactly BREAK, StrategyQA, TaskBench, TravelPlanner and
+  smart-administration;
+- enforces the preregistered counts (100, 100, 100, 100 and 60);
+- rejects duplicate or malformed IDs, non-string prompt text, malformed
+  metadata and any row whose split differs from the declared split;
+- records the source filename, exact source-file SHA-256, declared source
+  version and split, prompt IDs, per-prompt hashes and total count;
+- creates a canonical snapshot SHA-256 over the per-dataset provenance entries.
+
+The resulting `E1FrozenSnapshot.examples` can be passed to the direct campaign
+runner, and `e1_prompt_id_map(snapshot)` supplies the exact mapping accepted by
+`build_e1_conditions`. The intake does not download, transform, infer, or
+synthesize benchmark examples. Synthetic rows used by its unit tests are test
+fixtures only and are not benchmark inputs.
+
+The manifest records declared source versions and split names; it does not
+independently establish upstream dataset authenticity, licensing permission,
+or whether the declared split reproduces the paper's original selection.
+Those remain operator/source-verification obligations. Public-dataset license
+review is still required before any real campaign is frozen or run.
+
 ## Scientific boundary
 
 This is an executable harness contract, not an E1 result. It does not supply
