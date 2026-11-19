@@ -39,7 +39,7 @@ def registry():
 def condition(method, mode="homogeneous"):
     return E1Condition(dataset="BREAK", method_id=method, model_mode=mode,
         seed=0, prompt_ids=("p1",), call_budget=5,
-        matched_strategy_id="S1" if method == "nominal_multi_agent" else None)
+        matched_strategy_id="S1" if method not in {"S1", "S12"} else None)
 
 def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
@@ -53,7 +53,7 @@ def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
 def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
     prompt = Prompt("Make a plan.", Interpretation("Make a plan"))
-    extraction = AggregatedExtraction((), ())
+    extraction = aggregate_extractions(())
     method = runtime.build_method(condition("S1", "heterogeneous"), prompt, extraction)
     assert isinstance(method, DirectProtocolStrategyAdapter)
 
