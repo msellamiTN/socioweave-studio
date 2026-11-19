@@ -150,3 +150,27 @@ def test_direct_campaign_rejects_tampered_checkpoint_rows(tmp_path: Path, mutati
     checkpoint.write_text(json.dumps(row) + "\\n", encoding="utf-8")
     with pytest.raises(ValueError, match=match):
         runner.run(checkpoint)
+
+
+def test_direct_campaign_row_identity_distinguishes_model_modes(tmp_path: Path):
+    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    conditions = (
+        E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4),
+        E1Condition("smart-administration", "S2", "heterogeneous", 0, ("p1",), 4),
+    )
+    calls = []
+    runner = DirectE1CampaignRunner(
+        config=DirectE1CampaignConfig("campaign-modes", "abc123", "ME-fixed-v1"),
+        conditions=conditions, examples=(example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda condition, *_args: (calls.append(condition.model_mode) or Method(2)),
+        executor=FixedExecutor(),
+    )
+    checkpoint = tmp_path / "modes.jsonl"
+    rows = runner.run(checkpoint)
+    assert len(rows) == 2
+    assert {row["model_mode"] for row in rows} == {"homogeneous", "heterogeneous"}
+    assert calls == ["homogeneous", "heterogeneous"]
+    assert len(runner.run(checkpoint)) == 2
+    assert calls == ["homogeneous", "heterogeneous"]
