@@ -15,7 +15,7 @@ def test_registry_covers_paper_benchmarks_and_marks_license_review():
 
 def test_jsonl_loader_preserves_ids_splits_and_source_version(tmp_path):
     path = tmp_path / "break.jsonl"
-    path.write_text(json.dumps({"example_id": "q1", "prompt_text": "Do task", "split": "test"}) + "\\n", encoding="utf-8")
+    path.write_text(json.dumps({"example_id": "q1", "prompt_text": "Do task", "split": "test"}) + "\n", encoding="utf-8")
     rows = load_jsonl_dataset(path, dataset="BREAK", source_version="break-2026-01", expected_count=1, expected_split="test")
     assert rows[0].example_id == "q1"
     assert rows[0].source_version == "break-2026-01"
@@ -24,13 +24,13 @@ def test_jsonl_loader_preserves_ids_splits_and_source_version(tmp_path):
 
 def test_jsonl_loader_rejects_unknown_dataset_duplicate_and_bad_rows(tmp_path):
     path = tmp_path / "bad.jsonl"
-    path.write_text("{}\\n", encoding="utf-8")
+    path.write_text("{}\n", encoding="utf-8")
     with pytest.raises(ValueError, match="Unknown dataset"):
         load_jsonl_dataset(path, dataset="unknown", source_version="v1")
     with pytest.raises(ValueError, match="line 1"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
     path.write_text(
-        '{"example_id":"x","prompt_text":"A"}\\n{"example_id":"x","prompt_text":"B"}\\n',
+        '{"example_id":"x","prompt_text":"A"}\n{"example_id":"x","prompt_text":"B"}\n',
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="duplicate"):
@@ -43,7 +43,7 @@ def test_jsonl_loader_rejects_unknown_dataset_duplicate_and_bad_rows(tmp_path):
 def _write_fixture(path, dataset, count, split="test"):
     # Synthetic rows are test fixtures only; never used as benchmark evidence.
     path.write_text("".join(
-        json.dumps({"example_id": f"{dataset}-{i:03d}", "prompt_text": f"fixture prompt {i}", "split": split}) + "\\n"
+        json.dumps({"example_id": f"{dataset}-{i:03d}", "prompt_text": f"fixture prompt {i}", "split": split}) + "\n"
         for i in range(count)
     ), encoding="utf-8")
 
@@ -98,7 +98,7 @@ def test_snapshot_manifest_binds_exact_source_bytes_and_prompt_content(tmp_path)
     # Change one prompt while retaining row count and IDs.
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     rows[0]["prompt_text"] = "changed fixture prompt"
-    path.write_text("".join(json.dumps(row) + "\\n" for row in rows), encoding="utf-8")
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     second = freeze_e1_benchmark_snapshot(sources)
     assert first.manifest["snapshot_sha256"] != second.manifest["snapshot_sha256"]
     assert first.manifest["datasets"]["BREAK"]["source_sha256"] != second.manifest["datasets"]["BREAK"]["source_sha256"]
@@ -112,6 +112,6 @@ def test_snapshot_manifest_binds_exact_source_bytes_and_prompt_content(tmp_path)
 ])
 def test_jsonl_loader_rejects_non_object_or_malformed_rows(tmp_path, row):
     path = tmp_path / "bad.jsonl"
-    path.write_text(json.dumps(row) + "\\n", encoding="utf-8")
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="line 1"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
