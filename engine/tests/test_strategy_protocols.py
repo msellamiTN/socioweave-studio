@@ -39,8 +39,12 @@ def test_division_of_labour_requires_and_preserves_domain_restricted_views():
     blueprint = build_strategy_blueprint("S1", prompt_views=views)
     assert blueprint.prompt_views == views
     specialists = [step for step in blueprint.strategy.protocol if step.action is Action.DRAFT]
-    assert [step.input_ref for step in specialists] == ["prompt"] * 3
+    assert [step.input_ref for step in specialists] == ["partition:step:0"] * 3
     assert [step.round for step in specialists] == [2, 2, 2]
+    pairs = set(blueprint.strategy.visibility[1].visible_pairs)
+    assert all((f"specialist-{i}", "coordinator") in pairs for i in range(1, 4))
+    assert ("specialist-1", "specialist-2") not in pairs
+    assert ("specialist-2", "specialist-3") not in pairs
 
 
 def test_jigsaw_integrator_can_see_all_expert_outputs_but_experts_are_isolated():
