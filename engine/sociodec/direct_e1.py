@@ -171,27 +171,45 @@ def run_direct_e1_condition(
     execution = assess_execution(prompt, method_run.decomposition, executor_run.execution)
     full = combine_validity(structural, execution)
     obligations = e1_metric_obligations(condition.dataset)
-    metrics: dict[str, float] = {
-        "validity": float(full.fully_valid),
-        "redundancy": sum(
-            len(group) for group in equivalence_classes(method_run.decomposition.subproblems, matcher)
-            if len(group) > 1
-        ) / len(method_run.decomposition.subproblems),
-        "coupling": len(method_run.decomposition.E) / len(method_run.decomposition.subproblems),
-        "depth": float(_depth(method_run.decomposition)),
-        "solvability": sum(x.status.value == "solved" for x in executor_run.execution.executions)
-            / len(executor_run.execution.executions) if executor_run.execution.executions else 0.0,
+    profile = __import__("sociodec.dataset_metrics", fromlist=["get_metric_profile"]).get_metric_profile(condition.dataset)
+    metrics: dict[str, float] = {}
+    validity_checks = {
+        "V1": structural.v1_coverage, "V2": structural.v2_acyclicity,
+        "V3": execution.v3_solvability, "V4": execution.v4_faithfulness,
+        "V5": structural.v5_composition,
     }
+    if "validity" in obligations:
+        components = profile.validity_components or frozenset(validity_checks)
+        metrics["validity"] = float(all(validity_checks[name].status.value == "pass" for name in components))
     if "coverage" in obligations:
         effective = structural.effective_requirements
         if not effective:
             raise ValueError("Coverage obligation exists but effective requirement set is empty")
         metrics["coverage"] = len(method_run.decomposition.cov & frozenset(effective)) / len(effective)
-    if utility_scorer is not None:
+    if "redundancy" in obligations:
+        metrics["redundancy"] = sum(
+            len(group) for group in equivalence_classes(method_run.decomposition.subproblems, matcher)
+            if len(group) > 1
+        ) / len(method_run.decomposition.subproblems)
+    if "coupling" in obligations:
+        metrics["coupling"] = len(method_run.decomposition.E) / len(method_run.decomposition.subproblems)
+    if "solvability" in obligations:
+        metrics["solvability"] = sum(x.status.value == "solved" for x in executor_run.execution.executions) / len(executor_run.execution.executions) if executor_run.execution.executions else 0.0
+    if "cost" in obligations:
+        metrics["cost"] = float(calls_total)
+    if "utility" in obligations and utility_scorer is not None:
         utility = utility_scorer(prompt, executor_run.execution.composed_answer)
         if isinstance(utility, bool) or not isinstance(utility, (int, float)) or not math.isfinite(utility) or not 0 <= utility <= 1:
             raise ValueError("utility_scorer must return a finite value in [0,1]")
         metrics["utility"] = float(utility)
+    if "hypothesis_verdicts" in obligations:
+        metrics["hypothesis_verdicts"] = float(structural.hypothesis_verdicts.status.value == "pass")
+    if "stability" in obligations or "reference_agreement" in obligations or "process_gain" in obligations:
+        # These require cross-condition/reference data and are deliberately computed
+        # by the paired E1 analysis layer, never imputed in a single-condition run.
+        pass
+    from sociodec.dataset_metrics import validate_reported_metrics
+    validate_reported_metrics(condition.dataset, metrics);
 
     decomposition_hash = hashlib.sha256(_canonical_decomposition(method_run.decomposition).encode()).hexdigest()
     answer_hash = hashlib.sha256(executor_run.execution.composed_answer.encode("utf-8")).hexdigest()
