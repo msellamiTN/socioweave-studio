@@ -1,0 +1,45 @@
+name: Colab notebook validation
+
+on:
+  pull_request:
+    paths:
+      - "notebooks/colab/**/*.ipynb"
+      - ".github/workflows/colab-notebook-validation.yml"
+  push:
+    paths:
+      - "notebooks/colab/**/*.ipynb"
+      - ".github/workflows/colab-notebook-validation.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate notebook JSON and Python cells
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          notebooks = sorted(Path("notebooks/colab").rglob("*.ipynb"))
+          if not notebooks:
+              raise SystemExit("No Colab notebooks found")
+
+          for path in notebooks:
+              with path.open(encoding="utf-8") as stream:
+                  notebook = json.load(stream)
+              if notebook.get("nbformat") != 4:
+                  raise SystemExit(f"{path}: expected nbformat 4")
+              cells = notebook.get("cells")
+              if not isinstance(cells, list):
+                  raise SystemExit(f"{path}: cells must be a list")
+              for index, cell in enumerate(cells):
+                  if cell.get("cell_type") == "code":
+                      source = cell.get("source", "")
+                      source = "".join(source) if isinstance(source, list) else source
+                      compile(source, f"{path}:cell-{index}", "exec")
+              print(f"VALID {path}: {len(cells)} cells")
+          PY
