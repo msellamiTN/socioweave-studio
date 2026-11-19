@@ -80,3 +80,34 @@ def test_executor_rejects_cyclic_decomposition():
     import pytest
     with pytest.raises(ValueError,match="acyclic"):
         executor.execute(prompt=prompt,decomposition=cyclic,seed=0)
+
+def test_failed_provider_attempt_is_counted_and_traced():
+    prompt, decomposition = fixture()
+    class RaisingProvider(FakeProvider):
+        def generate(self, messages, config=None):
+            if not self.calls:
+                self.calls.append((messages, config))
+                raise RuntimeError("transport failed")
+            return super().generate(messages, config)
+    provider = RaisingProvider([
+        json.dumps({"composed_answer":"Partial"}),
+        json.dumps({"satisfied":False,"evidence":"Not established."}),
+    ])
+    result = ProviderFixedExecutor(provider,executor_id="executor-v1").execute(
+        prompt=prompt,decomposition=decomposition,seed=4)
+    assert result.calls_made == 3
+    assert result.provider_trace[0]["error"].startswith("RuntimeError")
+    assert result.execution.executions[0].status is ExecutionStatus.FAILED
+    assert result.execution.executions[1].status is ExecutionStatus.FAILED
+
+def test_failed_composition_forces_hard_constraint_assessment_failure():
+    prompt, decomposition = fixture()
+    provider = FakeProvider([
+        json.dumps({"answer":"analysis"}), json.dumps({"answer":"design"}),
+        "not-json",
+    ])
+    result = ProviderFixedExecutor(provider,executor_id="executor-v1").execute(
+        prompt=prompt,decomposition=decomposition,seed=5)
+    assert result.calls_made == 3
+    assert result.execution.constraint_assessments[0].satisfied is False
+    assert "composition failed" in result.execution.constraint_assessments[0].evidence
