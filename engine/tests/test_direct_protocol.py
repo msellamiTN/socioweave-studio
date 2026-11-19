@@ -52,8 +52,10 @@ class TracedInvoker:
         self.agent_id = agent_id
         self.response = response
         self.traces = []
+        self.contexts = []
 
     def invoke(self, agent, step, context):
+        self.contexts.append((agent.identifier, step.action.value, context))
         if step.action.value == "split":
             result = json.dumps({"partitions": {
                 "specialist-1": "LEGAL",
@@ -107,9 +109,13 @@ def test_direct_s1_executes_coordinator_split_and_routes_only_assigned_partition
         "specialist-3": "OPERATIONS",
     }
     for agent_id, partition in expected.items():
-        # The invoker's response callback is deliberately independent of context;
-        # capture the actual contexts through a second, context-aware run below.
-        assert invokers[agent_id].trace_dicts()[0]["action"] == "draft"
+        _, action, context = next(
+            item for item in invokers[agent_id].contexts if item[1] == "draft"
+        )
+        assert action == "draft"
+        assert context.input_content == partition
+        assert context.prompt_view == partition
+        assert "Create a report." not in context.prompt_view
 
 
 def test_direct_s11_uses_definition7_distance_for_epsilon_stopping():
