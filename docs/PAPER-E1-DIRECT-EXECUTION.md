@@ -39,15 +39,27 @@ The default matcher is `exact-output-local-constraints-v1`. It is a lexical
 proxy, not semantic equivalence; matcher sensitivity remains an experimental
 risk and must be reported.
 
-## Baseline path: not yet implemented
+## Baseline path: implemented under operational profile v1
 
-The E1 manifest defines the six baseline IDs, and `run_direct_e1_condition`
-accepts a baseline adapter through the same method interface. However, this
-repository does **not yet contain executable implementations** for those six
-baseline IDs. The baseline specifications and source ambiguities are tracked in
+The six baseline IDs have direct adapters in
+`sociodec.direct_baselines.DirectBaselineAdapter`. They are executed through
+the same `MethodRun` interface and then the same fixed executor ME,
+validation, metric-applicability and trace-accounting path as strategies.
+
+The operational details not specified in §8.1 are frozen under
+`e1-baselines-operational-profile-v1` and are recorded in each result's
+metadata. In particular, the profile defines self-refinement as draft/critique/
+revision, self-consistency as budget-sized independent sampling with
+matcher-based frequency aggregation, evaluator as non-mutating assessment,
+debate as two drafts plus budget-matched debate turns and judge, and nominal
+selection as three isolated drafts ranked by extracted-requirement coverage.
+These are implementation choices, not claims about the paper's exact prompts
+or omitted protocol details.
+
+The full source-vs-operationalization boundary is documented in
 [the E1 baseline operationalization audit](PAPER-E1-BASELINE-OPERATIONALIZATION.md).
-Do not describe the direct E1 path as complete until those adapters exist and
-are tested.
+The adapters have unit-test coverage; no provider-backed E1 baseline
+experiments or empirical results are claimed.
 
 ## Adapter obligations
 
