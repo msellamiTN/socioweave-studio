@@ -113,14 +113,18 @@ def build_strategy_blueprint(
         roles.update({(a, 3): Role.DECOMPOSER for a in specialists})
         p.extend([
             ProtocolStep("coordinator", Action.SPLIT, "prompt", 1, 1),
-            *(ProtocolStep(a, Action.DRAFT, "prompt", 2, 2) for a in specialists),
+            *(ProtocolStep(a, Action.DRAFT, "partition:step:0", 2, 2) for a in specialists),
             ProtocolStep("coordinator", Action.CHECK, "all_previous_outputs", 3, 3),
         ])
-        for r in (1, 2, 3):
-            visibility[r] = _pairs(ids, full=(r == 3))
-        views = prompt_views
-        if views is None:
-            raise ValueError("S1 requires explicit prompt_views: coordinator prompt and one domain part per specialist")
+        visibility[1] = _pairs(ids, full=False)
+        # Each specialist may inspect the coordinator's partition assignment,
+        # but never another specialist's partition or draft.
+        visibility[2] = tuple((a, a) for a in ids) + tuple((a, "coordinator") for a in specialists)
+        visibility[3] = _pairs(ids, full=True)
+        views = prompt_views or {
+            "coordinator": "FULL_PROMPT",
+            **{agent: "PARTITION_ASSIGNED_AT_RUNTIME" for agent in specialists},
+        }
 
     elif sid is StrategyId.S12:
         experts = tuple(f"expert-{i+1}" for i in range(n))
