@@ -570,6 +570,9 @@ def test_s1_routes_coordinator_partitions_to_isolated_specialists_without_prompt
     )
 
     assert run.calls_made == 5
+    coordinator_split = invoker.calls[0][2]
+    assert coordinator_split.input_content == prompt().text
+    assert coordinator_split.prompt_view == prompt().text
     specialist_calls = [item for item in invoker.calls if item[1] == "draft"]
     assert [agent for agent, _, _ in specialist_calls] == [
         "specialist-1", "specialist-2", "specialist-3",
