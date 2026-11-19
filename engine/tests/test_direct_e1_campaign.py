@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -123,3 +124,29 @@ def test_direct_campaign_rejects_changed_checkpoint_config(tmp_path: Path):
     )
     with pytest.raises(ValueError, match="campaign hash differs"):
         second.run(checkpoint)
+
+
+@pytest.mark.parametrize("mutation,match", [
+    ("foreign_row", "not part of the frozen campaign"),
+    ("prompt_hash", "prompt hash differs"),
+])
+def test_direct_campaign_rejects_tampered_checkpoint_rows(tmp_path: Path, mutation, match):
+    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
+    checkpoint = tmp_path / "tampered.jsonl"
+    runner = DirectE1CampaignRunner(
+        config=DirectE1CampaignConfig("campaign-integrity", "abc123", "ME-fixed-v1"),
+        conditions=(condition,), examples=(example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+    )
+    runner.run(checkpoint)
+    row = json.loads(checkpoint.read_text(encoding="utf-8"))
+    if mutation == "foreign_row":
+        row["example_id"] = "not-in-campaign"
+    else:
+        row["prompt_hash"] = "0" * 64
+    checkpoint.write_text(json.dumps(row) + "\\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=match):
+        runner.run(checkpoint)
