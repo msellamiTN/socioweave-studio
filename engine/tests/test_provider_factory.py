@@ -16,21 +16,21 @@ def spec(model, family="MA", *, provider_org=None, model_size=None):
             base_url="https://ma.example.invalid/v1", api_key_env="MA_API_KEY",
             provider_name="provider-a", family_id="MA",
             provider_org=provider_org or "Provider-A", weight_access="closed-weight",
-            model_revision="ma-revision-2026-11", access_date="2026-11-20",
+            model_revision=model, access_date="2026-11-20",
         )
     if family == "MB":
         return ProviderSpec(
             backend="huggingface-local", model_id=model,
             family_id="MB", provider_org=provider_org or "Provider-B",
             weight_access="open-weight", model_size=model_size or "small",
-            model_revision="mb-commit-abc123", access_date="2026-11-20",
+            model_revision="a" * 40, access_date="2026-11-20",
         )
     if family == "MC":
         return ProviderSpec(
             backend="huggingface-local", model_id=model,
             family_id="MC", provider_org=provider_org or "Provider-C",
             weight_access="open-weight", model_size=model_size or "large",
-            model_revision="mc-commit-def456", access_date="2026-11-20",
+            model_revision="b" * 40, access_date="2026-11-20",
         )
     if family == "ME":
         return ProviderSpec(
@@ -38,7 +38,7 @@ def spec(model, family="MA", *, provider_org=None, model_size=None):
             base_url="https://me.example.invalid/v1", api_key_env="ME_API_KEY",
             provider_name="executor-provider", family_id="ME",
             provider_org="Executor-Provider", weight_access="closed-weight",
-            model_revision="me-revision-2026-11", access_date="2026-11-20",
+            model_revision=model, access_date="2026-11-20",
         )
     raise ValueError(family)
 
@@ -163,6 +163,6 @@ def test_assignment_manifest_records_non_secret_family_provenance():
     r = registry(standard_assignments())
     manifest = r.assignment_manifest(condition("heterogeneous"), ("a", "b", "c"))
     assert manifest["agent_model_families"] == {"a": "MA", "b": "MB", "c": "MC"}
-    assert manifest["agent_model_provenance"]["b"]["model_revision"] == "mb-commit-abc123"
+    assert manifest["agent_model_provenance"]["b"]["model_revision"] == "a" * 40
     assert manifest["executor_provenance"]["family_id"] == "ME"
     assert "api_key" not in str(manifest).lower()
