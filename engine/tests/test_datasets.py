@@ -36,7 +36,7 @@ def test_jsonl_loader_rejects_unknown_dataset_duplicate_and_bad_rows(tmp_path):
     with pytest.raises(ValueError, match="line 1"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
     path.write_text(
-        '{"example_id":"x","prompt_text":"A"}\n{"example_id":"x","prompt_text":"B"}\n',
+        '{"example_id":"x","prompt_text":"A","reference_data":{"gold":"A"}}\n{"example_id":"x","prompt_text":"B","reference_data":{"gold":"B"}}\n',
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="duplicate"):
@@ -151,7 +151,7 @@ def test_jsonl_loader_rejects_non_object_reference_data(tmp_path):
     path = tmp_path / "bad-reference.jsonl"
     path.write_text(json.dumps({
         "example_id": "q1", "prompt_text": "Do task", "reference_data": ["not", "an", "object"],
-    }) + "\\n", encoding="utf-8")
+    }) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="reference_data must be a JSON object"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
 
@@ -162,7 +162,7 @@ def test_freeze_rejects_missing_required_reference_data(tmp_path):
     _write_fixture(path, "BREAK", EXPECTED_PROMPTS["BREAK"])
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     rows[0].pop("reference_data")
-    path.write_text("".join(json.dumps(row) + "\\n" for row in rows), encoding="utf-8")
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     sources["BREAK"] = E1DatasetSource(
         path, "BREAK-v1", "test", "synthetic test fixture only", "approved",
     )
