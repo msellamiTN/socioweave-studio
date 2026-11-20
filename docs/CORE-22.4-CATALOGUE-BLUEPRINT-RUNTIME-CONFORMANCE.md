@@ -1,6 +1,6 @@
 # Core 22.4 — Catalogue–Blueprint–Runtime Semantic Conformance
 
-**Status:** Reintegrated on current main; exact-head CI validation pending. This is software conformance work, not scientific validation or an empirical strategy comparison.
+**Status:** PASS — current-main reintegration validated on exact PR head `a4a06a18b84cc576ee0b05905f2ab1d932b9ef37` (merge commit `09f978c6dfeb31f8c4490ba5c2d9978e33bfc348`). This is software conformance work, not scientific validation or an empirical strategy comparison.
 
 ## Source contract
 
@@ -51,7 +51,7 @@ Negative mutations cover prompt-view roster, role assignment, visibility, decisi
 
 ## Acceptance evidence
 
-Historical baseline: GitHub Actions run [44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209) on earlier commit `47508bfab9954e999faae7311bb0cee7b3f2a592` passed 448 tests. That result is not current-head evidence; the reintegrated branch must pass its own exact-head workflow before this milestone can be marked validated. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md).
+Current exact-head evidence: GitHub Actions run [44822306187](https://github.com/msellamiTN/socioweave-studio/actions/runs/44822306187) on `a4a06a18b84cc576ee0b05905f2ab1d932b9ef37` passed **524 tests**. The earlier 448-test run remains historical only. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md).
 
 ## Evidence boundary
 
