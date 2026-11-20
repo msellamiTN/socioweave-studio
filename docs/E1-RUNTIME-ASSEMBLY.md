@@ -69,3 +69,13 @@ verify that a provider's claimed family, organization, weight status, or
 revision is truthful. The paper requires exact model versions and access
 dates to be reported with results. No concrete MA/MB/MC product identities
 are assumed in this repository.
+
+
+Call `DirectE1Runtime.campaign_manifest()` before execution and persist its
+returned JSON as a campaign artifact. It contains both homogeneous and
+heterogeneous agent rosters, the MA/MB/MC family catalogue, exact model IDs and
+revisions, provider organizations, weight-access declarations, access dates,
+and the fixed ME executor identity. It excludes API keys and credential
+values. The campaign runner does not yet automatically persist this artifact
+or bind its hash into every result row; that integration remains a separate
+pre-execution gate.
