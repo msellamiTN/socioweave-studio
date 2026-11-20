@@ -27,10 +27,14 @@ class DirectE1Runtime:
     registry: E1ProviderRegistry
 
     def assignment_manifest(self, condition: E1Condition, agent_ids: tuple[str, ...]) -> dict[str, object]:
-        """Expose non-secret routing identities for campaign-level freezing."""
+        """Expose non-secret routing identities for one method condition."""
         manifest = self.registry.assignment_manifest(condition, agent_ids)
         manifest["executor_id"] = self.executor.executor_id
         return manifest
+
+    def campaign_manifest(self) -> dict[str, object]:
+        """Return the full model/executor identity manifest to freeze with E1."""
+        return self.registry.campaign_manifest(executor_id=self.executor.executor_id)
 
     def build_method(
         self, condition: E1Condition, prompt: Prompt,
