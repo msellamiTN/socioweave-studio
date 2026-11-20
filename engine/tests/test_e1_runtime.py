@@ -1,6 +1,8 @@
 import pytest
-from sociodec.e1_protocol import E1Condition
+from sociodec.e1_protocol import ALL_DATASETS, EXPECTED_PROMPTS, E1Condition, build_e1_conditions
 from sociodec.extraction import AggregatedExtraction, aggregate_extractions
+from sociodec.experiments import BenchmarkPrompt, content_hash
+from sociodec.datasets import E1FrozenSnapshot
 from sociodec.models.prompt import Interpretation, Prompt
 from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
 from sociodec.e1_runtime import build_direct_e1_runtime
@@ -144,3 +146,100 @@ def test_runtime_rejects_missing_agent_provider_assignments_before_building_exec
     del providers.assignments["heterogeneous"]["reviewer-3"]
     with pytest.raises(ValueError, match="provider roster is incomplete"):
         build_direct_e1_runtime(registry=providers, executor_id="executor-fixed")
+
+
+def frozen_snapshot_fixture():
+    expected_ids = {
+        dataset: tuple(f"{dataset}-{i:03d}" for i in range(EXPECTED_PROMPTS[dataset]))
+        for dataset in ALL_DATASETS
+    }
+    examples = tuple(
+        BenchmarkPrompt(dataset, example_id, f"fixture prompt {example_id}",
+                        split="test", source_version=f"{dataset}-fixture-v1")
+        for dataset, ids in expected_ids.items() for example_id in ids
+    )
+    entries = {}
+    for dataset, ids in expected_ids.items():
+        dataset_examples = [item for item in examples if item.dataset == dataset]
+        entries[dataset] = {
+            "source_file": f"{dataset}.jsonl",
+            "source_sha256": "f" * 64,
+            "source_version": f"{dataset}-fixture-v1",
+            "split": "test",
+            "prompt_count": len(ids),
+            "prompt_ids": list(ids),
+            "prompt_sha256": {item.example_id: item.prompt_hash for item in dataset_examples},
+        }
+    manifest = {
+        "schema_version": "e1-frozen-benchmark-snapshot-v1",
+        "dataset_order": list(ALL_DATASETS),
+        "datasets": entries,
+        "total_prompt_count": len(examples),
+        "snapshot_sha256": content_hash({"datasets": entries}),
+    }
+    return E1FrozenSnapshot(examples, expected_ids, manifest)
+
+
+def full_conditions_fixture():
+    snapshot = frozen_snapshot_fixture()
+    return snapshot, build_e1_conditions(expected_prompt_ids=snapshot.expected_prompt_ids)
+
+
+def test_no_call_preflight_validates_complete_e1_grid_and_all_provider_rosters():
+    providers = registry()
+    runtime = build_direct_e1_runtime(
+        registry=providers, executor_id="executor-fixed",
+        prompt_view_factory=lambda _sid, _prompt, _extraction, ids: {
+            agent_id: "explicit facet fixture" for agent_id in ids
+        },
+    )
+    snapshot, conditions = full_conditions_fixture()
+    report = runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
+    assert report.condition_count == 4550
+    assert report.prompt_count == 460
+    assert report.provider_rosters_validated == 38
+    assert report.live_provider_calls == 0
+    assert report.readiness == "configuration_validated_no_live_calls"
+    assert len(report.dataset_snapshot_sha256) == 64
+    assert len(report.provider_manifest_sha256) == 64
+    assert len(report.conditions_sha256) == 64
+
+
+def test_no_call_preflight_rejects_missing_jigsaw_facet_factory():
+    runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
+    snapshot, conditions = full_conditions_fixture()
+    with pytest.raises(ValueError, match="S12 preflight requires an explicit Jigsaw"):
+        runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
+
+
+def test_no_call_preflight_rejects_snapshot_manifest_tampering():
+    runtime = build_direct_e1_runtime(
+        registry=registry(), executor_id="executor-fixed",
+        prompt_view_factory=lambda _sid, _prompt, _extraction, ids: {
+            agent_id: "explicit facet fixture" for agent_id in ids
+        },
+    )
+    snapshot, conditions = full_conditions_fixture()
+    changed = dict(snapshot.manifest)
+    changed_entries = dict(changed["datasets"])
+    changed_break = dict(changed_entries["BREAK"])
+    changed_break["source_sha256"] = "0" * 64
+    changed_entries["BREAK"] = changed_break
+    changed["datasets"] = changed_entries
+    tampered = E1FrozenSnapshot(snapshot.examples, snapshot.expected_prompt_ids, changed)
+    with pytest.raises(ValueError, match="snapshot manifest SHA-256"):
+        runtime.preflight_campaign(snapshot=tampered, conditions=conditions)
+
+
+def test_no_call_preflight_rejects_heterogeneous_judge_family_collision():
+    providers = registry()
+    providers.assignments["heterogeneous"]["editor"] = spec("m1")
+    runtime = build_direct_e1_runtime(
+        registry=providers, executor_id="executor-fixed",
+        prompt_view_factory=lambda _sid, _prompt, _extraction, ids: {
+            agent_id: "explicit facet fixture" for agent_id in ids
+        },
+    )
+    snapshot, conditions = full_conditions_fixture()
+    with pytest.raises(ValueError, match="judge editor shares a model family"):
+        runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
