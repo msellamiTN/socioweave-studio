@@ -25,6 +25,37 @@ EXTRACTION = aggregate_extractions((
     ExtractionResult(requirements=(REQ,), extractor_id="extractor-1"),
 ))
 
+PROVIDER_MANIFEST = {
+    "schema_version": "e1-provider-manifest-v1",
+    "model_modes": {
+        "homogeneous": {
+            "agent-1": {"model_id": "MA-v1", "backend": "openai-compatible",
+                        "provenance": {"family_id": "MA", "model_revision": "MA-v1"}},
+        },
+        "heterogeneous": {
+            "agent-1": {"model_id": "MA-v1", "backend": "openai-compatible",
+                        "provenance": {"family_id": "MA", "model_revision": "MA-v1"}},
+            "agent-2": {"model_id": "MB-v1", "backend": "huggingface-local",
+                        "provenance": {"family_id": "MB", "model_revision": "a" * 40}},
+            "agent-3": {"model_id": "MC-v1", "backend": "huggingface-local",
+                        "provenance": {"family_id": "MC", "model_revision": "b" * 40}},
+        },
+    },
+    "model_family_catalogue": {"MA": {}, "MB": {}, "MC": {}},
+    "executor": {
+        "executor_id": "ME-fixed-v1", "model_id": "ME-v1",
+        "backend": "openai-compatible",
+        "provenance": {"family_id": "ME", "model_revision": "ME-v1"},
+    },
+}
+
+
+def campaign_config(campaign_id, code_commit="abc123", manifest=None):
+    return DirectE1CampaignConfig(
+        campaign_id, code_commit, "ME-fixed-v1",
+        provider_manifest_json=json.dumps(manifest or PROVIDER_MANIFEST),
+    )
+
 
 class Method:
     def __init__(self, calls):
@@ -64,7 +95,7 @@ def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(t
         return Method(2 if condition.method_id == "S2" else 1)
 
     runner = DirectE1CampaignRunner(
-        config=DirectE1CampaignConfig("campaign-test", "abc123", "ME-fixed-v1"),
+        config=campaign_config("campaign-test"),
         conditions=conditions, examples=examples,
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -77,6 +108,12 @@ def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(t
     assert {row["status"] for row in first} == {"success"}
     assert all(row["calls_total"] == row["calls_method"] + row["calls_executor"] for row in first)
     assert factory_calls == ["S2", "single_plan_and_solve"]
+    manifest_path = checkpoint.with_suffix(checkpoint.suffix + ".manifest.json")
+    saved_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert saved_manifest["schema_version"] == "e1-campaign-execution-manifest-v1"
+    assert saved_manifest["provider_manifest_hash"] == runner.config.provider_manifest_hash
+    assert saved_manifest["provider_manifest"] == PROVIDER_MANIFEST
+    assert all(row["provider_manifest_hash"] == runner.config.provider_manifest_hash for row in first)
 
     second = runner.run(checkpoint)
     assert len(second) == 2
@@ -94,7 +131,7 @@ def test_direct_campaign_rejects_unmatched_baseline_budget():
     )
     with pytest.raises(ValueError, match="Budget mismatch"):
         DirectE1CampaignRunner(
-            config=DirectE1CampaignConfig("campaign-test", "abc123", "ME-fixed-v1"),
+            config=campaign_config("campaign-test"),
             conditions=conditions, examples=(example,),
             prompt_factory=lambda _example: PROMPT,
             extraction_factory=lambda _prompt: EXTRACTION,
@@ -108,7 +145,7 @@ def test_direct_campaign_rejects_changed_checkpoint_config(tmp_path: Path):
     condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
     checkpoint = tmp_path / "changed.jsonl"
     first = DirectE1CampaignRunner(
-        config=DirectE1CampaignConfig("campaign-one", "abc123", "ME-fixed-v1"),
+        config=campaign_config("campaign-one"),
         conditions=(condition,), examples=(example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -116,26 +153,27 @@ def test_direct_campaign_rejects_changed_checkpoint_config(tmp_path: Path):
     )
     first.run(checkpoint)
     second = DirectE1CampaignRunner(
-        config=DirectE1CampaignConfig("campaign-two", "abc123", "ME-fixed-v1"),
+        config=campaign_config("campaign-two"),
         conditions=(condition,), examples=(example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
         method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
     )
-    with pytest.raises(ValueError, match="campaign hash differs"):
+    with pytest.raises(ValueError, match="campaign manifest differs"):
         second.run(checkpoint)
 
 
 @pytest.mark.parametrize("mutation,match", [
     ("foreign_row", "not part of the frozen campaign"),
     ("prompt_hash", "prompt hash differs"),
+    ("provider_manifest_hash", "provider manifest hash differs"),
 ])
 def test_direct_campaign_rejects_tampered_checkpoint_rows(tmp_path: Path, mutation, match):
     example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
     condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
     checkpoint = tmp_path / "tampered.jsonl"
     runner = DirectE1CampaignRunner(
-        config=DirectE1CampaignConfig("campaign-integrity", "abc123", "ME-fixed-v1"),
+        config=campaign_config("campaign-integrity"),
         conditions=(condition,), examples=(example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -145,8 +183,10 @@ def test_direct_campaign_rejects_tampered_checkpoint_rows(tmp_path: Path, mutati
     row = json.loads(checkpoint.read_text(encoding="utf-8"))
     if mutation == "foreign_row":
         row["example_id"] = "not-in-campaign"
-    else:
+    elif mutation == "prompt_hash":
         row["prompt_hash"] = "0" * 64
+    else:
+        row["provider_manifest_hash"] = "0" * 64
     checkpoint.write_text(json.dumps(row) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match=match):
         runner.run(checkpoint)
@@ -160,7 +200,7 @@ def test_direct_campaign_row_identity_distinguishes_model_modes(tmp_path: Path):
     )
     calls = []
     runner = DirectE1CampaignRunner(
-        config=DirectE1CampaignConfig("campaign-modes", "abc123", "ME-fixed-v1"),
+        config=campaign_config("campaign-modes"),
         conditions=conditions, examples=(example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -174,3 +214,38 @@ def test_direct_campaign_row_identity_distinguishes_model_modes(tmp_path: Path):
     assert calls == ["homogeneous", "heterogeneous"]
     assert len(runner.run(checkpoint)) == 2
     assert calls == ["homogeneous", "heterogeneous"]
+
+
+def test_campaign_config_requires_a_complete_secret_free_provider_manifest():
+    with pytest.raises(ValueError, match="provider_manifest_json is required"):
+        DirectE1CampaignConfig("missing-manifest", "abc123", "ME-fixed-v1")
+    with pytest.raises(ValueError, match="must not contain credentials"):
+        campaign_config("secret-manifest", manifest={
+            **PROVIDER_MANIFEST,
+            "credentials": {"api_key": "do-not-store"},
+        })
+
+
+def test_changed_provider_manifest_cannot_resume_existing_checkpoint(tmp_path: Path):
+    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
+    checkpoint = tmp_path / "provider-change.jsonl"
+    first = DirectE1CampaignRunner(
+        config=campaign_config("same-campaign"),
+        conditions=(condition,), examples=(example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+    )
+    first.run(checkpoint)
+    changed_manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    changed_manifest["model_modes"]["heterogeneous"]["agent-2"]["model_id"] = "MB-rotated"
+    second = DirectE1CampaignRunner(
+        config=campaign_config("same-campaign", manifest=changed_manifest),
+        conditions=(condition,), examples=(example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+    )
+    with pytest.raises(ValueError, match="campaign manifest differs"):
+        second.run(checkpoint)
