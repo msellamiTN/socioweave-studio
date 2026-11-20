@@ -91,16 +91,37 @@ class DirectE1Runtime:
         if not isinstance(snapshot_sha256, str) or len(snapshot_sha256) != 64:
             raise ValueError("snapshot manifest must include a SHA-256 fingerprint")
         expected_ids = e1_prompt_id_map(snapshot)
+        dataset_entries = snapshot.manifest.get("datasets")
+        if not isinstance(dataset_entries, dict) or set(dataset_entries) != set(expected_ids):
+            raise ValueError("snapshot manifest must contain exactly the five dataset provenance entries")
+        if content_hash({"datasets": dataset_entries}) != snapshot_sha256:
+            raise ValueError("snapshot manifest SHA-256 does not match its dataset provenance entries")
+        if snapshot.manifest.get("total_prompt_count") != len(snapshot.examples):
+            raise ValueError("snapshot total_prompt_count differs from its example records")
         examples_by_dataset = {
             dataset: tuple(
-                example.example_id for example in snapshot.examples
+                example for example in snapshot.examples
                 if example.dataset == dataset
             )
             for dataset in expected_ids
         }
         for dataset, ids in expected_ids.items():
-            if len(examples_by_dataset[dataset]) != len(ids) or set(examples_by_dataset[dataset]) != set(ids):
+            examples = examples_by_dataset[dataset]
+            if len(examples) != len(ids) or {item.example_id for item in examples} != set(ids):
                 raise ValueError(f"snapshot examples do not match frozen prompt IDs for {dataset}")
+            entry = dataset_entries[dataset]
+            if not isinstance(entry, dict) or entry.get("prompt_count") != len(ids):
+                raise ValueError(f"snapshot manifest prompt count is invalid for {dataset}")
+            if set(entry.get("prompt_ids", ())) != set(ids):
+                raise ValueError(f"snapshot manifest prompt IDs differ for {dataset}")
+            expected_hashes = {item.example_id: item.prompt_hash for item in examples}
+            if entry.get("prompt_sha256") != expected_hashes:
+                raise ValueError(f"snapshot manifest prompt hashes differ for {dataset}")
+            source_sha = entry.get("source_sha256")
+            if not isinstance(source_sha, str) or len(source_sha) != 64:
+                raise ValueError(f"snapshot manifest source file hash is missing for {dataset}")
+            if not entry.get("source_version") or not entry.get("split"):
+                raise ValueError(f"snapshot manifest source version/split is missing for {dataset}")
         validate_e1_manifest(
             conditions, expected_prompt_ids=expected_ids, require_complete_grid=True,
         )
