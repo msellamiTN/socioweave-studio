@@ -147,16 +147,18 @@ class E1ProviderRegistry:
         except ValueError as exc:
             raise ValueError(f"Missing or invalid E1 model provenance for {label}: {exc}") from exc
 
-    def validate_complete_roster(self) -> None:
-        """Require provider assignments for every E1 strategy and baseline agent."""
+    def validate_complete_roster(self, *, n: int = 3, k: int = 3) -> None:
+        """Require provider assignments for every configured E1 agent role."""
+        if n < 1 or k < 1:
+            raise ValueError("n and k must be >= 1")
         required = {
-            "coordinator", *(f"specialist-{i}" for i in range(1, 4)),
-            *(f"expert-{i}" for i in range(1, 4)), "integrator",
-            *(f"participant-{i}" for i in range(1, 4)), "aggregator",
-            *(f"member-{i}" for i in range(1, 4)),
-            *(f"voter-{i}" for i in range(1, 4)), "facilitator",
+            "coordinator", *(f"specialist-{i}" for i in range(1, n + 1)),
+            *(f"expert-{i}" for i in range(1, n + 1)), "integrator",
+            *(f"participant-{i}" for i in range(1, n + 1)), "aggregator",
+            *(f"member-{i}" for i in range(1, n + 1)),
+            *(f"voter-{i}" for i in range(1, n + 1)), "facilitator",
             "author", "critic", "judge", "decomposer-1", "decomposer-2",
-            "synthesizer", *(f"reviewer-{i}" for i in range(1, 4)), "editor",
+            "synthesizer", *(f"reviewer-{i}" for i in range(1, k + 1)), "editor",
             "agent-A", "agent-B", "party-1", "party-2", "mediator", "moderator",
             "single-decomposer", "self-refiner", "self-consistency-sampler",
             "decomposer", "separate-evaluator", "debater-1", "debater-2",
