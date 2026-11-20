@@ -139,8 +139,11 @@ class SequentialCompositionExecutor:
         second_allowance = get_strategy(StrategyId(second_item.value)).calls(n=n, k=k, T=T)
         if first_allowance + second_allowance > available_calls:
             raise RuntimeError("Available call budget cannot cover both sequential phases")
+        # Definition 12: phase one must execute independently. Caller-supplied
+        # drafts/seeds are composition-boundary inputs and cannot suppress
+        # the first strategy's own draft calls.
         first = self.adapter(
-            first_item, prompt, extraction, initial_drafts, chain_seed,
+            first_item, prompt, extraction, (), None,
             first_allowance,
         )
         if first.calls_made > first_allowance:
