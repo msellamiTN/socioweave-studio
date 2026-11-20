@@ -72,11 +72,13 @@ dates to be reported with results. No concrete MA/MB/MC product identities
 are assumed in this repository.
 
 
-Call `DirectE1Runtime.campaign_manifest()` before execution and persist its
-returned JSON as a campaign artifact. It contains both homogeneous and
-heterogeneous agent rosters, the MA/MB/MC family catalogue, exact model IDs and
-revisions, provider organizations, weight-access declarations, access dates,
-and the fixed ME executor identity. It excludes API keys and credential
-values. The campaign runner does not yet automatically persist this artifact
-or bind its hash into every result row; that integration remains a separate
-pre-execution gate.
+Call `DirectE1Runtime.campaign_manifest()` before execution and pass its
+canonical JSON as `DirectE1CampaignConfig.provider_manifest_json`. The campaign
+config validates the two model modes, the MA/MB/MC catalogue, the fixed ME
+executor, assignment-to-family consistency, and absence of credential fields.
+The runner writes a sidecar `<checkpoint>.manifest.json` before the first
+trial, containing the complete provider manifest, conditions and frozen prompt
+hashes. Its provider-manifest hash is bound into the campaign configuration
+hash and every success/failure result row. Resume is rejected if the sidecar,
+provider manifest, or checkpoint hash differs. This closes the configuration
+identity gap; it does not independently verify provider claims or model behavior.
