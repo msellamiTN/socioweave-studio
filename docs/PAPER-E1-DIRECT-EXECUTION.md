@@ -122,6 +122,31 @@ or whether the declared split reproduces the paper's original selection.
 Those remain operator/source-verification obligations. Public-dataset license
 review is still required before any real campaign is frozen or run.
 
+## S6 and S11 decision-semantics safeguards
+
+The direct runtime now exposes an explicit `action_instruction` to the protocol
+invoker for S6's `counter-plan` action. It preserves the original prompt as the
+authoritative problem statement while treating D1 as the proposal to challenge,
+not as binding assumptions. The S6 runtime regression test verifies that the
+counter-planner receives both the original prompt and D1 as distinct context
+channels, together with the explicit negated-assumption instruction. This
+verifies the instruction contract at the invoker boundary; it does not prove
+that a language model obeys it.
+
+For S11, the runtime records whether the latest party revisions met the paper's
+stop condition (exact agreement or Definition 7 distance at most epsilon), the
+round in which convergence occurred, and the measured distance when configured.
+The typed decision decoder now applies Section 5.4.2's return rule and selects
+party-1's latest draft D1 after convergence. If the configured round limit is
+exhausted without convergence, a separately supplied negotiated joint
+decomposition and rationale remain mandatory; the mediator is not allowed to
+invent or select a party draft.
+
+These are software-level semantics and test evidence. They do not establish
+that the model follows the counter-plan instruction, that the distance matcher
+is semantically adequate, or that the resulting decomposition is valid or
+useful.
+
 ## Scientific boundary
 
 This is an executable harness contract, not an E1 result. It does not supply

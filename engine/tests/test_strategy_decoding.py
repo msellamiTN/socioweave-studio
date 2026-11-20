@@ -119,6 +119,33 @@ def test_strategy_decision_assembly_applies_paper_operator(sid, outputs, expecte
     assert result.decision.decomposition.subproblems[0].question == "Create service"
 
 
+def test_s11_returns_party_one_latest_draft_when_runtime_confirms_paper_stop_rule():
+    prompt, extraction, _, raw = fixture()
+    party_one = dict(raw)
+    party_one["subproblems"] = [dict(party_one["subproblems"][0], question="D1 latest", output="D1")]
+    party_two = dict(raw)
+    party_two["subproblems"] = [dict(party_two["subproblems"][0], question="D2 latest", output="D2")]
+    outputs = (
+        ProtocolOutput(0, "party-1", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(1, "party-2", 1, 1, "draft", json.dumps({"candidate": raw}), True, False),
+        ProtocolOutput(2, "mediator", 1, 2, "summarise", json.dumps({
+            "summary": "Agreements and disagreements", "agreements": ["scope"],
+            "disagreements": ["ordering"],
+        }), True, False),
+        ProtocolOutput(3, "party-1", 1, 3, "revise", json.dumps({"candidate": party_one}), True, False),
+        ProtocolOutput(4, "party-2", 1, 3, "revise", json.dumps({"candidate": party_two}), True, False),
+    )
+    converged = StrategyRun(
+        "S11", outputs, 5, 3, (), ("party-1", "party-2", "mediator"),
+        mediation_converged=True, mediation_stop_round=1, mediation_distance=0.04,
+    )
+    decision = ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S11, converged).decision
+    assert decision.rule == "compromise"
+    assert decision.selected_candidate_id == "party-1"
+    assert decision.decomposition.subproblems[0].question == "D1 latest"
+    assert "returns D1" in decision.rationale
+
+
 def test_s11_compromise_requires_explicit_negotiated_result():
     prompt, extraction, d, _ = fixture()
     outputs = (

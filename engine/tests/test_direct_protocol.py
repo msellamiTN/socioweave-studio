@@ -142,12 +142,6 @@ def test_direct_s11_uses_definition7_distance_for_epsilon_stopping():
             for agent_id in ids
         },
         invoker_factory=factory,
-        adjudications={
-            StrategyId.S11: DecisionAdjudication(
-                negotiated_decomposition=NEGOTIATED,
-                rationale="The parties' revised decompositions agree under Definition 7.",
-            )
-        },
         n=2,
         T=2,
     )
@@ -160,6 +154,10 @@ def test_direct_s11_uses_definition7_distance_for_epsilon_stopping():
     assert result.metadata["strategy_depth_executed"] == 3
     assert result.metadata["mediation_epsilon"] == 0.1
     assert result.metadata["mediation_distance_matcher"] == "exact-output-local-constraints-v1"
+    assert result.metadata["mediation_converged"] is True
+    assert result.metadata["mediation_stop_round"] == 1
+    assert result.metadata["mediation_distance"] <= 0.1
+    assert result.metadata["decision_selected_candidate"] == "party-1"
     assert result.metadata["strategy_base_calls"] == 5
     assert result.metadata["strategy_max_calls"] == 8
     left = Decomposition(

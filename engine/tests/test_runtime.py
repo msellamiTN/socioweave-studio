@@ -522,6 +522,9 @@ def test_s11_epsilon_stopping_compares_two_party_revised_decompositions():
     assert run.calls_made == 5
     assert run.depth_executed == 3
     assert compared == [('{"value":0}', '{"value":1}')]
+    assert run.mediation_converged is True
+    assert run.mediation_stop_round == 1
+    assert run.mediation_distance == 0.03
 
 
 def test_s11_runs_through_T_when_party_revisions_remain_different():
@@ -534,6 +537,8 @@ def test_s11_runs_through_T_when_party_revisions_remain_different():
     assert {item.round for item in run.outputs} == {1, 2, 3}
     assert run.calls_made == 11
     assert run.depth_executed == 7
+    assert run.mediation_converged is False
+    assert run.mediation_stop_round is None
 
 
 def test_s11_requires_explicit_distance_when_epsilon_is_configured():
@@ -609,3 +614,27 @@ def test_s1_rejects_missing_or_extra_coordinator_partitions():
     with pytest.raises(ValueError, match="map exactly the configured specialists"):
         run_strategy("S1", prompt(), blueprint.strategy, InvalidPartitionInvoker(),
                      prompt_views=blueprint.prompt_views)
+
+
+def test_s6_counter_plan_receives_original_prompt_and_explicit_negated_assumption_instruction():
+    class CaptureInvoker:
+        def __init__(self):
+            self.contexts = []
+        def invoke(self, agent, step, context):
+            self.contexts.append((step.action.value, context))
+            return f"output-{len(self.contexts)}"
+
+    blueprint = build_strategy_blueprint("S6")
+    invoker = CaptureInvoker()
+    result = run_strategy(
+        "S6", prompt(), blueprint.strategy, invoker,
+        prompt_views=blueprint.prompt_views,
+    )
+    assert result.calls_made == 3
+    action, context = next((a, ctx) for a, ctx in invoker.contexts if a == "counter-plan")
+    assert action == "counter-plan"
+    assert context.prompt_view == prompt().text
+    assert context.input_ref == "step:0"
+    assert context.input_content == "output-1"
+    assert "do not assume" in context.action_instruction.lower()
+    assert "original prompt" in context.action_instruction.lower()

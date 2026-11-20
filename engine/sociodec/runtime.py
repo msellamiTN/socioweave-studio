@@ -37,6 +37,7 @@ class ProtocolContext:
     input_content: str
     hypotheses: tuple[Hypothesis, ...]
     visible_history: tuple[VisibleOutput, ...]
+    action_instruction: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,9 @@ class StrategyRun:
     depth_executed: int
     seeded_agents: tuple[str, ...]
     expected_agent_ids: tuple[str, ...] | None = None
+    mediation_converged: bool | None = None
+    mediation_stop_round: int | None = None
+    mediation_distance: float | None = None
 
     @property
     def output_refs(self) -> dict[str, str]:
@@ -72,6 +76,21 @@ class ProtocolInvoker(Protocol):
         step: ProtocolStep,
         context: ProtocolContext,
     ) -> str: ...
+
+
+def _action_instruction(strategy_id: str, action: str) -> str:
+    """Return explicit paper semantics that are not captured by a verb alone."""
+    if strategy_id == "S6" and action == "counter-plan":
+        return (
+            "Dialectical inquiry counter-plan: use the original prompt as the "
+            "authoritative problem statement and treat the first draft only as "
+            "a proposal to challenge. Construct an independent alternative "
+            "decomposition; do not assume, inherit, or treat as binding the "
+            "first draft's assumptions, decomposition choices, or omissions. "
+            "The first draft is supplied as the object of counter-planning, "
+            "not as a replacement for the original prompt."
+        )
+    return ""
 
 
 def _role_for(strategy: SocialStrategy, agent_id: str, round_number: int) -> Role:
@@ -196,6 +215,9 @@ def run_strategy(
     stages = sorted({step.stage for step in strategy.protocol})
     consensus_stopped_after: int | None = None
     mediation_stopped_after: int | None = None
+    mediation_converged: bool | None = False if strategy_id == "S11" else None
+    mediation_stop_round: int | None = None
+    mediation_distance: float | None = None
 
     def canonical_candidate(record: ProtocolOutput) -> str:
         try:
@@ -325,6 +347,7 @@ def run_strategy(
                 input_content=input_content,
                 hypotheses=hypotheses,
                 visible_history=history,
+                action_instruction=_action_instruction(strategy_id, step.action.value),
             )
 
             from_seed = (
@@ -425,7 +448,10 @@ def run_strategy(
                     if not isinstance(distance, (int, float)) or not 0.0 <= distance <= 1.0:
                         raise ValueError("Mediation candidate distance must return a value in [0, 1]")
                     within_epsilon = distance <= mediation_epsilon
+                    mediation_distance = float(distance)
                 if agreed or within_epsilon:
+                    mediation_converged = True
+                    mediation_stop_round = round_number
                     mediation_stopped_after = round_number
 
         # Delphi stopping is evaluated only after the facilitator has completed
@@ -481,4 +507,7 @@ def run_strategy(
         depth_executed=len({item.stage for item in outputs}),
         seeded_agents=tuple(sorted(seeded_agents)),
         expected_agent_ids=tuple(agent.identifier for agent in strategy.agents),
+        mediation_converged=mediation_converged,
+        mediation_stop_round=mediation_stop_round,
+        mediation_distance=mediation_distance,
     )
