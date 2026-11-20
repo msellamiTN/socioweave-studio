@@ -9,7 +9,8 @@ from sociodec.direct_e1_campaign import (
 )
 from sociodec.e1_protocol import E1Condition
 from sociodec.execution import ExecutionRun, ExecutionStatus, SubproblemExecution
-from sociodec.experiments import BenchmarkPrompt
+from sociodec.experiments import BenchmarkPrompt, content_hash
+from sociodec.datasets import DATASET_REGISTRY
 from sociodec.extraction import ExtractionResult, aggregate_extractions
 from sociodec.models.decomposition import Decomposition, DeliverableComposition, Subproblem
 from sociodec.models.prompt import Interpretation, Prompt, Requirement, RequirementType, SourceSpan
@@ -68,10 +69,51 @@ PROVIDER_MANIFEST = {
 }
 
 
-def campaign_config(campaign_id, code_commit="abc123", manifest=None):
+def dataset_snapshot_json(examples):
+    datasets = {}
+    for dataset in sorted({item.dataset for item in examples}):
+        selected = [item for item in examples if item.dataset == dataset]
+        ids = [item.example_id for item in selected]
+        registry = DATASET_REGISTRY[dataset]
+        datasets[dataset] = {
+            "source_file": "synthetic-test-fixture.jsonl",
+            "source_sha256": "f" * 64,
+            "source_version": selected[0].source_version,
+            "split": selected[0].split,
+            "selection_protocol": "synthetic unit-test fixture; not benchmark selection",
+            "selection_seed": None,
+            "license_review_status": "approved",
+            "paper_source_url": registry["paper_source_url"],
+            "prompt_case": registry["prompt_case"],
+            "reference_provided": registry["reference_provided"],
+            "metrics": list(registry["metrics"]),
+            "coverage_applicable": registry["coverage_applicable"],
+            "source_release_status": registry["source_release_status"],
+            "prompt_count": len(ids),
+            "prompt_ids": ids,
+            "prompt_sha256": {item.example_id: item.prompt_hash for item in selected},
+            "reference_data_sha256": {item.example_id: item.reference_data_hash for item in selected},
+        }
+    manifest = {
+        "schema_version": "e1-frozen-benchmark-snapshot-v1",
+        "dataset_order": list(datasets),
+        "datasets": datasets,
+        "total_prompt_count": sum(item["prompt_count"] for item in datasets.values()),
+        "snapshot_sha256": content_hash({"datasets": datasets}),
+    }
+    return json.dumps(manifest)
+
+
+def campaign_config(campaign_id, code_commit="abc123", manifest=None, examples=None, dataset_snapshot=None):
+    if examples is None:
+        examples = (BenchmarkPrompt(
+            "smart-administration", "p1", PROMPT.text,
+            reference_data={"fixture_annotation": "synthetic test fixture only"},
+        ),)
     return DirectE1CampaignConfig(
         campaign_id, code_commit, "ME-fixed-v1",
         provider_manifest_json=json.dumps(manifest or PROVIDER_MANIFEST),
+        dataset_snapshot_manifest_json=json.dumps(dataset_snapshot) if dataset_snapshot is not None else dataset_snapshot_json(tuple(examples)),
     )
 
 
@@ -114,7 +156,7 @@ def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(t
         return Method(2 if condition.method_id == "S2" else 1)
 
     runner = DirectE1CampaignRunner(
-        config=campaign_config("campaign-test"),
+        config=campaign_config("campaign-test", examples=examples),
         conditions=conditions, examples=examples,
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -136,7 +178,10 @@ def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(t
     assert saved_manifest["schema_version"] == "e1-campaign-execution-manifest-v1"
     assert saved_manifest["provider_manifest_hash"] == runner.config.provider_manifest_hash
     assert saved_manifest["provider_manifest"] == PROVIDER_MANIFEST
+    assert saved_manifest["dataset_snapshot_hash"] == runner.config.dataset_snapshot_hash
+    assert saved_manifest["dataset_snapshot_manifest"] == runner.config.dataset_snapshot_manifest
     assert all(row["provider_manifest_hash"] == runner.config.provider_manifest_hash for row in first)
+    assert all(row["dataset_snapshot_hash"] == runner.config.dataset_snapshot_hash for row in first)
 
     second = runner.run(checkpoint)
     assert len(second) == 2
@@ -311,7 +356,7 @@ def test_changed_reference_data_cannot_resume_existing_checkpoint(tmp_path: Path
         reference_data={"gold_decomposition": {"steps": ["A", "B"]}},
     )
     first = DirectE1CampaignRunner(
-        config=campaign_config("same-reference-campaign"),
+        config=campaign_config("same-reference-campaign", examples=(first_example,)),
         conditions=(condition,), examples=(first_example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -323,8 +368,82 @@ def test_changed_reference_data_cannot_resume_existing_checkpoint(tmp_path: Path
         reference_data={"gold_decomposition": {"steps": ["A", "C"]}},
     )
     second = DirectE1CampaignRunner(
-        config=campaign_config("same-reference-campaign"),
+        config=campaign_config("same-reference-campaign", examples=(changed_example,)),
         conditions=(condition,), examples=(changed_example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+    )
+    with pytest.raises(ValueError, match="campaign manifest differs"):
+        second.run(checkpoint)
+
+
+
+def test_campaign_config_requires_and_verifies_dataset_snapshot_manifest():
+    with pytest.raises(ValueError, match="dataset_snapshot_manifest_json is required"):
+        DirectE1CampaignConfig(
+            "missing-dataset-snapshot", "abc123", "ME-fixed-v1",
+            provider_manifest_json=json.dumps(PROVIDER_MANIFEST),
+        )
+    example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
+    valid = json.loads(dataset_snapshot_json((example,)))
+    tampered = json.loads(json.dumps(valid))
+    tampered["datasets"]["smart-administration"]["source_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="snapshot SHA-256"):
+        campaign_config("tampered-snapshot", examples=(example,), dataset_snapshot=tampered)
+    wrong_schema = json.loads(json.dumps(valid))
+    wrong_schema["schema_version"] = "unknown"
+    with pytest.raises(ValueError, match="schema e1-frozen-benchmark-snapshot-v1"):
+        campaign_config("wrong-snapshot-schema", examples=(example,), dataset_snapshot=wrong_schema)
+
+
+def test_campaign_rejects_example_not_bound_to_dataset_snapshot():
+    frozen = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
+    changed = BenchmarkPrompt(
+        "smart-administration", "p1", "A changed prompt.",
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
+    config = campaign_config("snapshot-prompt-mismatch", examples=(frozen,))
+    condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
+    with pytest.raises(ValueError, match="prompt hash differs from dataset snapshot"):
+        DirectE1CampaignRunner(
+            config=config, conditions=(condition,), examples=(changed,),
+            prompt_factory=lambda _example: PROMPT,
+            extraction_factory=lambda _prompt: EXTRACTION,
+            method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+        )
+
+
+def test_changed_dataset_source_provenance_cannot_resume_checkpoint(tmp_path: Path):
+    example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
+    condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
+    checkpoint = tmp_path / "dataset-source-change.jsonl"
+    original = json.loads(dataset_snapshot_json((example,)))
+    first = DirectE1CampaignRunner(
+        config=campaign_config("same-dataset-campaign", examples=(example,)),
+        conditions=(condition,), examples=(example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+    )
+    first.run(checkpoint)
+    changed = json.loads(json.dumps(original))
+    entry = changed["datasets"]["smart-administration"]
+    entry["source_sha256"] = "0" * 64
+    entry["selection_protocol"] = "different explicitly declared synthetic fixture selection"
+    changed["snapshot_sha256"] = content_hash({"datasets": changed["datasets"]})
+    second = DirectE1CampaignRunner(
+        config=campaign_config("same-dataset-campaign", examples=(example,), dataset_snapshot=changed),
+        conditions=(condition,), examples=(example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
         method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
