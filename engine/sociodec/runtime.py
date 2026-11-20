@@ -63,6 +63,53 @@ class StrategyRun:
     mediation_converged: bool | None = None
     mediation_stop_round: int | None = None
     mediation_distance: float | None = None
+    scheduled_steps: int | None = None
+    scheduled_depth: int | None = None
+
+    @property
+    def protocol_steps(self) -> int:
+        """Number of protocol outputs actually produced."""
+        return len(self.outputs)
+
+    @property
+    def model_invocations(self) -> int:
+        return sum(item.model_invoked for item in self.outputs)
+
+    @property
+    def seeded_steps(self) -> int:
+        return sum(item.from_seed for item in self.outputs)
+
+    @property
+    def precomputed_steps(self) -> int:
+        return sum(not item.model_invoked and not item.from_seed for item in self.outputs)
+
+    @property
+    def skipped_steps(self) -> int | None:
+        if self.scheduled_steps is None:
+            return None
+        return self.scheduled_steps - self.protocol_steps
+
+    @property
+    def skipped_stages(self) -> int | None:
+        if self.scheduled_depth is None:
+            return None
+        return self.scheduled_depth - self.depth_executed
+
+    @property
+    def accounting_reconciles(self) -> bool:
+        if self.scheduled_steps is None or self.scheduled_depth is None:
+            return False
+        skipped = self.skipped_steps
+        skipped_stages = self.skipped_stages
+        return (
+            skipped is not None and skipped >= 0
+            and skipped_stages is not None and skipped_stages >= 0
+            and self.protocol_steps + skipped == self.scheduled_steps
+            and self.depth_executed + skipped_stages == self.scheduled_depth
+            and self.protocol_steps
+            == self.model_invocations + self.seeded_steps + self.precomputed_steps
+            and self.calls_made == self.model_invocations
+        )
 
     @property
     def output_refs(self) -> dict[str, str]:
@@ -510,4 +557,6 @@ def run_strategy(
         mediation_converged=mediation_converged,
         mediation_stop_round=mediation_stop_round,
         mediation_distance=mediation_distance,
+        scheduled_steps=len(strategy.protocol),
+        scheduled_depth=len(stages),
     )
