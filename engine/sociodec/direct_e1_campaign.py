@@ -186,7 +186,9 @@ def _result_record(
             "method_id": condition.method_id, "model_mode": condition.model_mode,
             "seed": condition.seed, "matched_strategy_id": condition.matched_strategy_id,
             "method_call_budget": condition.call_budget,
-            "prompt_hash": example.prompt_hash, "status": "failed", "error": error,
+            "prompt_hash": example.prompt_hash,
+            "reference_data_sha256": example.reference_data_hash,
+            "status": "failed", "error": error,
         }
     return {
         "campaign_id": config.campaign_id,
@@ -205,6 +207,7 @@ def _result_record(
         "method_call_budget": result.call_budget,
         "calls_method": result.calls_method, "calls_executor": result.calls_executor,
         "calls_total": result.calls_total,
+        "reference_data_sha256": example.reference_data_hash,
         "metrics": dict(result.metrics),
         "validity": {
             "V1": result.structural.v1_coverage.status.value,
@@ -246,6 +249,14 @@ class DirectE1CampaignRunner:
             raise ValueError("At least one preregistered E1 condition is required")
         if len(self.examples) == 0:
             raise ValueError("At least one frozen benchmark prompt is required")
+        missing_references = [
+            key for key, example in self.examples.items() if not example.reference_data
+        ]
+        if missing_references:
+            raise ValueError(
+                "Every E1 campaign prompt must carry its structured Table 12 reference data; "
+                f"missing={missing_references[:5]}"
+            )
         if executor.executor_id != config.executor_id:
             raise ValueError("Executor instance does not match the preregistered fixed executor ID")
         if len({_condition_key(x) for x in self.conditions}) != len(self.conditions):
@@ -374,6 +385,7 @@ class DirectE1CampaignRunner:
                             condition=condition, example_id=prompt_id, prompt=prompt,
                             requirements=extraction.requirements,
                             hypotheses=extraction.hypotheses,
+                            reference_data=example.reference_data,
                             method=method, executor=self.executor,
                             expected_executor_id=self.config.executor_id,
                             seed=condition.seed, utility_scorer=self.utility_scorer,
