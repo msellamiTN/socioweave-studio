@@ -1,6 +1,6 @@
 import pytest
 from sociodec.e1_protocol import E1Condition
-from sociodec.extraction import aggregate_extractions
+from sociodec.extraction import AggregatedExtraction, aggregate_extractions
 from sociodec.models.prompt import Interpretation, Prompt
 from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
 from sociodec.e1_runtime import build_direct_e1_runtime
