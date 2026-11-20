@@ -53,7 +53,7 @@ def _sources(tmp_path, *, split="test"):
     for dataset in ALL_DATASETS:
         path = tmp_path / f"{dataset}.jsonl"
         _write_fixture(path, dataset, EXPECTED_PROMPTS[dataset], split=split)
-        sources[dataset] = E1DatasetSource(path, f"{dataset}-fixture-v1", split)
+        sources[dataset] = E1DatasetSource(path, f"{dataset}-fixture-v1", split, "synthetic test fixture only", "approved")
     return sources
 
 
@@ -77,7 +77,7 @@ def test_freeze_e1_snapshot_rejects_missing_dataset_and_wrong_count(tmp_path):
         freeze_e1_benchmark_snapshot({k: v for k, v in sources.items() if k != "BREAK"})
     path = tmp_path / "BREAK.jsonl"
     _write_fixture(path, "BREAK", EXPECTED_PROMPTS["BREAK"] - 1)
-    sources["BREAK"] = E1DatasetSource(path, "BREAK-v1", "test")
+    sources["BREAK"] = E1DatasetSource(path, "BREAK-v1", "test", "synthetic test fixture only", "approved")
     with pytest.raises(ValueError, match="expected 100 examples"):
         freeze_e1_benchmark_snapshot(sources)
 
@@ -86,7 +86,7 @@ def test_freeze_e1_snapshot_rejects_mixed_or_wrong_split(tmp_path):
     sources = _sources(tmp_path)
     path = tmp_path / "BREAK.jsonl"
     _write_fixture(path, "BREAK", EXPECTED_PROMPTS["BREAK"], split="validation")
-    sources["BREAK"] = E1DatasetSource(path, "BREAK-v1", "test")
+    sources["BREAK"] = E1DatasetSource(path, "BREAK-v1", "test", "synthetic test fixture only", "approved")
     with pytest.raises(ValueError, match="differs from declared split"):
         freeze_e1_benchmark_snapshot(sources)
 
@@ -115,3 +115,23 @@ def test_jsonl_loader_rejects_non_object_or_malformed_rows(tmp_path, row):
     path.write_text(json.dumps(row) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="line 1"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
+
+
+def test_dataset_registry_matches_paper_table12_sources_and_metric_scope():
+    assert DATASET_REGISTRY["BREAK"]["paper_source_url"] == "https://allenai.github.io/Break/"
+    assert DATASET_REGISTRY["StrategyQA"]["paper_source_url"] == "https://allenai.org/data/strategyqa"
+    assert DATASET_REGISTRY["TaskBench"]["paper_source_url"] == "https://github.com/microsoft/JARVIS/tree/main/taskbench"
+    assert DATASET_REGISTRY["TravelPlanner"]["paper_source_url"] == "https://osu-nlp-group.github.io/TravelPlanner"
+    assert DATASET_REGISTRY["smart-administration"]["source_release_status"] == "to_be_released_with_code"
+    assert DATASET_REGISTRY["BREAK"]["coverage_applicable"] is False
+    assert DATASET_REGISTRY["TravelPlanner"]["coverage_applicable"] == "annotated_constraints_only"
+    assert DATASET_REGISTRY["smart-administration"]["coverage_applicable"] is True
+
+
+def test_dataset_source_requires_explicit_selection_and_usage_approval(tmp_path):
+    path = tmp_path / "break.jsonl"
+    path.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="selection_protocol"):
+        E1DatasetSource(path, "v1", "test", "", "approved")
+    with pytest.raises(ValueError, match="explicitly approved"):
+        E1DatasetSource(path, "v1", "test", "first 100 rows", "not-reviewed")

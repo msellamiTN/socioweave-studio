@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Callable, Mapping
 
 from sociodec.experiments import content_hash
-from sociodec.datasets import E1FrozenSnapshot, e1_prompt_id_map
+from sociodec.datasets import DATASET_REGISTRY, E1FrozenSnapshot, e1_prompt_id_map
 from sociodec.e1_protocol import validate_e1_manifest
 from sociodec.catalogue import get_strategy
 from sociodec.strategy_protocols import build_strategy_blueprint
@@ -122,6 +122,16 @@ class DirectE1Runtime:
                 raise ValueError(f"snapshot manifest source file hash is missing for {dataset}")
             if not entry.get("source_version") or not entry.get("split"):
                 raise ValueError(f"snapshot manifest source version/split is missing for {dataset}")
+            if not entry.get("selection_protocol"):
+                raise ValueError(f"snapshot manifest selection protocol is missing for {dataset}")
+            if entry.get("license_review_status") != "approved":
+                raise ValueError(f"snapshot usage rights are not approved for {dataset}")
+            for field in (
+                "paper_source_url", "prompt_case", "reference_provided",
+                "metrics", "coverage_applicable", "source_release_status",
+            ):
+                if entry.get(field) != DATASET_REGISTRY[dataset][field]:
+                    raise ValueError(f"snapshot Table 12 source metadata differs for {dataset}/{field}")
         validate_e1_manifest(
             conditions, expected_prompt_ids=expected_ids, require_complete_grid=True,
         )
