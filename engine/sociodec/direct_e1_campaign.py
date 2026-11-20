@@ -288,8 +288,8 @@ class DirectE1CampaignRunner:
             "campaign_config_hash": config_hash,
             "code_commit": self.config.code_commit,
             "protocol_profile": self.config.protocol_profile,
-            "conditions": [_condition_key(x) for x in self.conditions],
-            "prompt_snapshot": prompt_snapshot,
+            "conditions": [list(_condition_key(x)) for x in self.conditions],
+            "prompt_snapshot": [list(item) for item in prompt_snapshot],
             "provider_manifest_hash": self.config.provider_manifest_hash,
             "provider_manifest": self.config.provider_manifest,
         }
