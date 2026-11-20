@@ -187,8 +187,8 @@ class E1ProviderRegistry:
         distinct = set(models.values())
         if condition.model_mode == "homogeneous" and len(distinct) != 1:
             raise ValueError("homogeneous E1 roster must use exactly one model identity")
-        if condition.model_mode == "heterogeneous" and len(distinct) < min(3, len(agent_ids)):
-            raise ValueError("heterogeneous E1 roster must use up to three distinct model identities")
+        if condition.model_mode == "heterogeneous" and len(distinct) < 2:
+            raise ValueError("heterogeneous E1 roster must use at least two distinct model identities")
         return models
 
     def resolve_model_families(self, condition: E1Condition, agent_ids: tuple[str, ...]) -> dict[str, str]:
