@@ -636,17 +636,27 @@ class ProtocolDecisionDecoder:
                     raise StrategyDecisionError(
                         f"S11 mediator summary in round {round_number} must identify agreements or disagreements"
                     )
-            if adjudication is None or adjudication.negotiated_decomposition is None:
+            if run.mediation_converged is True:
+                # Section 5.4.2's explicit return rule: once the two latest
+                # party drafts agree or are within epsilon, return D1. The
+                # mediator facilitates convergence; it does not select.
+                party_one = _required_candidates(pool, ("party-1",))[0]
+                decision = DecisionResult(
+                    party_one.decomposition, "compromise", "party-1",
+                    "The mediation stop condition was met; Section 5.4.2 returns D1 (party-1's latest draft).",
+                )
+            elif adjudication is None or adjudication.negotiated_decomposition is None:
                 raise StrategyDecisionError(
-                    "S11 requires an explicit negotiated joint decomposition; the mediator cannot choose a party draft"
+                    "S11 exhausted its configured rounds without convergence and requires an explicit negotiated joint decomposition"
                 )
             if not adjudication.rationale.strip():
                 raise StrategyDecisionError("S11 negotiated joint decomposition requires acceptance rationale")
-            selected = _required_candidates(pool, ("party-1", "party-2"))
-            decision = compromise(
-                selected, adjudication.negotiated_decomposition,
-                mediator_id="mediator", rationale=adjudication.rationale,
-            )
+            else:
+                selected = _required_candidates(pool, ("party-1", "party-2"))
+                decision = compromise(
+                    selected, adjudication.negotiated_decomposition,
+                    mediator_id="mediator", rationale=adjudication.rationale,
+                )
         elif strategy_id is StrategyId.S13:
             trace = tuple((agent, message.action) for agent, message in messages)
             expected_trace = (
