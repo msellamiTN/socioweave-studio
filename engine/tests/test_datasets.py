@@ -15,11 +15,17 @@ def test_registry_covers_paper_benchmarks_and_marks_license_review():
 
 def test_jsonl_loader_preserves_ids_splits_and_source_version(tmp_path):
     path = tmp_path / "break.jsonl"
-    path.write_text(json.dumps({"example_id": "q1", "prompt_text": "Do task", "split": "test"}) + "\n", encoding="utf-8")
+    path.write_text(json.dumps({
+        "example_id": "q1", "prompt_text": "Do task", "split": "test",
+        "reference_data": {"gold_steps": ["step one", "step two"], "nested": {"answer": 42}},
+    }) + "\n", encoding="utf-8")
     rows = load_jsonl_dataset(path, dataset="BREAK", source_version="break-2026-01", expected_count=1, expected_split="test")
     assert rows[0].example_id == "q1"
     assert rows[0].source_version == "break-2026-01"
     assert rows[0].split == "test"
+    assert rows[0].reference_data == {
+        "gold_steps": ["step one", "step two"], "nested": {"answer": 42},
+    }
 
 
 def test_jsonl_loader_rejects_unknown_dataset_duplicate_and_bad_rows(tmp_path):
@@ -43,7 +49,10 @@ def test_jsonl_loader_rejects_unknown_dataset_duplicate_and_bad_rows(tmp_path):
 def _write_fixture(path, dataset, count, split="test"):
     # Synthetic rows are test fixtures only; never used as benchmark evidence.
     path.write_text("".join(
-        json.dumps({"example_id": f"{dataset}-{i:03d}", "prompt_text": f"fixture prompt {i}", "split": split}) + "\n"
+        json.dumps({
+            "example_id": f"{dataset}-{i:03d}", "prompt_text": f"fixture prompt {i}",
+            "split": split, "reference_data": {"fixture_annotation": "synthetic test fixture only"},
+        }) + "\n"
         for i in range(count)
     ), encoding="utf-8")
 
@@ -69,6 +78,7 @@ def test_freeze_e1_snapshot_validates_all_five_files_and_exports_grid_ids(tmp_pa
         assert entry["prompt_count"] == EXPECTED_PROMPTS[dataset]
         assert len(entry["source_sha256"]) == 64
         assert len(entry["prompt_sha256"]) == EXPECTED_PROMPTS[dataset]
+        assert len(entry["reference_data_sha256"]) == EXPECTED_PROMPTS[dataset]
 
 
 def test_freeze_e1_snapshot_rejects_missing_dataset_and_wrong_count(tmp_path):
@@ -135,3 +145,26 @@ def test_dataset_source_requires_explicit_selection_and_usage_approval(tmp_path)
         E1DatasetSource(path, "v1", "test", "", "approved")
     with pytest.raises(ValueError, match="explicitly approved"):
         E1DatasetSource(path, "v1", "test", "first 100 rows", "not-reviewed")
+
+
+def test_jsonl_loader_rejects_non_object_reference_data(tmp_path):
+    path = tmp_path / "bad-reference.jsonl"
+    path.write_text(json.dumps({
+        "example_id": "q1", "prompt_text": "Do task", "reference_data": ["not", "an", "object"],
+    }) + "\\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="reference_data must be a JSON object"):
+        load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
+
+
+def test_freeze_rejects_missing_required_reference_data(tmp_path):
+    sources = _sources(tmp_path)
+    path = tmp_path / "BREAK.jsonl"
+    _write_fixture(path, "BREAK", EXPECTED_PROMPTS["BREAK"])
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    rows[0].pop("reference_data")
+    path.write_text("".join(json.dumps(row) + "\\n" for row in rows), encoding="utf-8")
+    sources["BREAK"] = E1DatasetSource(
+        path, "BREAK-v1", "test", "synthetic test fixture only", "approved",
+    )
+    with pytest.raises(ValueError, match="reference_data is required"):
+        freeze_e1_benchmark_snapshot(sources)
