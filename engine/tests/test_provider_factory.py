@@ -1,7 +1,7 @@
 import pytest
 
 from sociodec.e1_protocol import E1Condition
-from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
+from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec, _build_provider
 
 
 class FakeProvider:
@@ -166,3 +166,18 @@ def test_assignment_manifest_records_non_secret_family_provenance():
     assert manifest["agent_model_provenance"]["b"]["model_revision"] == "a" * 40
     assert manifest["executor_provenance"]["family_id"] == "ME"
     assert "api_key" not in str(manifest).lower()
+
+
+def test_local_provider_factory_pins_immutable_model_revision():
+    provider = _build_provider(spec("m2", "MB"))
+    assert provider._revision == "a" * 40
+
+
+def test_closed_weight_model_revision_must_match_exact_api_model_id():
+    with pytest.raises(ValueError, match="must equal the exact API model_id"):
+        ProviderSpec(
+            backend="openai-compatible", model_id="model-alias",
+            base_url="https://api.example.invalid/v1", api_key_env="API_KEY",
+            family_id="MA", provider_org="Provider-A", weight_access="closed-weight",
+            model_revision="different-version", access_date="2026-11-20",
+        )
