@@ -645,13 +645,13 @@ class ProtocolDecisionDecoder:
                     party_one.decomposition, "compromise", "party-1",
                     "The mediation stop condition was met; Section 5.4.2 returns D1 (party-1's latest draft).",
                 )
-            elif adjudication is None or adjudication.negotiated_decomposition is None:
-                raise StrategyDecisionError(
-                    "S11 exhausted its configured rounds without convergence and requires an explicit negotiated joint decomposition"
-                )
-            if not adjudication.rationale.strip():
-                raise StrategyDecisionError("S11 negotiated joint decomposition requires acceptance rationale")
             else:
+                if adjudication is None or adjudication.negotiated_decomposition is None:
+                    raise StrategyDecisionError(
+                        "S11 exhausted its configured rounds without convergence and requires an explicit negotiated joint decomposition"
+                    )
+                if not adjudication.rationale.strip():
+                    raise StrategyDecisionError("S11 negotiated joint decomposition requires acceptance rationale")
                 selected = _required_candidates(pool, ("party-1", "party-2"))
                 decision = compromise(
                     selected, adjudication.negotiated_decomposition,
