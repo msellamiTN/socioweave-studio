@@ -68,6 +68,7 @@ def build_direct_e1_runtime(
         extraction: AggregatedExtraction,
     ) -> DirectMethodAdapter:
         if condition.method_id in BASELINES:
+            registry.validate_baseline_assignment(condition, condition.method_id)
             return DirectBaselineAdapter(
                 extraction=extraction,
                 provider_resolver=registry.baseline_provider_resolver,
@@ -81,6 +82,7 @@ def build_direct_e1_runtime(
         return DirectProtocolStrategyAdapter(
             extraction=extraction,
             model_resolver=registry.resolve_models,
+            model_family_resolver=registry.resolve_model_families,
             invoker_factory=registry.invoker_factory(condition),
             prompt_view_factory=prompt_view_factory,
             agent_contexts=agent_contexts,
