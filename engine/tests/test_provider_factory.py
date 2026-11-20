@@ -47,6 +47,7 @@ def condition(mode, method="S1"):
     return E1Condition(
         dataset="BREAK", method_id=method, model_mode=mode,
         seed=0, prompt_ids=("b-001",), call_budget=5,
+        matched_strategy_id="S1" if method == "multi_agent_debate" else None,
     )
 
 
