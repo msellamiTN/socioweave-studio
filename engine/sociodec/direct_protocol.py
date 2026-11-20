@@ -77,7 +77,7 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         if set(models) != set(agent_ids) or any(not isinstance(v, str) or not v.strip() for v in models.values()):
             raise ValueError("model_resolver must return a non-empty model ID for every agent")
         distinct = set(models.values())
-        required_models = 1 if condition.model_mode == "homogeneous" else min(3, len(agent_ids))
+        required_models = 1 if condition.model_mode == "homogeneous" else 2
         if len(distinct) < required_models:
             raise ValueError(
                 f"{condition.model_mode} condition requires at least {required_models} distinct model identities"
