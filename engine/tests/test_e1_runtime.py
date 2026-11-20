@@ -49,6 +49,16 @@ def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
     assert isinstance(method, DirectBaselineAdapter)
     assert runtime.executor.executor_id == "executor-fixed"
     assert runtime.executor.provider.model_name == "executor"
+    manifest = runtime.assignment_manifest(
+        condition("S1", "homogeneous"),
+        ("coordinator", "specialist-1", "specialist-2", "specialist-3"),
+    )
+    assert manifest["executor_id"] == "executor-fixed"
+    assert manifest["executor_model_id"] == "executor"
+    assert manifest["agent_model_ids"] == {
+        "coordinator": "m1", "specialist-1": "m1",
+        "specialist-2": "m1", "specialist-3": "m1",
+    }
 
 def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
