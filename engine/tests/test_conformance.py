@@ -1,3 +1,4 @@
+import json
 import pytest
 from dataclasses import replace
 
@@ -120,6 +121,13 @@ def test_profile_export_is_machine_readable_and_keeps_paper_and_runtime_costs_di
 
 class ConformanceInvoker:
     def invoke(self, agent, step, context):
+        if step.action is Action.SPLIT:
+            # S1 protocol fixture only: the coordinator must assign every
+            # configured specialist a non-empty partition before drafts run.
+            return json.dumps({"partitions": {
+                "specialist-1": "fixture partition 1",
+                "specialist-2": "fixture partition 2",
+            }})
         if step.action is Action.SUMMARISE:
             return '{"summary":"neutral summary","agreements":["a"],"disagreements":["b"]}'
         if step.action is Action.JUDGE and agent.identifier == "editor":
