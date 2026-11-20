@@ -1,6 +1,6 @@
 # Core 22.4 — Catalogue–Blueprint–Runtime Semantic Conformance
 
-**Status:** PASS — deterministic software conformance on commit `47508bfab9954e999faae7311bb0cee7b3f2a592`. This is not scientific validation or an empirical strategy comparison.
+**Status:** Reintegrated on current main; exact-head CI validation pending. This is software conformance work, not scientific validation or an empirical strategy comparison.
 
 ## Source contract
 
@@ -38,7 +38,7 @@ The oracle uses independent expected signatures; it does not call the strategy f
 - `skipped_steps` / `skipped_stages`: conditional or early-stop work not executed;
 - `accounting_reconciles`: verifies that the three output classes partition all produced steps and that `calls_made == model_invocations`.
 
-The accounting identity is `scheduled_steps = protocol_steps + skipped_steps`; executed protocol outputs are partitioned into provider, seeded and precomputed steps. The analogous depth identity is `scheduled_depth = depth_executed + skipped_stages`. The runtime's existing stage-snapshot behavior is regression-tested: peer outputs from the same stage are not visible to one another; step references must exist before the current stage and be permitted by visibility. Sequential composition tests protect the first-phase independence and second-phase seed placement contract. The first phase receives an empty draft tuple and no chain seed; only the designated second-phase author receives the preceding decomposition.
+The accounting identity is `scheduled_steps = protocol_steps + skipped_steps`; executed protocol outputs are partitioned into provider, seeded and precomputed steps. The analogous depth identity is `scheduled_depth = depth_executed + skipped_stages`. The runtime's stage-snapshot behavior is regression-tested: peer outputs from the same stage are not visible to one another; step references must exist before the current stage and be permitted by visibility. S6 additionally passes an explicit counter-plan instruction to the invoker while preserving the original prompt and D1 in separate context channels. S11 records convergence and applies the paper's D1 return rule when the stop condition is met. Sequential composition tests protect the first-phase independence and second-phase seed placement contract. The first phase receives an empty draft tuple and no chain seed; only the designated second-phase author receives the preceding decomposition.
 
 ## Conformance test matrix
 
@@ -51,7 +51,7 @@ Negative mutations cover prompt-view roster, role assignment, visibility, decisi
 
 ## Acceptance evidence
 
-GitHub Actions run [44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209) on exact commit `47508bfab9954e999faae7311bb0cee7b3f2a592`: **448 passed, 0 failed, 0 skipped**. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md) for the conformance matrix and reproduction instructions.
+Historical baseline: GitHub Actions run [44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209) on earlier commit `47508bfab9954e999faae7311bb0cee7b3f2a592` passed 448 tests. That result is not current-head evidence; the reintegrated branch must pass its own exact-head workflow before this milestone can be marked validated. See [CORE-22.4-TEST-REPORT.md](CORE-22.4-TEST-REPORT.md).
 
 ## Evidence boundary
 
