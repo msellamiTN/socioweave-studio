@@ -64,6 +64,7 @@ def protocol_messages(agent: Agent, step: ProtocolStep,
         "agent_context": context.agent_context,
         "prompt_view": context.prompt_view,
         "action": context.action,
+        "action_instruction": context.action_instruction,
         "input_ref": context.input_ref,
         "input_content": context.input_content,
         "hypotheses": [
