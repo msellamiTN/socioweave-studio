@@ -260,8 +260,8 @@ class DirectE1CampaignRunner:
             if existing_manifest != campaign_manifest:
                 raise ValueError("Existing campaign manifest differs from requested frozen campaign")
         else:
-            with manifest_path.open("x", encoding="utf-8", newline="\\n") as manifest_stream:
-                manifest_stream.write(encoded_manifest + "\\n")
+            with manifest_path.open("x", encoding="utf-8", newline="\n") as manifest_stream:
+                manifest_stream.write(encoded_manifest + "\n")
                 manifest_stream.flush()
                 os.fsync(manifest_stream.fileno())
         expected_rows = {
