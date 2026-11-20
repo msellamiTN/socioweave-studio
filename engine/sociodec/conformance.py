@@ -56,7 +56,7 @@ class ConformanceReport:
 # deliberately absent: they are not among the paper's thirteen strategies.
 _PROFILE_DATA = {
     StrategyId.S1: ("n+1", (Role.COORDINATOR, Role.DECOMPOSER), "3",
-        "SPLIT | DRAFT[n] | CHECK", ("prompt", "all_previous_outputs"),
+        "SPLIT | DRAFT[n] | CHECK", ("prompt", "partition:step:0", "all_previous_outputs"),
         "domain-partitioned specialists; coordinator integrates", "n+2", "3", "n+2", "3", False),
     StrategyId.S12: ("n+1", (Role.DECOMPOSER, Role.AGGREGATOR), "2",
         "DRAFT[n] | MERGE", ("prompt", "all_previous_outputs"),
@@ -211,7 +211,7 @@ def _expected_steps(sid: StrategyId, n: int, k: int, T: int):
     add = steps.append
     if sid is StrategyId.S1:
         add(("coordinator", Action.SPLIT, "prompt", 1, 1))
-        steps.extend((f"specialist-{i}", Action.DRAFT, "prompt", 2, 2) for i in range(1, n + 1))
+        steps.extend((f"specialist-{i}", Action.DRAFT, "partition:step:0", 2, 2) for i in range(1, n + 1))
         add(("coordinator", Action.CHECK, "all_previous_outputs", 3, 3))
     elif sid in {StrategyId.S12, StrategyId.S2}:
         prefix, merger = ("expert-", "integrator") if sid is StrategyId.S12 else ("participant-", "aggregator")
@@ -275,8 +275,10 @@ def _expected_visibility(sid: StrategyId, agent_ids: tuple[str, ...], T: int):
     own = tuple((agent, agent) for agent in agent_ids)
     full = tuple((observer, author) for observer in agent_ids for author in agent_ids)
     if sid is StrategyId.S1:
-        for r in range(1, 4):
-            pairs_by_round[r] = full if r == 3 else own
+        specialists = tuple(a for a in agent_ids if a.startswith("specialist-"))
+        pairs_by_round[1] = own
+        pairs_by_round[2] = own + tuple((a, "coordinator") for a in specialists)
+        pairs_by_round[3] = full
     elif sid is StrategyId.S2:
         participants = tuple(a for a in agent_ids if a != "aggregator")
         pairs_by_round[1] = own
@@ -426,13 +428,16 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
 
     # Input references are checked as executable references, not just strings.
     for index, step in enumerate(strategy.protocol):
-        if step.input_ref not in {"prompt", "all_previous_outputs"} and not step.input_ref.startswith("step:"):
+        is_partition_ref = step.input_ref.startswith("partition:step:")
+        is_step_ref = step.input_ref.startswith("step:")
+        if step.input_ref not in {"prompt", "all_previous_outputs"} and not is_step_ref and not is_partition_ref:
             findings.append(ConformanceFinding(
                 "input-reference", f"step {index} uses unsupported input reference {step.input_ref!r}"
             ))
-        if step.input_ref.startswith("step:"):
+        if is_step_ref or is_partition_ref:
+            prefix = "partition:step:" if is_partition_ref else "step:"
             try:
-                target_index = int(step.input_ref.split(":", 1)[1])
+                target_index = int(step.input_ref.removeprefix(prefix))
             except ValueError:
                 target_index = -1
             valid_target = 0 <= target_index < index
@@ -445,6 +450,12 @@ def validate_blueprint(blueprint: StrategyBlueprint, *, n: int = 3, k: int = 3, 
                       f"{step.agent_id} cannot see referenced output by {target.agent_id} in round {step.round}")
                 check("input-stage", target.stage < step.stage,
                       f"{step.agent_id} references same/future stage output {step.input_ref}")
+                if is_partition_ref:
+                    check("partition-reference-target",
+                          sid is StrategyId.S1 and target.agent_id == "coordinator"
+                          and target.action is Action.SPLIT
+                          and step.agent_id.startswith("specialist-"),
+                          "partition references must target the S1 coordinator's split output and be consumed by a specialist")
 
     return ConformanceReport(
         sid, (n, k, T), expected_calls, strategy.calls,
