@@ -16,27 +16,27 @@ def spec(name):
             backend="openai-compatible", model_id=name,
             base_url="https://ma.example.invalid/v1", api_key_env="MA_API_KEY",
             provider_name="provider-a", family_id="MA", provider_org="Provider-A",
-            weight_access="closed-weight", model_revision="ma-revision-2026-11",
+            weight_access="closed-weight", model_revision=name,
             access_date="2026-11-20",
         )
     if name == "m2":
         return ProviderSpec(
             backend="huggingface-local", model_id=name,
             family_id="MB", provider_org="Provider-B", weight_access="open-weight",
-            model_size="small", model_revision="mb-commit-abc123", access_date="2026-11-20",
+            model_size="small", model_revision="a" * 40, access_date="2026-11-20",
         )
     if name == "m3":
         return ProviderSpec(
             backend="huggingface-local", model_id=name,
             family_id="MC", provider_org="Provider-C", weight_access="open-weight",
-            model_size="large", model_revision="mc-commit-def456", access_date="2026-11-20",
+            model_size="large", model_revision="b" * 40, access_date="2026-11-20",
         )
     if name == "executor":
         return ProviderSpec(
             backend="openai-compatible", model_id=name,
             base_url="https://me.example.invalid/v1", api_key_env="ME_API_KEY",
             provider_name="executor-provider", family_id="ME", provider_org="Executor-Provider",
-            weight_access="closed-weight", model_revision="me-revision-2026-11",
+            weight_access="closed-weight", model_revision=name,
             access_date="2026-11-20",
         )
     raise ValueError(name)
