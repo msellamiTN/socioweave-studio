@@ -1,7 +1,7 @@
 # Core 22.4 — Test and Conformance Report
 
-**Result:** PASS — deterministic software conformance tests on exact commit `47508bfab9954e999faae7311bb0cee7b3f2a592`.  
-**GitHub Actions:** [Run 44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209).  
+**Result:** Historical baseline only — 448 tests passed on earlier commit `47508bfab9954e999faae7311bb0cee7b3f2a592`. The reintegrated implementation on current main is pending exact-head CI.  
+**Historical GitHub Actions:** [Run 44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209).  
 **Result:** 448 passed in 0.69s; 0 failed; 0 skipped.
 
 ## Coverage delivered
@@ -68,3 +68,8 @@ From `engine/`:
 python -m pip install -e '.[dev]'
 python -m pytest -q
 ```
+
+
+## Current-head validation status
+
+The current-main reintegration adds explicit S6 counter-plan instruction context, S11 convergence-to-D1 decision semantics, Definition 12 first-phase seed isolation, and scheduled/executed call-depth reconciliation. The older 448-test run above does not validate these reintegrated changes. Replace this section with the exact PR head SHA, workflow run ID, and final test counts only after the current-head CI succeeds.
