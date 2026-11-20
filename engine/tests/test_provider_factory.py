@@ -95,15 +95,14 @@ def test_heterogeneous_rejects_single_model_assignment():
         r.resolve_models(condition("heterogeneous"), ("a", "b"))
 
 
-def test_heterogeneous_rejects_distinct_model_ids_from_one_family():
+def test_model_family_provenance_is_mandatory_for_e1():
     assignments = standard_assignments()
-    assignments["heterogeneous"] = {
-        "a": spec("m1", "MA"), "b": spec("m1-variant", "MA"), "c": spec("m3", "MC"),
-        "unused": spec("m2", "MB"),
-    }
+    assignments["heterogeneous"]["b"] = ProviderSpec(
+        backend="huggingface-local", model_id="m2",
+    )
     r = registry(assignments)
-    with pytest.raises(ValueError, match="requires at least 2 distinct model families"):
-        r.resolve_model_families(condition("heterogeneous"), ("a", "b"))
+    with pytest.raises(ValueError, match="Missing or invalid E1 model provenance"):
+        r.resolve_model_families(condition("heterogeneous"), ("a", "b", "c"))
 
 
 def test_model_family_catalogue_requires_three_distinct_provider_organizations():
