@@ -258,6 +258,7 @@ def test_changed_provider_manifest_cannot_resume_existing_checkpoint(tmp_path: P
     first.run(checkpoint)
     changed_manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
     changed_manifest["model_modes"]["heterogeneous"]["agent-2"]["model_id"] = "MB-rotated"
+    changed_manifest["model_family_catalogue"]["MB"]["model_id"] = "MB-rotated"
     second = DirectE1CampaignRunner(
         config=campaign_config("same-campaign", manifest=changed_manifest),
         conditions=(condition,), examples=(example,),
