@@ -243,7 +243,7 @@ class E1ProviderRegistry:
             for agent in agent_ids
         }
         distinct = set(families.values())
-        required = 1 if condition.model_mode == "homogeneous" else min(3, len(agent_ids))
+        required = 1 if condition.model_mode == "homogeneous" else min(2, len(agent_ids))
         if len(distinct) < required:
             raise ValueError(
                 f"{condition.model_mode} roster requires at least {required} distinct model families"
