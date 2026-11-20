@@ -614,3 +614,27 @@ def test_s1_rejects_missing_or_extra_coordinator_partitions():
     with pytest.raises(ValueError, match="map exactly the configured specialists"):
         run_strategy("S1", prompt(), blueprint.strategy, InvalidPartitionInvoker(),
                      prompt_views=blueprint.prompt_views)
+
+
+def test_s6_counter_plan_receives_original_prompt_and_explicit_negated_assumption_instruction():
+    class CaptureInvoker:
+        def __init__(self):
+            self.contexts = []
+        def invoke(self, agent, step, context):
+            self.contexts.append((step.action.value, context))
+            return f"output-{len(self.contexts)}"
+
+    blueprint = build_strategy_blueprint("S6")
+    invoker = CaptureInvoker()
+    result = run_strategy(
+        "S6", prompt(), blueprint.strategy, invoker,
+        prompt_views=blueprint.prompt_views,
+    )
+    assert result.calls_made == 3
+    action, context = next((a, ctx) for a, ctx in invoker.contexts if a == "counter-plan")
+    assert action == "counter-plan"
+    assert context.prompt_view == prompt().text
+    assert context.input_ref == "step:0"
+    assert context.input_content == "output-1"
+    assert "do not assume" in context.action_instruction.lower()
+    assert "original prompt" in context.action_instruction.lower()
