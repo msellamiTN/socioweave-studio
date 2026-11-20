@@ -67,9 +67,41 @@ class DirectE1CampaignConfig:
             raise ValueError("provider manifest must declare homogeneous and heterogeneous model modes")
         if any(not isinstance(roster, dict) or not roster for roster in modes.values()):
             raise ValueError("provider manifest model-mode rosters must be non-empty objects")
+        for mode, roster in modes.items():
+            for agent_id, assignment in roster.items():
+                if not isinstance(assignment, dict) or not assignment.get("model_id") or not assignment.get("backend"):
+                    raise ValueError(f"provider manifest has an incomplete {mode}/{agent_id} model assignment")
+                provenance = assignment.get("provenance")
+                if not isinstance(provenance, dict) or not provenance.get("family_id") or not provenance.get("model_revision") or not provenance.get("access_date"):
+                    raise ValueError(f"provider manifest has incomplete {mode}/{agent_id} provenance")
         families = manifest.get("model_family_catalogue")
-        if not isinstance(families, dict) or set(families) != {"MA", "MB", "MC"}:
-            raise ValueError("provider manifest must declare exactly MA, MB and MC")
+        if not isinstance(families, dict) or set(families) != {"MA", "MB", "MC"} or any(not isinstance(v, dict) for v in families.values()):
+            raise ValueError("provider manifest must declare exactly MA, MB and MC with provenance")
+        family_provenance = {
+            family: data for family, data in families.items()
+        }
+        provider_orgs = [data.get("provider_org") for data in family_provenance.values()]
+        if any(not org for org in provider_orgs) or len(set(provider_orgs)) != 3:
+            raise ValueError("provider manifest families must declare three distinct provider organizations")
+        access = [data.get("weight_access") for data in family_provenance.values()]
+        if access.count("closed-weight") != 1 or access.count("open-weight") != 2:
+            raise ValueError("provider manifest requires one closed-weight and two open-weight families")
+        open_sizes = [
+            data.get("model_size") for data in family_provenance.values()
+            if data.get("weight_access") == "open-weight"
+        ]
+        if any(not size for size in open_sizes) or len(set(open_sizes)) != 2:
+            raise ValueError("provider manifest open-weight families must have different size labels")
+        homogeneous = modes["homogeneous"]
+        if any(item["provenance"]["family_id"] != "MA" for item in homogeneous.values()) or len({
+            item["model_id"] for item in homogeneous.values()
+        }) != 1:
+            raise ValueError("homogeneous provider manifest must assign the exact MA identity to every agent")
+        heterogeneous_families = {
+            item["provenance"]["family_id"] for item in modes["heterogeneous"].values()
+        }
+        if heterogeneous_families != {"MA", "MB", "MC"}:
+            raise ValueError("heterogeneous provider manifest must cover MA, MB and MC")
         executor = manifest.get("executor")
         if not isinstance(executor, dict) or executor.get("executor_id") != self.executor_id:
             raise ValueError("provider manifest executor identity differs from campaign executor_id")
