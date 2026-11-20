@@ -10,7 +10,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Mapping
 
 from sociodec.direct_e1 import (
     DirectE1Result, DirectMethodAdapter, E1FixedExecutor, run_direct_e1_condition,
@@ -27,6 +27,19 @@ MethodFactory = Callable[[E1Condition, Prompt, AggregatedExtraction], DirectMeth
 UtilityScorer = Callable[[Prompt, str], float]
 
 
+def _contains_secret_key(value: object) -> bool:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            name = str(key).lower()
+            if any(token in name for token in ("api_key", "secret", "password", "credential", "access_token")):
+                return True
+            if _contains_secret_key(item):
+                return True
+    elif isinstance(value, (tuple, list)):
+        return any(_contains_secret_key(item) for item in value)
+    return False
+
+
 @dataclass(frozen=True, slots=True)
 class DirectE1CampaignConfig:
     campaign_id: str
@@ -34,12 +47,46 @@ class DirectE1CampaignConfig:
     executor_id: str
     protocol_profile: str = "paper-e1-direct-v1"
     retry_failed: bool = False
+    provider_manifest_json: str = ""
 
     def __post_init__(self) -> None:
         if not self.campaign_id.strip() or not self.code_commit.strip() or not self.executor_id.strip():
             raise ValueError("campaign_id, code_commit and executor_id must be non-empty")
         if self.retry_failed:
             raise ValueError("In-place retry is disabled; use a new campaign_id/configuration")
+        if not isinstance(self.provider_manifest_json, str) or not self.provider_manifest_json.strip():
+            raise ValueError("A complete frozen provider_manifest_json is required before E1 campaign execution")
+        try:
+            manifest = json.loads(self.provider_manifest_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("provider_manifest_json must be valid JSON") from exc
+        if not isinstance(manifest, dict) or manifest.get("schema_version") != "e1-provider-manifest-v1":
+            raise ValueError("provider manifest must use schema e1-provider-manifest-v1")
+        modes = manifest.get("model_modes")
+        if not isinstance(modes, dict) or set(modes) != {"homogeneous", "heterogeneous"}:
+            raise ValueError("provider manifest must declare homogeneous and heterogeneous model modes")
+        if any(not isinstance(roster, dict) or not roster for roster in modes.values()):
+            raise ValueError("provider manifest model-mode rosters must be non-empty objects")
+        families = manifest.get("model_family_catalogue")
+        if not isinstance(families, dict) or set(families) != {"MA", "MB", "MC"}:
+            raise ValueError("provider manifest must declare exactly MA, MB and MC")
+        executor = manifest.get("executor")
+        if not isinstance(executor, dict) or executor.get("executor_id") != self.executor_id:
+            raise ValueError("provider manifest executor identity differs from campaign executor_id")
+        if not executor.get("model_id") or not isinstance(executor.get("provenance"), dict):
+            raise ValueError("provider manifest must include exact fixed executor model provenance")
+        if _contains_secret_key(manifest):
+            raise ValueError("provider manifest must not contain credentials or secret values")
+        canonical = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        object.__setattr__(self, "provider_manifest_json", canonical)
+
+    @property
+    def provider_manifest(self) -> dict[str, object]:
+        return json.loads(self.provider_manifest_json)
+
+    @property
+    def provider_manifest_hash(self) -> str:
+        return content_hash(self.provider_manifest)
 
 
 def _condition_key(condition: E1Condition) -> tuple:
@@ -82,10 +129,12 @@ def _result_record(
     if result is None:
         return {
             "campaign_id": config.campaign_id,
-            "campaign_config_hash": content_hash(config.__dict__ if hasattr(config, "__dict__") else {
+            "campaign_config_hash": content_hash({
                 "campaign_id": config.campaign_id, "code_commit": config.code_commit,
                 "executor_id": config.executor_id, "protocol_profile": config.protocol_profile,
+                "provider_manifest_hash": config.provider_manifest_hash,
             }),
+            "provider_manifest_hash": config.provider_manifest_hash,
             "code_commit": config.code_commit,
             "protocol_profile": config.protocol_profile,
             "dataset": condition.dataset, "example_id": example.example_id,
@@ -99,7 +148,9 @@ def _result_record(
         "campaign_config_hash": content_hash({
             "campaign_id": config.campaign_id, "code_commit": config.code_commit,
             "executor_id": config.executor_id, "protocol_profile": config.protocol_profile,
+            "provider_manifest_hash": config.provider_manifest_hash,
         }),
+        "provider_manifest_hash": config.provider_manifest_hash,
         "code_commit": config.code_commit,
         "protocol_profile": config.protocol_profile,
         "dataset": result.dataset, "example_id": result.example_id,
@@ -166,23 +217,53 @@ class DirectE1CampaignRunner:
     def run(self, checkpoint_path: str | Path) -> tuple[dict[str, object], ...]:
         target = Path(checkpoint_path)
         target.parent.mkdir(parents=True, exist_ok=True)
+        prompt_snapshot = sorted(
+            (dataset, example_id, example.prompt_hash)
+            for (dataset, example_id), example in self.examples.items()
+            if any(
+                condition.dataset == dataset and example_id in condition.prompt_ids
+                for condition in self.conditions
+            )
+        )
         config_hash = content_hash({
             "campaign_id": self.config.campaign_id,
             "code_commit": self.config.code_commit,
             "executor_id": self.config.executor_id,
             "protocol_profile": self.config.protocol_profile,
+            "provider_manifest_hash": self.config.provider_manifest_hash,
             "conditions": [_condition_key(x) for x in self.conditions],
-            # Prompt IDs alone do not freeze benchmark content. Bind the
-            # checkpoint to the exact prompt snapshots used by this campaign.
-            "prompt_snapshot": sorted(
-                (dataset, example_id, example.prompt_hash)
-                for (dataset, example_id), example in self.examples.items()
-                if any(
-                    condition.dataset == dataset and example_id in condition.prompt_ids
-                    for condition in self.conditions
-                )
-            ),
+            "prompt_snapshot": prompt_snapshot,
         })
+        manifest_path = target.with_suffix(target.suffix + ".manifest.json")
+        if target.exists() and not manifest_path.exists():
+            raise ValueError("Existing checkpoint is missing its frozen campaign manifest")
+        campaign_manifest = {
+            "schema_version": "e1-campaign-execution-manifest-v1",
+            "campaign_id": self.config.campaign_id,
+            "campaign_config_hash": config_hash,
+            "code_commit": self.config.code_commit,
+            "protocol_profile": self.config.protocol_profile,
+            "conditions": [_condition_key(x) for x in self.conditions],
+            "prompt_snapshot": prompt_snapshot,
+            "provider_manifest_hash": self.config.provider_manifest_hash,
+            "provider_manifest": self.config.provider_manifest,
+        }
+        encoded_manifest = json.dumps(
+            campaign_manifest, ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        )
+        if manifest_path.exists():
+            try:
+                existing_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise ValueError("Existing campaign manifest is invalid JSON") from exc
+            if existing_manifest != campaign_manifest:
+                raise ValueError("Existing campaign manifest differs from requested frozen campaign")
+        else:
+            with manifest_path.open("x", encoding="utf-8", newline="\\n") as manifest_stream:
+                manifest_stream.write(encoded_manifest + "\\n")
+                manifest_stream.flush()
+                os.fsync(manifest_stream.fileno())
         expected_rows = {
             (
                 condition.dataset, prompt_id, condition.method_id,
@@ -207,6 +288,8 @@ class DirectE1CampaignRunner:
                         raise ValueError(f"Checkpoint row on line {line_number} must be a JSON object")
                     if row.get("campaign_config_hash") != config_hash:
                         raise ValueError("Checkpoint campaign hash differs from requested campaign")
+                    if row.get("provider_manifest_hash") != self.config.provider_manifest_hash:
+                        raise ValueError("Checkpoint provider manifest hash differs from requested model configuration")
                     key = (
                         row.get("dataset"), row.get("example_id"), row.get("method_id"),
                         row.get("model_mode"), row.get("seed"), row.get("matched_strategy_id"),
