@@ -98,6 +98,7 @@ class FixedExecutor:
 def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(tmp_path: Path):
     examples = (BenchmarkPrompt(
         "smart-administration", "p1", PROMPT.text, source_version="frozen-v1",
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
     ),)
     conditions = (
         E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4),
@@ -139,7 +140,10 @@ def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(t
 
 
 def test_direct_campaign_rejects_unmatched_baseline_budget():
-    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
     conditions = (
         E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4),
         E1Condition(
@@ -159,7 +163,10 @@ def test_direct_campaign_rejects_unmatched_baseline_budget():
 
 
 def test_direct_campaign_rejects_changed_checkpoint_config(tmp_path: Path):
-    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
     condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
     checkpoint = tmp_path / "changed.jsonl"
     first = DirectE1CampaignRunner(
@@ -187,7 +194,10 @@ def test_direct_campaign_rejects_changed_checkpoint_config(tmp_path: Path):
     ("provider_manifest_hash", "provider manifest hash differs"),
 ])
 def test_direct_campaign_rejects_tampered_checkpoint_rows(tmp_path: Path, mutation, match):
-    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
     condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
     checkpoint = tmp_path / "tampered.jsonl"
     runner = DirectE1CampaignRunner(
@@ -211,7 +221,10 @@ def test_direct_campaign_rejects_tampered_checkpoint_rows(tmp_path: Path, mutati
 
 
 def test_direct_campaign_row_identity_distinguishes_model_modes(tmp_path: Path):
-    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
     conditions = (
         E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4),
         E1Condition("smart-administration", "S2", "heterogeneous", 0, ("p1",), 4),
@@ -245,7 +258,10 @@ def test_campaign_config_requires_a_complete_secret_free_provider_manifest():
 
 
 def test_changed_provider_manifest_cannot_resume_existing_checkpoint(tmp_path: Path):
-    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"fixture_annotation": "synthetic test fixture only"},
+    )
     condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
     checkpoint = tmp_path / "provider-change.jsonl"
     first = DirectE1CampaignRunner(
@@ -262,6 +278,49 @@ def test_changed_provider_manifest_cannot_resume_existing_checkpoint(tmp_path: P
     second = DirectE1CampaignRunner(
         config=campaign_config("same-campaign", manifest=changed_manifest),
         conditions=(condition,), examples=(example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+    )
+    with pytest.raises(ValueError, match="campaign manifest differs"):
+        second.run(checkpoint)
+
+
+def test_campaign_rejects_prompt_without_structured_reference_data():
+    example = BenchmarkPrompt("smart-administration", "p1", PROMPT.text)
+    condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
+    with pytest.raises(ValueError, match="structured Table 12 reference data"):
+        DirectE1CampaignRunner(
+            config=campaign_config("missing-reference"),
+            conditions=(condition,), examples=(example,),
+            prompt_factory=lambda _example: PROMPT,
+            extraction_factory=lambda _prompt: EXTRACTION,
+            method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+        )
+
+
+def test_changed_reference_data_cannot_resume_existing_checkpoint(tmp_path: Path):
+    condition = E1Condition("smart-administration", "S2", "homogeneous", 0, ("p1",), 4)
+    checkpoint = tmp_path / "reference-change.jsonl"
+    first_example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"gold_decomposition": {"steps": ["A", "B"]}},
+    )
+    first = DirectE1CampaignRunner(
+        config=campaign_config("same-reference-campaign"),
+        conditions=(condition,), examples=(first_example,),
+        prompt_factory=lambda _example: PROMPT,
+        extraction_factory=lambda _prompt: EXTRACTION,
+        method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
+    )
+    first.run(checkpoint)
+    changed_example = BenchmarkPrompt(
+        "smart-administration", "p1", PROMPT.text,
+        reference_data={"gold_decomposition": {"steps": ["A", "C"]}},
+    )
+    second = DirectE1CampaignRunner(
+        config=campaign_config("same-reference-campaign"),
+        conditions=(condition,), examples=(changed_example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
         method_factory=lambda *_args: Method(2), executor=FixedExecutor(),
