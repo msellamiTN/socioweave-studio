@@ -4,8 +4,9 @@ from .base import ChatMessage, GenerationConfig, GenerationResult
 
 class HuggingFaceLocalProvider:
     def __init__(self, *, model_id: str = "Qwen/Qwen2.5-1.5B-Instruct",
+                 revision: str | None = None,
                  load_in_4bit: bool = False, max_input_tokens: int = 4096) -> None:
-        self._model_id, self._load_in_4bit = model_id, load_in_4bit
+        self._model_id, self._revision, self._load_in_4bit = model_id, revision, load_in_4bit
         self._max_input_tokens = max_input_tokens
         self._tokenizer = self._model = None
 
@@ -35,8 +36,10 @@ class HuggingFaceLocalProvider:
             )
         else:
             kwargs["torch_dtype"] = torch.float16 if torch.cuda.is_available() else torch.float32
-        self._tokenizer = AutoTokenizer.from_pretrained(self._model_id)
-        self._model = AutoModelForCausalLM.from_pretrained(self._model_id, **kwargs)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._model_id, revision=self._revision)
+        self._model = AutoModelForCausalLM.from_pretrained(
+            self._model_id, revision=self._revision, **kwargs,
+        )
         self._model.eval()
 
     def generate(self, messages: list[ChatMessage],

@@ -27,10 +27,14 @@ class DirectE1Runtime:
     registry: E1ProviderRegistry
 
     def assignment_manifest(self, condition: E1Condition, agent_ids: tuple[str, ...]) -> dict[str, object]:
-        """Expose non-secret routing identities for campaign-level freezing."""
+        """Expose non-secret routing identities for one method condition."""
         manifest = self.registry.assignment_manifest(condition, agent_ids)
         manifest["executor_id"] = self.executor.executor_id
         return manifest
+
+    def campaign_manifest(self) -> dict[str, object]:
+        """Return the full model/executor identity manifest to freeze with E1."""
+        return self.registry.campaign_manifest(executor_id=self.executor.executor_id)
 
     def build_method(
         self, condition: E1Condition, prompt: Prompt,
@@ -58,6 +62,8 @@ def build_direct_e1_runtime(
     """
     if not executor_id.strip():
         raise ValueError("executor_id must be non-empty")
+    registry.validate_complete_roster(n=n, k=k)
+    registry.validate_family_catalogue()
     executor = ProviderFixedExecutor(
         registry.executor_provider(), executor_id=executor_id,
         max_new_tokens=max_executor_tokens,
@@ -68,6 +74,7 @@ def build_direct_e1_runtime(
         extraction: AggregatedExtraction,
     ) -> DirectMethodAdapter:
         if condition.method_id in BASELINES:
+            registry.validate_baseline_assignment(condition, condition.method_id)
             return DirectBaselineAdapter(
                 extraction=extraction,
                 provider_resolver=registry.baseline_provider_resolver,
@@ -81,6 +88,7 @@ def build_direct_e1_runtime(
         return DirectProtocolStrategyAdapter(
             extraction=extraction,
             model_resolver=registry.resolve_models,
+            model_family_resolver=registry.resolve_model_families,
             invoker_factory=registry.invoker_factory(condition),
             prompt_view_factory=prompt_view_factory,
             agent_contexts=agent_contexts,

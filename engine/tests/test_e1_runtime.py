@@ -10,29 +10,66 @@ from sociodec.direct_protocol import DirectProtocolStrategyAdapter
 class FakeProvider:
     def __init__(self, spec): self.model_name = spec.model_id; self.provider_name = "fake"
 
-def spec(name): return ProviderSpec(backend="huggingface-local", model_id=name)
+def spec(name):
+    if name == "m1":
+        return ProviderSpec(
+            backend="openai-compatible", model_id=name,
+            base_url="https://ma.example.invalid/v1", api_key_env="MA_API_KEY",
+            provider_name="provider-a", family_id="MA", provider_org="Provider-A",
+            weight_access="closed-weight", model_revision=name,
+            access_date="2026-11-20",
+        )
+    if name == "m2":
+        return ProviderSpec(
+            backend="huggingface-local", model_id=name,
+            family_id="MB", provider_org="Provider-B", weight_access="open-weight",
+            model_size="small", model_revision="a" * 40, access_date="2026-11-20",
+        )
+    if name == "m3":
+        return ProviderSpec(
+            backend="huggingface-local", model_id=name,
+            family_id="MC", provider_org="Provider-C", weight_access="open-weight",
+            model_size="large", model_revision="b" * 40, access_date="2026-11-20",
+        )
+    if name == "executor":
+        return ProviderSpec(
+            backend="openai-compatible", model_id=name,
+            base_url="https://me.example.invalid/v1", api_key_env="ME_API_KEY",
+            provider_name="executor-provider", family_id="ME", provider_org="Executor-Provider",
+            weight_access="closed-weight", model_revision=name,
+            access_date="2026-11-20",
+        )
+    raise ValueError(name)
 
 def registry():
-    assignments = {
-        "homogeneous": {
-            "single-decomposer":spec("m1"), "self-refiner":spec("m1"),
-            "self-consistency-sampler":spec("m1"), "decomposer":spec("m1"),
-            "separate-evaluator":spec("m1"), "debater-1":spec("m1"),
-            "debater-2":spec("m1"), "independent-judge":spec("m1"),
-            **{f"nominal-member-{i}":spec("m1") for i in range(1,4)},
-            "coordinator":spec("m1"), **{f"specialist-{i}":spec("m1") for i in range(1,4)},
-            **{f"expert-{i}":spec("m1") for i in range(1,4)}, "integrator":spec("m1"),
-        },
-        "heterogeneous": {
-            "single-decomposer":spec("m1"), "self-refiner":spec("m2"),
-            "self-consistency-sampler":spec("m1"), "decomposer":spec("m2"),
-            "separate-evaluator":spec("m3"), "debater-1":spec("m1"),
-            "debater-2":spec("m2"), "independent-judge":spec("m3"),
-            **{f"nominal-member-{i}":spec(f"m{i}") for i in range(1,4)},
-            "coordinator":spec("m1"), **{f"specialist-{i}":spec(f"m{i%2+1}") for i in range(1,4)},
-            **{f"expert-{i}":spec(f"m{i%2+1}") for i in range(1,4)}, "integrator":spec("m3"),
-        },
+    required_agents = {
+        "coordinator", "specialist-1", "specialist-2", "specialist-3",
+        "expert-1", "expert-2", "expert-3", "integrator",
+        "participant-1", "participant-2", "participant-3", "aggregator",
+        "member-1", "member-2", "member-3", "voter-1", "voter-2", "voter-3",
+        "facilitator", "author", "critic", "judge", "decomposer-1", "decomposer-2",
+        "synthesizer", "reviewer-1", "reviewer-2", "reviewer-3", "editor",
+        "agent-A", "agent-B", "party-1", "party-2", "mediator", "moderator",
+        "single-decomposer", "self-refiner", "self-consistency-sampler",
+        "decomposer", "separate-evaluator", "debater-1", "debater-2",
+        "independent-judge", "nominal-member-1", "nominal-member-2", "nominal-member-3",
     }
+    family_b = {
+        "specialist-2", "expert-2", "participant-2", "member-2", "voter-2",
+        "critic", "decomposer-2", "reviewer-2", "agent-B", "party-2",
+        "self-refiner", "debater-2", "nominal-member-2",
+    }
+    family_a = {
+        "coordinator", "specialist-1", "expert-1", "participant-1", "member-1",
+        "voter-1", "author", "decomposer-1", "reviewer-1", "agent-A", "party-1",
+        "single-decomposer", "self-consistency-sampler", "decomposer", "debater-1",
+        "nominal-member-1",
+    }
+    heterogeneous = {agent: spec("m3") for agent in required_agents}
+    heterogeneous.update({agent: spec("m1") for agent in family_a})
+    heterogeneous.update({agent: spec("m2") for agent in family_b})
+    homogeneous = {agent: spec("m1") for agent in required_agents}
+    assignments = {"homogeneous": homogeneous, "heterogeneous": heterogeneous}
     return E1ProviderRegistry(assignments=assignments, executor=spec("executor"),
         provider_builder=FakeProvider)
 
@@ -59,6 +96,23 @@ def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
         "coordinator": "m1", "specialist-1": "m1",
         "specialist-2": "m1", "specialist-3": "m1",
     }
+    assert manifest["agent_model_families"] == {
+        "coordinator": "MA", "specialist-1": "MA",
+        "specialist-2": "MA", "specialist-3": "MA",
+    }
+    assert manifest["executor_provenance"]["model_revision"] == "executor"
+
+def test_runtime_exports_full_non_secret_campaign_model_manifest():
+    runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
+    manifest = runtime.campaign_manifest()
+    assert manifest["schema_version"] == "e1-provider-manifest-v1"
+    assert set(manifest["model_modes"]) == {"homogeneous", "heterogeneous"}
+    assert set(manifest["model_family_catalogue"]) == {"MA", "MB", "MC"}
+    assert manifest["executor"]["executor_id"] == "executor-fixed"
+    assert manifest["executor"]["provenance"]["model_revision"] == "executor"
+    assert "api_key" not in str(manifest).lower()
+    assert "secret" not in str(manifest).lower()
+
 
 def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
@@ -73,3 +127,20 @@ def test_runtime_refuses_to_invent_jigsaw_facets():
     extraction = aggregate_extractions(())
     with pytest.raises(ValueError, match="explicit prompt_view_factory"):
         runtime.build_method(condition("S12"), prompt, extraction)
+
+
+def test_runtime_rejects_debate_judge_from_an_author_family_before_adapter_creation():
+    providers = registry()
+    providers.assignments["heterogeneous"]["independent-judge"] = spec("m1")
+    runtime = build_direct_e1_runtime(registry=providers, executor_id="executor-fixed")
+    prompt = Prompt("Debate this plan.", Interpretation("Debate this plan"))
+    extraction = aggregate_extractions(())
+    with pytest.raises(ValueError, match="distinct from both authors"):
+        runtime.build_method(condition("multi_agent_debate", "heterogeneous"), prompt, extraction)
+
+
+def test_runtime_rejects_missing_agent_provider_assignments_before_building_executor():
+    providers = registry()
+    del providers.assignments["heterogeneous"]["reviewer-3"]
+    with pytest.raises(ValueError, match="provider roster is incomplete"):
+        build_direct_e1_runtime(registry=providers, executor_id="executor-fixed")

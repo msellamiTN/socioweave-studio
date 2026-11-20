@@ -8,13 +8,14 @@ from sociodec.direct_e1 import DirectMethodAdapter, MethodRun
 from sociodec.e1_protocol import E1Condition, BASELINES
 from sociodec.extraction import AggregatedExtraction
 from sociodec.models.prompt import Prompt
-from sociodec.models.strategy import Agent, ProtocolStep
+from sociodec.models.strategy import Agent, ProtocolStep, Role
 from sociodec.runtime import ProtocolContext, ProtocolInvoker, run_strategy
 from sociodec.protocol_decoding import parse_candidate
 from sociodec.strategy_decoding import DecisionAdjudication, ProtocolDecisionDecoder
 from sociodec.strategy_protocols import build_strategy_blueprint
 
 ModelResolver = Callable[[E1Condition, tuple[str, ...]], Mapping[str, str]]
+ModelFamilyResolver = Callable[[E1Condition, tuple[str, ...]], Mapping[str, str]]
 PromptViewFactory = Callable[[StrategyId, Prompt, AggregatedExtraction, tuple[str, ...]], Mapping[str, str]]
 InvokerFactory = Callable[[Agent, int], ProtocolInvoker]
 
@@ -41,6 +42,7 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
     """One strategy -> typed decision decoder; no adaptive drafts or selector."""
     def __init__(self, *, extraction: AggregatedExtraction, model_resolver: ModelResolver,
                  invoker_factory: InvokerFactory, prompt_view_factory: PromptViewFactory | None = None,
+                 model_family_resolver: ModelFamilyResolver | None = None,
                  agent_contexts: Mapping[str, str] | None = None,
                  adjudications: Mapping[StrategyId | str, DecisionAdjudication] | None = None,
                  n: int = 3, k: int = 3, T: int = 2,
@@ -49,6 +51,7 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                  consensus_epsilon: float = 0.1):
         if min(n, k, T) < 1: raise ValueError("n, k and T must be >= 1")
         self.extraction, self.model_resolver, self.invoker_factory = extraction, model_resolver, invoker_factory
+        self.model_family_resolver = model_family_resolver
         self.prompt_view_factory, self.agent_contexts = prompt_view_factory, dict(agent_contexts or {})
         if not 0.0 <= delphi_epsilon <= 1.0:
             raise ValueError("delphi_epsilon must be in [0, 1]")
@@ -74,10 +77,37 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         if set(models) != set(agent_ids) or any(not isinstance(v, str) or not v.strip() for v in models.values()):
             raise ValueError("model_resolver must return a non-empty model ID for every agent")
         distinct = set(models.values())
-        if condition.model_mode == "homogeneous" and len(distinct) != 1:
-            raise ValueError("homogeneous condition requires one shared model identity")
-        if condition.model_mode == "heterogeneous" and len(distinct) < 2:
-            raise ValueError("heterogeneous condition requires at least two model identities")
+        required_models = 1 if condition.model_mode == "homogeneous" else 2
+        if len(distinct) < required_models:
+            raise ValueError(
+                f"{condition.model_mode} condition requires at least {required_models} distinct model identities"
+            )
+        model_families: dict[str, str] = {}
+        if self.model_family_resolver is not None:
+            model_families = dict(self.model_family_resolver(condition, agent_ids))
+            if set(model_families) != set(agent_ids) or any(
+                not isinstance(value, str) or not value.strip()
+                for value in model_families.values()
+            ):
+                raise ValueError("model_family_resolver must return one non-empty family ID per agent")
+            required_families = 1 if condition.model_mode == "homogeneous" else min(2, len(agent_ids))
+            if len(set(model_families.values())) < required_families:
+                raise ValueError(
+                    f"{condition.model_mode} condition requires at least {required_families} distinct model families"
+                )
+            for assignment in roster.strategy.assignments:
+                if condition.model_mode != "heterogeneous" or assignment.role is not Role.JUDGE:
+                    continue
+                authors = {
+                    item.agent_id for item in roster.strategy.assignments
+                    if item.round == assignment.round and item.role is Role.DECOMPOSER
+                }
+                if model_families[assignment.agent_id] in {
+                    model_families[author] for author in authors
+                }:
+                    raise ValueError(
+                        f"judge {assignment.agent_id} must use a model family distinct from the authors it judges"
+                    )
         views = None
         if self.prompt_view_factory:
             views = dict(self.prompt_view_factory(sid, prompt, self.extraction, agent_ids))
@@ -149,7 +179,8 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 "mediation_converged": run.mediation_converged if sid is StrategyId.S11 else None,
                 "mediation_stop_round": run.mediation_stop_round if sid is StrategyId.S11 else None,
                 "mediation_distance": run.mediation_distance if sid is StrategyId.S11 else None,
-                "agent_model_ids": models, "seeded_agents": list(run.seeded_agents),
+                "agent_model_ids": models, "agent_model_families": model_families or None,
+                "seeded_agents": list(run.seeded_agents),
                 "output_count": len(run.outputs), "decision_rule": decoded.decision.rule,
                 "decision_selected_candidate": decoded.decision.selected_candidate_id,
                 "decision_rationale": decoded.decision.rationale, "trace_complete": len(traces) == run.calls_made,

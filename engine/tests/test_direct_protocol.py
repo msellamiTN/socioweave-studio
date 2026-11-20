@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from sociodec.catalogue import StrategyId
 from sociodec.decisions import decomposition_distance
 from sociodec.direct_protocol import DirectProtocolStrategyAdapter
@@ -256,3 +258,31 @@ def test_direct_s4_uses_definition7_epsilon_for_delphi_stability():
     assert {round_number for _, round_number, action in calls if action == "revise"} == {2}
     assert [action for _, _, action in calls].count("draft") == 2
     assert [action for _, _, action in calls].count("revise") == 2
+
+
+def test_heterogeneous_strategy_rejects_judge_sharing_author_family():
+    adapter = DirectProtocolStrategyAdapter(
+        extraction=EXTRACTION,
+        model_resolver=lambda _condition, ids: {
+            agent_id: {"author": "model-A", "reviewer-1": "model-B",
+                       "reviewer-2": "model-C", "reviewer-3": "model-B",
+                       "editor": "model-A"}[agent_id]
+            for agent_id in ids
+        },
+        model_family_resolver=lambda _condition, ids: {
+            agent_id: {"author": "MA", "reviewer-1": "MB",
+                       "reviewer-2": "MC", "reviewer-3": "MB",
+                       "editor": "MA"}[agent_id]
+            for agent_id in ids
+        },
+        invoker_factory=lambda _agent, _seed: (_ for _ in ()).throw(
+            AssertionError("provider invocation must not begin after invalid family preflight")
+        ),
+        n=3,
+        k=3,
+    )
+    condition = E1Condition(
+        "smart-administration", "S8", "heterogeneous", 0, ("p-001",), 6,
+    )
+    with pytest.raises(ValueError, match="judge editor must use a model family distinct"):
+        adapter.run(condition=condition, prompt=PROMPT, seed=21)
