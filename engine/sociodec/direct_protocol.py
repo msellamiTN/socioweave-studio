@@ -96,7 +96,7 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                     f"{condition.model_mode} condition requires at least {required_families} distinct model families"
                 )
             for assignment in blueprint.strategy.assignments:
-                if assignment.role is not Role.JUDGE:
+                if condition.model_mode != "heterogeneous" or assignment.role is not Role.JUDGE:
                     continue
                 authors = {
                     item.agent_id for item in blueprint.strategy.assignments
