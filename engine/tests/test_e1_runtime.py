@@ -154,8 +154,11 @@ def frozen_snapshot_fixture():
         for dataset in ALL_DATASETS
     }
     examples = tuple(
-        BenchmarkPrompt(dataset, example_id, f"fixture prompt {example_id}",
-                        split="test", source_version=f"{dataset}-fixture-v1")
+        BenchmarkPrompt(
+            dataset, example_id, f"fixture prompt {example_id}",
+            split="test", source_version=f"{dataset}-fixture-v1",
+            reference_data={"fixture_annotation": "synthetic test fixture only"},
+        )
         for dataset, ids in expected_ids.items() for example_id in ids
     )
     entries = {}
@@ -178,6 +181,9 @@ def frozen_snapshot_fixture():
             "prompt_count": len(ids),
             "prompt_ids": list(ids),
             "prompt_sha256": {item.example_id: item.prompt_hash for item in dataset_examples},
+            "reference_data_sha256": {
+                item.example_id: item.reference_data_hash for item in dataset_examples
+            },
         }
     manifest = {
         "schema_version": "e1-frozen-benchmark-snapshot-v1",
