@@ -37,6 +37,7 @@ class ProtocolContext:
     input_content: str
     hypotheses: tuple[Hypothesis, ...]
     visible_history: tuple[VisibleOutput, ...]
+    action_instruction: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +76,21 @@ class ProtocolInvoker(Protocol):
         step: ProtocolStep,
         context: ProtocolContext,
     ) -> str: ...
+
+
+def _action_instruction(strategy_id: str, action: str) -> str:
+    """Return explicit paper semantics that are not captured by a verb alone."""
+    if strategy_id == "S6" and action == "counter-plan":
+        return (
+            "Dialectical inquiry counter-plan: use the original prompt as the "
+            "authoritative problem statement and treat the first draft only as "
+            "a proposal to challenge. Construct an independent alternative "
+            "decomposition; do not assume, inherit, or treat as binding the "
+            "first draft's assumptions, decomposition choices, or omissions. "
+            "The first draft is supplied as the object of counter-planning, "
+            "not as a replacement for the original prompt."
+        )
+    return ""
 
 
 def _role_for(strategy: SocialStrategy, agent_id: str, round_number: int) -> Role:
@@ -331,6 +347,7 @@ def run_strategy(
                 input_content=input_content,
                 hypotheses=hypotheses,
                 visible_history=history,
+                action_instruction=_action_instruction(strategy_id, step.action.value),
             )
 
             from_seed = (
