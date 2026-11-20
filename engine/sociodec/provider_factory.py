@@ -138,6 +138,28 @@ class E1ProviderRegistry:
         except ValueError as exc:
             raise ValueError(f"Missing or invalid E1 model provenance for {label}: {exc}") from exc
 
+    def validate_complete_roster(self) -> None:
+        """Require provider assignments for every E1 strategy and baseline agent."""
+        required = {
+            "coordinator", *(f"specialist-{i}" for i in range(1, 4)),
+            *(f"expert-{i}" for i in range(1, 4)), "integrator",
+            *(f"participant-{i}" for i in range(1, 4)), "aggregator",
+            *(f"member-{i}" for i in range(1, 4)),
+            *(f"voter-{i}" for i in range(1, 4)), "facilitator",
+            "author", "critic", "judge", "decomposer-1", "decomposer-2",
+            "synthesizer", *(f"reviewer-{i}" for i in range(1, 4)), "editor",
+            "agent-A", "agent-B", "party-1", "party-2", "mediator", "moderator",
+            "single-decomposer", "self-refiner", "self-consistency-sampler",
+            "decomposer", "separate-evaluator", "debater-1", "debater-2",
+            "independent-judge", *(f"nominal-member-{i}" for i in range(1, 4)),
+        }
+        for mode, roster in self.assignments.items():
+            missing = required - set(roster)
+            if missing:
+                raise ValueError(
+                    f"{mode} provider roster is incomplete; missing agent assignments: {sorted(missing)}"
+                )
+
     def validate_family_catalogue(self) -> dict[str, ProviderSpec]:
         """Validate MA/MB/MC as three distinct provider families.
 
