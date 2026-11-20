@@ -68,23 +68,28 @@ See [Brand Guide](docs/BRAND_GUIDE.md) and [Brand Assets](assets/brand/).
 
 ```text
 socioweave-studio/
-├── assets/
-│   └── brand/             # SVG logo, symbol and favicon
-├── docs/
-│   ├── BRAND_GUIDE.md
-│   └── GITHUB_BRANDING.md
+├── assets/                # Brand assets
+├── docs/                  # Research, conformance and implementation records
+├── engine/
+│   ├── sociodec/           # Python research engine and E1 execution components
+│   └── tests/              # Deterministic unit and integration tests
 └── README.md
 ```
 
-This repository is being initialized. The full engine, web application, notebooks and reproducible experiments are planned as subsequent implementation milestones; their presence or completion is not implied by this brand package.
+The repository now contains an executable research implementation in `engine/`, including the paper's strategy/runtime contracts, provider-backed execution interfaces, conformance checks, and a no-call E1 campaign harness. The README is a high-level orientation only; consult the research and test reports in `docs/` for the exact scope and evidence status.
 
 ## Repository topics
 
 Suggested GitHub topics: `multi-agent-systems`, `llm-agents`, `prompt-decomposition`, `agent-orchestration`, `research-platform`, `socioweave`.
 
-## Status
+## Status and evidence boundary
 
-Brand foundation committed. Scientific implementation and experimental campaigns must be tracked independently and reported only when implemented and tested.
+- **Implemented:** brand foundation, Python engine, strategy/runtime conformance checks, E1 dataset intake and snapshot hashing, provider/model provenance gates, and campaign preflight/checkpoint contracts.
+- **Software validation:** report only the exact commit and CI run recorded in the relevant test report. Deterministic tests and mock providers establish software behavior, not empirical model performance.
+- **Not yet established:** live provider smoke tests, the complete approved five-dataset benchmark bundle, the practitioner-reviewed smart-administration annotations, and empirical E1–E9 results.
+- **Pending analysis:** dataset-specific reference adapters and paired computation of reference agreement, stability and process gain.
+
+No benchmark result, provider execution, or scientific conclusion should be inferred from the presence of the harness alone.
 
 ---
 
