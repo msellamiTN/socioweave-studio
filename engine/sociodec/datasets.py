@@ -18,11 +18,68 @@ from sociodec.e1_protocol import ALL_DATASETS, EXPECTED_PROMPTS
 
 
 DATASET_REGISTRY = {
-    "BREAK": {"paper_source": "BREAK", "split_policy": "use the paper's selected split", "license_review_required": True},
-    "StrategyQA": {"paper_source": "StrategyQA", "split_policy": "use the paper's selected split", "license_review_required": True},
-    "TaskBench": {"paper_source": "TaskBench", "split_policy": "use the paper's selected split", "license_review_required": True},
-    "TravelPlanner": {"paper_source": "TravelPlanner", "split_policy": "use the paper's selected split", "license_review_required": True},
-    "smart-administration": {"paper_source": "author-curated 60-prompt set", "split_policy": "version and annotate the author-curated set", "license_review_required": False},
+    "BREAK": {
+        "paper_source_url": "https://allenai.github.io/Break/",
+        "prompt_case": "well-structured prompts; granularity",
+        "reference_provided": "gold decomposition of each question into ordered steps",
+        "metrics": [
+            "reference agreement", "redundancy", "coupling", "validity V2/V5",
+            "stability", "cost",
+        ],
+        "coverage_applicable": False,
+        "source_release_status": "public_source",
+        "selection_protocol": "not specified by paper; operator must declare exact 100-prompt selection",
+        "license_review_required": True,
+    },
+    "StrategyQA": {
+        "paper_source_url": "https://allenai.org/data/strategyqa",
+        "prompt_case": "implicit prerequisites; omission",
+        "reference_provided": "annotated decomposition, evidence and answer",
+        "metrics": [
+            "reference agreement/implicit-step recall", "utility/answer accuracy",
+            "process gain", "stability", "cost",
+        ],
+        "coverage_applicable": False,
+        "source_release_status": "public_source",
+        "selection_protocol": "not specified by paper; operator must declare exact 100-prompt selection",
+        "license_review_required": True,
+    },
+    "TaskBench": {
+        "paper_source_url": "https://github.com/microsoft/JARVIS/tree/main/taskbench",
+        "prompt_case": "dependencies between sub-tasks; several domains",
+        "reference_provided": "reference graph of sub-tasks",
+        "metrics": [
+            "reference agreement on sub-tasks/dependencies", "validity V2/V5",
+            "coupling", "stability", "cost",
+        ],
+        "coverage_applicable": False,
+        "source_release_status": "public_source",
+        "selection_protocol": "not specified by paper; operator must declare exact 100-prompt selection",
+        "license_review_required": True,
+    },
+    "TravelPlanner": {
+        "paper_source_url": "https://osu-nlp-group.github.io/TravelPlanner",
+        "prompt_case": "many constraints; utility by execution",
+        "reference_provided": "annotated constraints and checks on the final plan",
+        "metrics": [
+            "utility", "solvability", "process gain", "validity V2/V5",
+            "coverage restricted to annotated constraints", "stability", "cost",
+        ],
+        "coverage_applicable": "annotated_constraints_only",
+        "source_release_status": "public_source",
+        "selection_protocol": "not specified by paper; operator must declare exact 100-prompt selection",
+        "license_review_required": True,
+    },
+    "smart-administration": {
+        "paper_source_url": None,
+        "prompt_case": "ambiguity, conflicting objectives, several institutions",
+        "reference_provided": "requirement lists, hypotheses and reference decompositions reviewed by practitioners",
+        "metrics": ["all Table 9 metrics, including V1 coverage and hypothesis verdicts"],
+        "coverage_applicable": True,
+        "source_release_status": "to_be_released_with_code",
+        "selection_protocol": "author-curated 60-prompt set; exact version and IDs must be supplied",
+        "license_review_required": False,
+    },
 }
 
 
@@ -32,12 +89,23 @@ class E1DatasetSource:
     path: str | Path
     source_version: str
     split: str
+    selection_protocol: str
+    license_review_status: str
+    selection_seed: int | None = None
 
     def __post_init__(self) -> None:
         if not str(self.path).strip():
             raise ValueError("dataset source path must be non-empty")
         if not self.source_version.strip() or not self.split.strip():
             raise ValueError("source_version and split must be non-empty")
+        if not self.selection_protocol.strip():
+            raise ValueError("selection_protocol must record the exact prompt-selection procedure")
+        if self.license_review_status != "approved":
+            raise ValueError("dataset usage must be explicitly approved before snapshot freezing")
+        if self.selection_seed is not None and (
+            not isinstance(self.selection_seed, int) or self.selection_seed < 0
+        ):
+            raise ValueError("selection_seed must be a non-negative integer when supplied")
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +220,15 @@ def freeze_e1_benchmark_snapshot(
             "source_sha256": sha256_file(path),
             "source_version": source.source_version,
             "split": source.split,
+            "selection_protocol": source.selection_protocol,
+            "selection_seed": source.selection_seed,
+            "license_review_status": source.license_review_status,
+            "paper_source_url": DATASET_REGISTRY[dataset]["paper_source_url"],
+            "prompt_case": DATASET_REGISTRY[dataset]["prompt_case"],
+            "reference_provided": DATASET_REGISTRY[dataset]["reference_provided"],
+            "metrics": list(DATASET_REGISTRY[dataset]["metrics"]),
+            "coverage_applicable": DATASET_REGISTRY[dataset]["coverage_applicable"],
+            "source_release_status": DATASET_REGISTRY[dataset]["source_release_status"],
             "prompt_count": len(examples),
             "prompt_ids": list(ids),
             "prompt_sha256": {x.example_id: x.prompt_hash for x in examples},
