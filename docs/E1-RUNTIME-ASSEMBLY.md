@@ -34,3 +34,36 @@ families, training lineages, or provider organizations. A heterogeneous
 condition must not be described as a three-family comparison until those
 family identities are explicitly declared and validated in a separate
 provider/model provenance layer. No live calls are made by the assembly tests.
+
+
+## Table 13 model-family provenance gate
+
+The paper labels the agent families abstractly as MA, MB and MC; it does not
+name concrete model products. The runtime therefore does not invent those
+identities. The operator must declare, for every assigned model, a family ID,
+provider organization, weight-access class, exact model revision and access
+date. Open-weight entries also require a size label.
+
+Before a direct E1 runtime is assembled, the registry now requires:
+
+- a complete agent assignment roster for all thirteen strategies and six
+  baselines in both model modes;
+- one exact model identity/family across the homogeneous MA roster;
+- exactly three heterogeneous agent families, three distinct provider
+  organizations, one closed-weight API model and two open-weight models with
+  different declared size labels;
+- immutable 40-character commit revisions for locally loaded Hugging Face
+  models, passed to both tokenizer and model loading; the exact API model ID
+  must equal its declared revision;
+- at least two distinct families for two-agent strategy rosters and three
+  families for rosters with at least three agents;
+- judge-family separation from the authors being judged, including the
+  independent judge in the multi-agent-debate baseline.
+
+The registry records exact family/provider/revision/access-date metadata in
+its non-secret assignment manifest. These checks establish consistency of
+operator declarations and routing configuration; they do not independently
+verify that a provider's claimed family, organization, weight status, or
+revision is truthful. The paper requires exact model versions and access
+dates to be reported with results. No concrete MA/MB/MC product identities
+are assumed in this repository.
