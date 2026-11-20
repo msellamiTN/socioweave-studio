@@ -127,6 +127,10 @@ def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(t
     assert {row["status"] for row in first} == {"success"}
     assert all(row["calls_total"] == row["calls_method"] + row["calls_executor"] for row in first)
     assert factory_calls == ["S2", "single_plan_and_solve"]
+    assert first[0]["reference_data_sha256"] == examples[0].reference_data_hash
+    assert first[0]["metadata"]["reference_data_present"] is True
+    assert first[0]["metadata"]["reference_data_sha256"] == examples[0].reference_data_hash
+    assert isinstance(first[0]["metadata"]["pending_metrics"], list)
     manifest_path = checkpoint.with_suffix(checkpoint.suffix + ".manifest.json")
     saved_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert saved_manifest["schema_version"] == "e1-campaign-execution-manifest-v1"
