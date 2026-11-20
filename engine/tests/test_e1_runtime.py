@@ -100,7 +100,7 @@ def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
         "coordinator": "MA", "specialist-1": "MA",
         "specialist-2": "MA", "specialist-3": "MA",
     }
-    assert manifest["executor_provenance"]["model_revision"] == "me-revision-2026-11"
+    assert manifest["executor_provenance"]["model_revision"] == "executor"
 
 def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
