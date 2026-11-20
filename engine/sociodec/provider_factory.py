@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import re
 from typing import Callable, Mapping
 
 from sociodec.e1_protocol import E1Condition
@@ -63,8 +64,13 @@ class ProviderSpec:
                 date.fromisoformat(self.access_date)
             except ValueError as exc:
                 raise ValueError("access_date must use ISO YYYY-MM-DD format") from exc
-            if self.weight_access == "closed-weight" and self.backend != "openai-compatible":
-                raise ValueError("closed-weight E1 models must be accessed through the API backend")
+            if self.weight_access == "closed-weight":
+                if self.backend != "openai-compatible":
+                    raise ValueError("closed-weight E1 models must be accessed through the API backend")
+                if self.model_revision != self.model_id:
+                    raise ValueError("closed-weight model_revision must equal the exact API model_id sent in requests")
+            if self.backend == "huggingface-local" and not re.fullmatch(r"[0-9a-fA-F]{40}", self.model_revision):
+                raise ValueError("local open-weight model_revision must be an immutable 40-character commit SHA")
 
     def provenance_dict(self) -> dict[str, str]:
         """Return non-secret operator-declared model provenance."""
@@ -89,7 +95,8 @@ ProviderBuilder = Callable[[ProviderSpec], LLMProvider]
 def _build_provider(spec: ProviderSpec) -> LLMProvider:
     if spec.backend == "huggingface-local":
         return HuggingFaceLocalProvider(
-            model_id=spec.model_id, load_in_4bit=spec.load_in_4bit,
+            model_id=spec.model_id, revision=spec.model_revision,
+            load_in_4bit=spec.load_in_4bit,
             max_input_tokens=spec.max_input_tokens,
         )
     return OpenAICompatibleProvider(
