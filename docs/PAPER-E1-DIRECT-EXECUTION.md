@@ -147,6 +147,34 @@ that the model follows the counter-plan instruction, that the distance matcher
 is semantically adequate, or that the resulting decomposition is valid or
 useful.
 
+## Paper Table 12 dataset source registry and selection boundary
+
+The dataset registry now records the source URLs and evaluation scope stated in
+Table 12 of the paper:
+
+| Dataset | Paper source | Reference and metric scope |
+|---|---|---|
+| BREAK | https://allenai.github.io/Break/ | Ordered-step gold decompositions; reference agreement, redundancy, coupling, V2/V5 validity, stability and cost; no coverage metric |
+| StrategyQA | https://allenai.org/data/strategyqa | Annotated decomposition, evidence and answer; implicit-step recall, answer accuracy/utility, process gain, stability and cost; no coverage metric |
+| TaskBench | https://github.com/microsoft/JARVIS/tree/main/taskbench | Reference sub-task graph; sub-task/dependency agreement, V2/V5 validity, coupling, stability and cost; no coverage metric |
+| TravelPlanner | https://osu-nlp-group.github.io/TravelPlanner | Annotated constraints and final-plan checks; utility, solvability, process gain, V2/V5 validity, coverage only over annotated constraints, stability and cost; no reference decomposition |
+| smart-administration | To be released with the code | Practitioner-reviewed requirements, hypotheses and reference decompositions; all Table 9 metrics including V1 coverage and hypothesis verdicts |
+
+Table 13 specifies 100 prompts per public benchmark and 60
+smart-administration prompts. It does not identify the exact prompt IDs, split
+selection, or sampling algorithm. The intake therefore does not choose the
+first 100 rows, sample randomly, or infer a test split. Every
+`E1DatasetSource` must declare an explicit `selection_protocol` and an
+approved `license_review_status`; both are included in the snapshot hash and
+manifest. Public dataset code-repository licenses are not assumed to grant
+rights to every underlying dataset or its component sources.
+
+The paper describes smart-administration as “to be released with the code”.
+Until the author-curated 60-prompt source and its practitioner-reviewed
+annotations are supplied, that dataset cannot be frozen and the complete E1
+campaign cannot pass preflight. Synthetic unit-test fixtures are not benchmark
+evidence.
+
 ## Scientific boundary
 
 This is an executable harness contract, not an E1 result. It does not supply
