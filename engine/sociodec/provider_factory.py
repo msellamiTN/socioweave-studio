@@ -84,6 +84,8 @@ class ProviderSpec:
         if any(value is None for value in required.values()):
             raise ValueError("complete model provenance is required for E1")
         result = {key: str(value) for key, value in required.items()}
+        result["model_id"] = self.model_id
+        result["backend"] = self.backend
         if self.model_size is not None:
             result["model_size"] = self.model_size
         return result
