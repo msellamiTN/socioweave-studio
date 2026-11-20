@@ -304,6 +304,37 @@ class E1ProviderRegistry:
             self._executor_provider = provider
         return self._executor_provider
 
+    def campaign_manifest(self, *, executor_id: str) -> dict[str, object]:
+        """Return the complete non-secret Table 13 routing manifest for both modes."""
+        if not executor_id.strip():
+            raise ValueError("executor_id must be non-empty")
+        self.validate_family_catalogue()
+        modes: dict[str, object] = {}
+        for mode, roster in self.assignments.items():
+            modes[mode] = {
+                agent_id: {
+                    "model_id": spec.model_id,
+                    "backend": spec.backend,
+                    "provenance": self._require_provenance(spec, f"{mode}/{agent_id}"),
+                }
+                for agent_id, spec in sorted(roster.items())
+            }
+        family_specs = self.validate_family_catalogue()
+        return {
+            "schema_version": "e1-provider-manifest-v1",
+            "model_modes": modes,
+            "model_family_catalogue": {
+                family: self._require_provenance(spec, family)
+                for family, spec in sorted(family_specs.items())
+            },
+            "executor": {
+                "executor_id": executor_id,
+                "model_id": self.executor_spec.model_id,
+                "backend": self.executor_spec.backend,
+                "provenance": self._require_provenance(self.executor_spec, "fixed executor ME"),
+            },
+        }
+
     def assignment_manifest(self, condition: E1Condition, agent_ids: tuple[str, ...]) -> dict[str, object]:
         models = self.resolve_models(condition, agent_ids)
         families = self.resolve_model_families(condition, agent_ids)
