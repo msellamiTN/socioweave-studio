@@ -195,6 +195,15 @@ class E1ProviderRegistry:
             raise ValueError(
                 f"Table 13 requires exactly three declared agent model families; found {len(family_specs)}"
             )
+        homogeneous_specs = list(self.assignments["homogeneous"].items())
+        homogeneous_provenance = {
+            agent: self._require_provenance(spec, f"homogeneous/{agent}")
+            for agent, spec in homogeneous_specs
+        }
+        if len({spec.model_id for _, spec in homogeneous_specs}) != 1 or len({
+            item["family_id"] for item in homogeneous_provenance.values()
+        }) != 1:
+            raise ValueError("homogeneous Table 13 condition must use the exact MA model identity for every agent")
         provenances = {family: self._require_provenance(spec, family) for family, spec in family_specs.items()}
         providers = [item["provider_org"] for item in provenances.values()]
         if len(set(providers)) != 3:
@@ -294,6 +303,7 @@ class E1ProviderRegistry:
     def assignment_manifest(self, condition: E1Condition, agent_ids: tuple[str, ...]) -> dict[str, object]:
         models = self.resolve_models(condition, agent_ids)
         families = self.resolve_model_families(condition, agent_ids)
+        family_catalogue = self.validate_family_catalogue()
         provenance = {
             agent: self._require_provenance(self._spec(condition.model_mode, agent), agent)
             for agent in agent_ids
@@ -304,6 +314,10 @@ class E1ProviderRegistry:
             "agent_model_ids": models,
             "agent_model_families": families,
             "agent_model_provenance": provenance,
+            "model_family_catalogue": {
+                family: self._require_provenance(spec, family)
+                for family, spec in family_catalogue.items()
+            },
             "distinct_method_models": sorted(set(models.values())),
             "executor_model_id": self.executor_spec.model_id,
             "executor_backend": self.executor_spec.backend,
