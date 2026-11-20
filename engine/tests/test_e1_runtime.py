@@ -109,9 +109,11 @@ def test_runtime_refuses_to_invent_jigsaw_facets():
         runtime.build_method(condition("S12"), prompt, extraction)
 
 
-def test_runtime_preflights_debate_judge_family_before_any_provider_call():
-    runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
+def test_runtime_rejects_debate_judge_from_an_author_family_before_adapter_creation():
+    providers = registry()
+    providers.assignments["heterogeneous"]["independent-judge"] = spec("m1")
+    runtime = build_direct_e1_runtime(registry=providers, executor_id="executor-fixed")
     prompt = Prompt("Debate this plan.", Interpretation("Debate this plan"))
     extraction = aggregate_extractions(())
-    method = runtime.build_method(condition("multi_agent_debate", "heterogeneous"), prompt, extraction)
-    assert isinstance(method, DirectBaselineAdapter)
+    with pytest.raises(ValueError, match="distinct from both authors"):
+        runtime.build_method(condition("multi_agent_debate", "heterogeneous"), prompt, extraction)
