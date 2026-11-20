@@ -1,7 +1,7 @@
 # Core 22.4 — Test and Conformance Report
 
-**Result:** Historical baseline only — 448 tests passed on earlier commit `47508bfab9954e999faae7311bb0cee7b3f2a592`. The reintegrated implementation on current main is pending exact-head CI.  
-**Historical GitHub Actions:** [Run 44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209).  
+**Result:** PASS — 524 tests passed on exact PR head `a4a06a18b84cc576ee0b05905f2ab1d932b9ef37`; merge commit `09f978c6dfeb31f8c4490ba5c2d9978e33bfc348`.  
+**Current exact-head GitHub Actions:** [Run 44822306187](https://github.com/msellamiTN/socioweave-studio/actions/runs/44822306187). The earlier [run 44423677209](https://github.com/msellamiTN/socioweave-studio/actions/runs/44423677209) is historical.  
 **Result:** 448 passed in 0.69s; 0 failed; 0 skipped.
 
 ## Coverage delivered
@@ -72,4 +72,4 @@ python -m pytest -q
 
 ## Current-head validation status
 
-The current-main reintegration adds explicit S6 counter-plan instruction context, S11 convergence-to-D1 decision semantics, Definition 12 first-phase seed isolation, and scheduled/executed call-depth reconciliation. The older 448-test run above does not validate these reintegrated changes. Replace this section with the exact PR head SHA, workflow run ID, and final test counts only after the current-head CI succeeds.
+The current-main reintegration includes explicit S6 counter-plan instruction context, S11 convergence-to-D1 decision semantics, Definition 12 first-phase seed isolation, and scheduled/executed call-depth reconciliation. The independent oracle validates all 13 established strategy blueprints at (1,1,1), (3,3,2), and (5,4,3); deterministic mock runtime execution reconciles protocol accounting across all 13 at (2,2,1). S1's coordinator partition reference is checked as a dedicated executable input type, including target action and directional visibility.
