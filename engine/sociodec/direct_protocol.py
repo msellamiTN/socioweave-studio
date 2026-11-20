@@ -90,16 +90,16 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 for value in model_families.values()
             ):
                 raise ValueError("model_family_resolver must return one non-empty family ID per agent")
-            required_families = 1 if condition.model_mode == "homogeneous" else min(3, len(agent_ids))
+            required_families = 1 if condition.model_mode == "homogeneous" else min(2, len(agent_ids))
             if len(set(model_families.values())) < required_families:
                 raise ValueError(
                     f"{condition.model_mode} condition requires at least {required_families} distinct model families"
                 )
-            for assignment in blueprint.strategy.assignments:
+            for assignment in roster.strategy.assignments:
                 if condition.model_mode != "heterogeneous" or assignment.role is not Role.JUDGE:
                     continue
                 authors = {
-                    item.agent_id for item in blueprint.strategy.assignments
+                    item.agent_id for item in roster.strategy.assignments
                     if item.round == assignment.round and item.role is Role.DECOMPOSER
                 }
                 if model_families[assignment.agent_id] in {
