@@ -42,26 +42,34 @@ def spec(name):
     raise ValueError(name)
 
 def registry():
-    assignments = {
-        "homogeneous": {
-            "single-decomposer":spec("m1"), "self-refiner":spec("m1"),
-            "self-consistency-sampler":spec("m1"), "decomposer":spec("m1"),
-            "separate-evaluator":spec("m1"), "debater-1":spec("m1"),
-            "debater-2":spec("m1"), "independent-judge":spec("m1"),
-            **{f"nominal-member-{i}":spec("m1") for i in range(1,4)},
-            "coordinator":spec("m1"), **{f"specialist-{i}":spec("m1") for i in range(1,4)},
-            **{f"expert-{i}":spec("m1") for i in range(1,4)}, "integrator":spec("m1"),
-        },
-        "heterogeneous": {
-            "single-decomposer":spec("m1"), "self-refiner":spec("m2"),
-            "self-consistency-sampler":spec("m1"), "decomposer":spec("m2"),
-            "separate-evaluator":spec("m3"), "debater-1":spec("m1"),
-            "debater-2":spec("m2"), "independent-judge":spec("m3"),
-            **{f"nominal-member-{i}":spec(f"m{i}") for i in range(1,4)},
-            "coordinator":spec("m1"), **{f"specialist-{i}":spec(f"m{i%2+1}") for i in range(1,4)},
-            **{f"expert-{i}":spec(f"m{i%2+1}") for i in range(1,4)}, "integrator":spec("m3"),
-        },
+    required_agents = {
+        "coordinator", "specialist-1", "specialist-2", "specialist-3",
+        "expert-1", "expert-2", "expert-3", "integrator",
+        "participant-1", "participant-2", "participant-3", "aggregator",
+        "member-1", "member-2", "member-3", "voter-1", "voter-2", "voter-3",
+        "facilitator", "author", "critic", "judge", "decomposer-1", "decomposer-2",
+        "synthesizer", "reviewer-1", "reviewer-2", "reviewer-3", "editor",
+        "agent-A", "agent-B", "party-1", "party-2", "mediator", "moderator",
+        "single-decomposer", "self-refiner", "self-consistency-sampler",
+        "decomposer", "separate-evaluator", "debater-1", "debater-2",
+        "independent-judge", "nominal-member-1", "nominal-member-2", "nominal-member-3",
     }
+    family_b = {
+        "specialist-2", "expert-2", "participant-2", "member-2", "voter-2",
+        "critic", "decomposer-2", "reviewer-2", "agent-B", "party-2",
+        "self-refiner", "debater-2", "nominal-member-2",
+    }
+    family_a = {
+        "coordinator", "specialist-1", "expert-1", "participant-1", "member-1",
+        "voter-1", "author", "decomposer-1", "reviewer-1", "agent-A", "party-1",
+        "single-decomposer", "self-consistency-sampler", "decomposer", "debater-1",
+        "nominal-member-1",
+    }
+    heterogeneous = {agent: spec("m3") for agent in required_agents}
+    heterogeneous.update({agent: spec("m1") for agent in family_a})
+    heterogeneous.update({agent: spec("m2") for agent in family_b})
+    homogeneous = {agent: spec("m1") for agent in required_agents}
+    assignments = {"homogeneous": homogeneous, "heterogeneous": heterogeneous}
     return E1ProviderRegistry(assignments=assignments, executor=spec("executor"),
         provider_builder=FakeProvider)
 
