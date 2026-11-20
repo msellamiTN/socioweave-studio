@@ -75,7 +75,7 @@ def test_sequential_composition_seeds_second_phase_and_accumulates_calls_and_evi
         def __init__(self):
             self.calls = []
         def __call__(self, item, prompt, extraction, drafts, seed, allowance):
-            self.calls.append((item, seed, allowance))
+            self.calls.append((item, drafts, seed, allowance))
             from sociodec.models.decomposition import Decomposition
             decomposition = Decomposition((), (), ())
             verdict = HypothesisVerdict(_extraction().hypotheses[0], HypothesisVerdictValue.CONFIRMED)
@@ -91,8 +91,10 @@ def test_sequential_composition_seeds_second_phase_and_accumulates_calls_and_evi
     )
     assert adapter.calls[0][0] is PlanItem.S2
     assert adapter.calls[1][0] is PlanItem.S8
-    assert adapter.calls[1][1] == result.decomposition
-    assert [x[2] for x in adapter.calls] == [4, 6]
+    assert adapter.calls[0][1] == ()
+    assert adapter.calls[0][2] is None
+    assert adapter.calls[1][2] == result.decomposition
+    assert [x[3] for x in adapter.calls] == [4, 6]
     assert result.calls_made == 4
     assert result.strategy_run_id.startswith("C8:")
 
@@ -123,3 +125,29 @@ def test_sequential_composition_rejects_conflicting_hypothesis_verdicts():
             PlanItem.COMBO_JIGSAW_THEN_CRITIC, _prompt(), _extraction(),
             (None, None), None, 8,
         )
+
+
+def test_sequential_composition_discards_external_seeds_before_first_phase():
+    class Adapter:
+        def __init__(self):
+            self.calls = []
+            self.decompositions = []
+        def __call__(self, item, prompt, extraction, drafts, seed, allowance):
+            from sociodec.models.decomposition import Decomposition
+            decomposition = Decomposition((), (), ())
+            self.calls.append((item, drafts, seed))
+            self.decompositions.append(decomposition)
+            return StrategyOutcome(decomposition, 1, strategy_run_id=item.value)
+
+    adapter = Adapter()
+    executor = SequentialCompositionExecutor(adapter)
+    external_drafts = (object(), object())
+    external_seed = object()
+    executor(
+        PlanItem.C8_BRAINSTORM_THEN_REVIEW, _prompt(), _extraction(),
+        external_drafts, external_seed, 10,
+    )
+    assert adapter.calls[0] == (PlanItem.S2, (), None)
+    assert adapter.calls[1][0] is PlanItem.S8
+    assert adapter.calls[1][1] == external_drafts
+    assert adapter.calls[1][2] is adapter.decompositions[0]
