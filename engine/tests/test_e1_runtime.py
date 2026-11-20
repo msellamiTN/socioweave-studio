@@ -125,3 +125,10 @@ def test_runtime_rejects_debate_judge_from_an_author_family_before_adapter_creat
     extraction = aggregate_extractions(())
     with pytest.raises(ValueError, match="distinct from both authors"):
         runtime.build_method(condition("multi_agent_debate", "heterogeneous"), prompt, extraction)
+
+
+def test_runtime_rejects_missing_agent_provider_assignments_before_building_executor():
+    providers = registry()
+    del providers.assignments["heterogeneous"]["reviewer-3"]
+    with pytest.raises(ValueError, match="provider roster is incomplete"):
+        build_direct_e1_runtime(registry=providers, executor_id="executor-fixed")
