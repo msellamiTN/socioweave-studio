@@ -159,6 +159,19 @@ def test_baseline_debate_judge_must_be_from_family_distinct_from_both_authors():
         )
 
 
+def test_homogeneous_debate_keeps_all_agents_on_ma_without_heterogeneous_judge_rule():
+    assignments = standard_assignments()
+    assignments["homogeneous"].update({
+        "debater-1": spec("m1", "MA"),
+        "debater-2": spec("m1", "MA"),
+        "independent-judge": spec("m1", "MA"),
+    })
+    r = registry(assignments)
+    assert r.validate_baseline_assignment(
+        condition("homogeneous", "multi_agent_debate"), "multi_agent_debate"
+    ) == {"debater-1": "MA", "debater-2": "MA", "independent-judge": "MA"}
+
+
 def test_assignment_manifest_records_non_secret_family_provenance():
     r = registry(standard_assignments())
     manifest = r.assignment_manifest(condition("heterogeneous"), ("a", "b", "c"))
