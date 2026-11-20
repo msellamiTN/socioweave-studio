@@ -82,3 +82,21 @@ hashes. Its provider-manifest hash is bound into the campaign configuration
 hash and every success/failure result row. Resume is rejected if the sidecar,
 provider manifest, or checkpoint hash differs. This closes the configuration
 identity gap; it does not independently verify provider claims or model behavior.
+
+
+## No-call E1 campaign preflight
+
+After freezing the five dataset files and constructing the complete E1 grid, call
+`DirectE1Runtime.preflight_campaign(snapshot=..., conditions=...)`. This
+fail-closed check verifies the snapshot's aggregate and per-prompt hashes,
+source versions/splits, all 4,550 condition rows, paper call-budget formulas,
+the 38 method/model-mode provider rosters, heterogeneous family assignments,
+and judge-family independence. It also refuses S12 unless an explicit facet
+prompt-view factory was configured.
+
+The returned `E1CampaignPreflightReport` includes the dataset snapshot,
+provider-manifest and condition-grid hashes. Its readiness value is
+`configuration_validated_no_live_calls` and `live_provider_calls` is zero.
+This is not a provider connectivity smoke test and is not permission to claim
+that E1 trials ran. The next gate is a separately authorized, cost-capped
+provider smoke test followed by the preregistered campaign.
