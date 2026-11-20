@@ -210,8 +210,11 @@ class E1ProviderRegistry:
             raise ValueError("homogeneous Table 13 condition must use the exact MA model identity for every agent")
         provenances = {family: self._require_provenance(spec, family) for family, spec in family_specs.items()}
         providers = [item["provider_org"] for item in provenances.values()]
+        model_ids = [spec.model_id for spec in family_specs.values()]
         if len(set(providers)) != 3:
             raise ValueError("the three E1 model families must declare three distinct provider organizations")
+        if len(set(model_ids)) != 3:
+            raise ValueError("the three E1 model families must declare three distinct model identities")
         closed = [family for family, item in provenances.items() if item["weight_access"] == "closed-weight"]
         opened = [family for family, item in provenances.items() if item["weight_access"] == "open-weight"]
         if len(closed) != 1 or len(opened) != 2:
