@@ -265,7 +265,7 @@ class E1ProviderRegistry:
         except KeyError as exc:
             raise ValueError(f"Unknown E1 baseline: {baseline_id}") from exc
         families = self.resolve_model_families(condition, agent_ids)
-        if baseline_id == "multi_agent_debate" and families["independent-judge"] in {
+        if condition.model_mode == "heterogeneous" and baseline_id == "multi_agent_debate" and families["independent-judge"] in {
             families["debater-1"], families["debater-2"]
         }:
             raise ValueError("multi-agent debate judge must use a family distinct from both authors")
