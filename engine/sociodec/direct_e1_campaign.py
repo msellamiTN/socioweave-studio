@@ -302,7 +302,7 @@ class DirectE1CampaignRunner:
                 existing_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError as exc:
                 raise ValueError("Existing campaign manifest is invalid JSON") from exc
-            if existing_manifest != campaign_manifest:
+            if existing_manifest != json.loads(encoded_manifest):
                 raise ValueError("Existing campaign manifest differs from requested frozen campaign")
         else:
             with manifest_path.open("x", encoding="utf-8", newline="\n") as manifest_stream:
