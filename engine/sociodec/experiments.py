@@ -33,18 +33,39 @@ class BenchmarkPrompt:
     split: str = "test"
     source_version: str = "unspecified"
     metadata: Mapping[str, str] = field(default_factory=dict)
+    reference_data: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.dataset.strip() or not self.example_id.strip() or not self.prompt_text.strip():
             raise ValueError("dataset, example_id and prompt_text must be non-empty")
         if not self.split.strip() or not self.source_version.strip():
             raise ValueError("split and source_version must be non-empty")
+        if not isinstance(self.metadata, Mapping) or any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in self.metadata.items()
+        ):
+            raise ValueError("metadata must map string keys to string values")
+        if not isinstance(self.reference_data, Mapping):
+            raise ValueError("reference_data must be a JSON object")
+        try:
+            content_hash(dict(self.reference_data))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("reference_data must contain finite JSON-compatible values") from exc
+
+    @property
+    def reference_data_hash(self) -> str:
+        return content_hash(dict(self.reference_data))
 
     @property
     def prompt_hash(self) -> str:
-        return content_hash({"dataset": self.dataset, "id": self.example_id,
-                             "prompt": self.prompt_text, "split": self.split,
-                             "source_version": self.source_version})
+        """Hash the full frozen example, including references and metadata."""
+        return content_hash({
+            "dataset": self.dataset, "id": self.example_id,
+            "prompt": self.prompt_text, "split": self.split,
+            "source_version": self.source_version,
+            "metadata": dict(self.metadata),
+            "reference_data": dict(self.reference_data),
+        })
 
 
 @dataclass(frozen=True, slots=True)

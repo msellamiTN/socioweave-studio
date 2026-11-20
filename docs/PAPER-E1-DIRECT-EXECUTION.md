@@ -175,6 +175,32 @@ annotations are supplied, that dataset cannot be frozen and the complete E1
 campaign cannot pass preflight. Synthetic unit-test fixtures are not benchmark
 evidence.
 
+## Structured reference annotations are part of the frozen example
+
+Every E1 JSONL row must now contain a non-empty `reference_data` JSON object
+in addition to `example_id`, `prompt_text`, `split` and `metadata`. The
+intake preserves nested dataset-native annotations without silently converting
+them into a decomposition. This supports the distinct Table 12 reference
+types: BREAK gold ordered steps, StrategyQA decompositions/evidence/answers,
+TaskBench reference sub-task graphs, TravelPlanner annotated constraints and
+final-plan checks, and practitioner-reviewed smart-administration references.
+
+The canonical example hash now binds prompt text, split, source version,
+metadata and the complete structured reference object. Snapshot manifests
+record a separate reference-data hash, preflight checks it, and every E1 result
+row carries that hash. The campaign runner refuses examples without structured
+reference data.
+
+**Metric boundary:** Table 9 defines reference agreement as
+(1-\operatorname{dist}(D^\star,D_{ref})), stability as agreement across
+seeds and agent orders, and process gain as (U(\sigma)) minus the one-agent
+utility at the same budget. These are not single-row metrics. The current
+condition runner records them in `pending_metrics` for the paired analysis
+layer; it does not fabricate them or claim that reference agreement, stability
+or process gain have been computed. Dataset-specific adapters from the
+preserved source annotations to the paper's typed reference decomposition,
+and the paired E1/E9 analysis, remain outstanding.
+
 ## Scientific boundary
 
 This is an executable harness contract, not an E1 result. It does not supply

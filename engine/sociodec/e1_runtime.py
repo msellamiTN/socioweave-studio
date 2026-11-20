@@ -114,9 +114,16 @@ class DirectE1Runtime:
                 raise ValueError(f"snapshot manifest prompt count is invalid for {dataset}")
             if set(entry.get("prompt_ids", ())) != set(ids):
                 raise ValueError(f"snapshot manifest prompt IDs differ for {dataset}")
+            if any(not item.reference_data for item in examples):
+                raise ValueError(f"structured reference data is missing for {dataset}")
             expected_hashes = {item.example_id: item.prompt_hash for item in examples}
             if entry.get("prompt_sha256") != expected_hashes:
                 raise ValueError(f"snapshot manifest prompt hashes differ for {dataset}")
+            expected_reference_hashes = {
+                item.example_id: item.reference_data_hash for item in examples
+            }
+            if entry.get("reference_data_sha256") != expected_reference_hashes:
+                raise ValueError(f"snapshot manifest reference-data hashes differ for {dataset}")
             source_sha = entry.get("source_sha256")
             if not isinstance(source_sha, str) or len(source_sha) != 64:
                 raise ValueError(f"snapshot manifest source file hash is missing for {dataset}")

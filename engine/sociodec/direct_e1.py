@@ -17,6 +17,7 @@ from sociodec.execution import ExecutionRun, assess_execution, combine_validity
 from sociodec.models.decomposition import Decomposition
 from sociodec.models.prompt import Prompt, Requirement
 from sociodec.validation import HypothesisVerdict, ValidationReport, validate_decomposition
+from sociodec.experiments import content_hash
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +125,7 @@ def run_direct_e1_condition(
     prompt: Prompt,
     requirements: tuple[Requirement, ...],
     hypotheses: tuple = (),
+    reference_data: Mapping[str, object] | None = None,
     method: DirectMethodAdapter,
     executor: E1FixedExecutor,
     expected_executor_id: str,
@@ -143,6 +145,13 @@ def run_direct_e1_condition(
         raise ValueError("seed must be a non-negative integer")
     if not expected_executor_id.strip() or executor.executor_id != expected_executor_id:
         raise ValueError("fixed executor identity mismatch")
+    if reference_data is not None and not isinstance(reference_data, Mapping):
+        raise TypeError("reference_data must be a JSON object when supplied")
+    frozen_reference_data = dict(reference_data or {})
+    try:
+        reference_data_hash = content_hash(frozen_reference_data)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("reference_data must contain finite JSON-compatible values") from exc
     method_run = method.run(condition=condition, prompt=prompt, seed=seed)
     if not isinstance(method_run, MethodRun):
         raise TypeError("method adapter must return MethodRun")
@@ -213,6 +222,7 @@ def run_direct_e1_condition(
         # These require cross-condition/reference data and are deliberately computed
         # by the paired E1 analysis layer, never imputed in a single-condition run.
         pass
+    pending_metrics = sorted(set(obligations) - set(metrics))
     from sociodec.dataset_metrics import validate_reported_metrics
     validate_reported_metrics(condition.dataset, metrics);
 
@@ -231,6 +241,9 @@ def run_direct_e1_condition(
         "trace_is_complete": bool(trace) and len(trace) >= calls_total,
         "method_call_budget": condition.call_budget,
         "executor_calls_excluded_from_method_budget": executor_run.calls_made,
+        "reference_data_present": bool(frozen_reference_data),
+        "reference_data_sha256": reference_data_hash,
+        "pending_metrics": pending_metrics,
     }
     return DirectE1Result(
         condition.dataset, example_id, condition.method_id, condition.model_mode,

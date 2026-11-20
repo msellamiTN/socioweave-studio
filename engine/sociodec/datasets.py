@@ -151,6 +151,7 @@ def load_jsonl_dataset(
                 prompt_text = item.get("prompt_text")
                 split = item.get("split", "test")
                 metadata = item.get("metadata", {})
+                reference_data = item.get("reference_data", {})
                 if not isinstance(example_id, str) or not example_id.strip():
                     raise ValueError("example_id must be a non-empty string")
                 if not isinstance(prompt_text, str) or not prompt_text.strip():
@@ -161,6 +162,14 @@ def load_jsonl_dataset(
                     raise ValueError("metadata must be a JSON object")
                 if any(not isinstance(k, str) or not isinstance(v, (str, int, float, bool)) for k, v in metadata.items()):
                     raise ValueError("metadata values must be scalar strings, numbers or booleans")
+                if not isinstance(reference_data, dict):
+                    raise ValueError("reference_data must be a JSON object")
+                if DATASET_REGISTRY[dataset]["reference_provided"] and not reference_data:
+                    raise ValueError("reference_data is required by the paper's Table 12 for this dataset")
+                try:
+                    content_hash(reference_data)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("reference_data must contain finite JSON-compatible values") from exc
                 if expected_split is not None and split != expected_split:
                     raise ValueError(
                         f"row split {split!r} differs from declared split {expected_split!r}"
@@ -172,6 +181,7 @@ def load_jsonl_dataset(
                     split=split,
                     source_version=source_version,
                     metadata={k: str(v) for k, v in metadata.items()},
+                    reference_data=reference_data,
                 ))
             except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                 raise ValueError(f"Invalid dataset row at line {line_number}: {exc}") from exc
@@ -232,6 +242,7 @@ def freeze_e1_benchmark_snapshot(
             "prompt_count": len(examples),
             "prompt_ids": list(ids),
             "prompt_sha256": {x.example_id: x.prompt_hash for x in examples},
+            "reference_data_sha256": {x.example_id: x.reference_data_hash for x in examples},
         }
 
     snapshot_sha256 = content_hash({"datasets": dataset_entries})
