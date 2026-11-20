@@ -2,7 +2,7 @@ import pytest
 from sociodec.e1_protocol import ALL_DATASETS, EXPECTED_PROMPTS, E1Condition, build_e1_conditions
 from sociodec.extraction import AggregatedExtraction, aggregate_extractions
 from sociodec.experiments import BenchmarkPrompt, content_hash
-from sociodec.datasets import E1FrozenSnapshot
+from sociodec.datasets import DATASET_REGISTRY, E1FrozenSnapshot
 from sociodec.models.prompt import Interpretation, Prompt
 from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
 from sociodec.e1_runtime import build_direct_e1_runtime
@@ -169,12 +169,12 @@ def frozen_snapshot_fixture():
             "selection_protocol": "synthetic test fixture only",
             "selection_seed": None,
             "license_review_status": "approved",
-            "paper_source_url": None,
-            "prompt_case": "fixture",
-            "reference_provided": "fixture",
-            "metrics": [],
-            "coverage_applicable": False,
-            "source_release_status": "test_fixture",
+            "paper_source_url": DATASET_REGISTRY[dataset]["paper_source_url"],
+            "prompt_case": DATASET_REGISTRY[dataset]["prompt_case"],
+            "reference_provided": DATASET_REGISTRY[dataset]["reference_provided"],
+            "metrics": list(DATASET_REGISTRY[dataset]["metrics"]),
+            "coverage_applicable": DATASET_REGISTRY[dataset]["coverage_applicable"],
+            "source_release_status": DATASET_REGISTRY[dataset]["source_release_status"],
             "prompt_count": len(ids),
             "prompt_ids": list(ids),
             "prompt_sha256": {item.example_id: item.prompt_hash for item in dataset_examples},
