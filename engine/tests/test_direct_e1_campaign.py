@@ -9,7 +9,8 @@ from sociodec.direct_e1_campaign import (
 )
 from sociodec.e1_protocol import E1Condition
 from sociodec.execution import ExecutionRun, ExecutionStatus, SubproblemExecution
-from sociodec.experiments import BenchmarkPrompt
+from sociodec.experiments import BenchmarkPrompt, content_hash
+from sociodec.datasets import DATASET_REGISTRY
 from sociodec.extraction import ExtractionResult, aggregate_extractions
 from sociodec.models.decomposition import Decomposition, DeliverableComposition, Subproblem
 from sociodec.models.prompt import Interpretation, Prompt, Requirement, RequirementType, SourceSpan
@@ -68,10 +69,51 @@ PROVIDER_MANIFEST = {
 }
 
 
-def campaign_config(campaign_id, code_commit="abc123", manifest=None):
+def dataset_snapshot_json(examples):
+    datasets = {}
+    for dataset in sorted({item.dataset for item in examples}):
+        selected = [item for item in examples if item.dataset == dataset]
+        ids = [item.example_id for item in selected]
+        registry = DATASET_REGISTRY[dataset]
+        datasets[dataset] = {
+            "source_file": "synthetic-test-fixture.jsonl",
+            "source_sha256": "f" * 64,
+            "source_version": selected[0].source_version,
+            "split": selected[0].split,
+            "selection_protocol": "synthetic unit-test fixture; not benchmark selection",
+            "selection_seed": None,
+            "license_review_status": "approved",
+            "paper_source_url": registry["paper_source_url"],
+            "prompt_case": registry["prompt_case"],
+            "reference_provided": registry["reference_provided"],
+            "metrics": list(registry["metrics"]),
+            "coverage_applicable": registry["coverage_applicable"],
+            "source_release_status": registry["source_release_status"],
+            "prompt_count": len(ids),
+            "prompt_ids": ids,
+            "prompt_sha256": {item.example_id: item.prompt_hash for item in selected},
+            "reference_data_sha256": {item.example_id: item.reference_data_hash for item in selected},
+        }
+    manifest = {
+        "schema_version": "e1-frozen-benchmark-snapshot-v1",
+        "dataset_order": list(datasets),
+        "datasets": datasets,
+        "total_prompt_count": sum(item["prompt_count"] for item in datasets.values()),
+        "snapshot_sha256": content_hash({"datasets": datasets}),
+    }
+    return json.dumps(manifest)
+
+
+def campaign_config(campaign_id, code_commit="abc123", manifest=None, examples=None):
+    if examples is None:
+        examples = (BenchmarkPrompt(
+            "smart-administration", "p1", PROMPT.text,
+            reference_data={"fixture_annotation": "synthetic test fixture only"},
+        ),)
     return DirectE1CampaignConfig(
         campaign_id, code_commit, "ME-fixed-v1",
         provider_manifest_json=json.dumps(manifest or PROVIDER_MANIFEST),
+        dataset_snapshot_manifest_json=dataset_snapshot_json(tuple(examples)),
     )
 
 
@@ -114,7 +156,7 @@ def test_direct_campaign_is_resumable_and_preserves_method_executor_accounting(t
         return Method(2 if condition.method_id == "S2" else 1)
 
     runner = DirectE1CampaignRunner(
-        config=campaign_config("campaign-test"),
+        config=campaign_config("campaign-test", examples=examples),
         conditions=conditions, examples=examples,
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -311,7 +353,7 @@ def test_changed_reference_data_cannot_resume_existing_checkpoint(tmp_path: Path
         reference_data={"gold_decomposition": {"steps": ["A", "B"]}},
     )
     first = DirectE1CampaignRunner(
-        config=campaign_config("same-reference-campaign"),
+        config=campaign_config("same-reference-campaign", examples=(first_example,)),
         conditions=(condition,), examples=(first_example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
@@ -323,7 +365,7 @@ def test_changed_reference_data_cannot_resume_existing_checkpoint(tmp_path: Path
         reference_data={"gold_decomposition": {"steps": ["A", "C"]}},
     )
     second = DirectE1CampaignRunner(
-        config=campaign_config("same-reference-campaign"),
+        config=campaign_config("same-reference-campaign", examples=(changed_example,)),
         conditions=(condition,), examples=(changed_example,),
         prompt_factory=lambda _example: PROMPT,
         extraction_factory=lambda _prompt: EXTRACTION,
