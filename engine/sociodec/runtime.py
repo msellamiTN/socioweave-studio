@@ -215,7 +215,7 @@ def run_strategy(
     stages = sorted({step.stage for step in strategy.protocol})
     consensus_stopped_after: int | None = None
     mediation_stopped_after: int | None = None
-    mediation_converged: bool | None = None
+    mediation_converged: bool | None = False if strategy_id == "S11" else None
     mediation_stop_round: int | None = None
     mediation_distance: float | None = None
 
