@@ -86,7 +86,7 @@ def test_freeze_e1_snapshot_rejects_mixed_or_wrong_split(tmp_path):
     sources = _sources(tmp_path)
     path = tmp_path / "BREAK.jsonl"
     _write_fixture(path, "BREAK", EXPECTED_PROMPTS["BREAK"], split="validation")
-    sources["BREAK"] = E1DatasetSource(path, "BREAK-v1", "test")
+    sources["BREAK"] = E1DatasetSource(path, "BREAK-v1", "test", "synthetic test fixture only", "approved")
     with pytest.raises(ValueError, match="differs from declared split"):
         freeze_e1_benchmark_snapshot(sources)
 
