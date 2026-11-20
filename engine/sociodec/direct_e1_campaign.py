@@ -276,8 +276,8 @@ class DirectE1CampaignRunner:
             "executor_id": self.config.executor_id,
             "protocol_profile": self.config.protocol_profile,
             "provider_manifest_hash": self.config.provider_manifest_hash,
-            "conditions": [_condition_key(x) for x in self.conditions],
-            "prompt_snapshot": prompt_snapshot,
+            "conditions": [list(_condition_key(x)) for x in self.conditions],
+            "prompt_snapshot": [list(item) for item in prompt_snapshot],
         })
         manifest_path = target.with_suffix(target.suffix + ".manifest.json")
         if target.exists() and not manifest_path.exists():
