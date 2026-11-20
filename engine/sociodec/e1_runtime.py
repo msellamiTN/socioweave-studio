@@ -153,10 +153,19 @@ class DirectE1Runtime:
                 self.registry.validate_baseline_assignment(condition, condition.method_id)
                 continue
             strategy = StrategyId(condition.method_id)
-            if strategy is StrategyId.S12 and not self.supports_jigsaw_facets:
-                raise ValueError("S12 preflight requires an explicit Jigsaw facet prompt-view factory")
+            prompt_views = None
+            if strategy is StrategyId.S12:
+                if not self.supports_jigsaw_facets:
+                    raise ValueError("S12 preflight requires an explicit Jigsaw facet prompt-view factory")
+                # Structural sentinel views only: the real callback is exercised
+                # with each actual prompt/extraction at method construction time.
+                prompt_views = {
+                    **{f"expert-{i}": f"EXPLICIT_FACET_VIEW_REQUIRED_{i}" for i in range(1, self.n + 1)},
+                    "integrator": "FULL_PROMPT",
+                }
             blueprint = build_strategy_blueprint(
                 strategy, n=self.n, k=self.k, T=self.T,
+                prompt_views=prompt_views,
             )
             agent_ids = tuple(agent.identifier for agent in blueprint.strategy.agents)
             self.registry.resolve_models(condition, agent_ids)
