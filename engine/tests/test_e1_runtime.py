@@ -10,7 +10,36 @@ from sociodec.direct_protocol import DirectProtocolStrategyAdapter
 class FakeProvider:
     def __init__(self, spec): self.model_name = spec.model_id; self.provider_name = "fake"
 
-def spec(name): return ProviderSpec(backend="huggingface-local", model_id=name)
+def spec(name):
+    if name == "m1":
+        return ProviderSpec(
+            backend="openai-compatible", model_id=name,
+            base_url="https://ma.example.invalid/v1", api_key_env="MA_API_KEY",
+            provider_name="provider-a", family_id="MA", provider_org="Provider-A",
+            weight_access="closed-weight", model_revision="ma-revision-2026-11",
+            access_date="2026-11-20",
+        )
+    if name == "m2":
+        return ProviderSpec(
+            backend="huggingface-local", model_id=name,
+            family_id="MB", provider_org="Provider-B", weight_access="open-weight",
+            model_size="small", model_revision="mb-commit-abc123", access_date="2026-11-20",
+        )
+    if name == "m3":
+        return ProviderSpec(
+            backend="huggingface-local", model_id=name,
+            family_id="MC", provider_org="Provider-C", weight_access="open-weight",
+            model_size="large", model_revision="mc-commit-def456", access_date="2026-11-20",
+        )
+    if name == "executor":
+        return ProviderSpec(
+            backend="openai-compatible", model_id=name,
+            base_url="https://me.example.invalid/v1", api_key_env="ME_API_KEY",
+            provider_name="executor-provider", family_id="ME", provider_org="Executor-Provider",
+            weight_access="closed-weight", model_revision="me-revision-2026-11",
+            access_date="2026-11-20",
+        )
+    raise ValueError(name)
 
 def registry():
     assignments = {
@@ -59,6 +88,11 @@ def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
         "coordinator": "m1", "specialist-1": "m1",
         "specialist-2": "m1", "specialist-3": "m1",
     }
+    assert manifest["agent_model_families"] == {
+        "coordinator": "MA", "specialist-1": "MA",
+        "specialist-2": "MA", "specialist-3": "MA",
+    }
+    assert manifest["executor_provenance"]["model_revision"] == "me-revision-2026-11"
 
 def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
@@ -73,3 +107,11 @@ def test_runtime_refuses_to_invent_jigsaw_facets():
     extraction = aggregate_extractions(())
     with pytest.raises(ValueError, match="explicit prompt_view_factory"):
         runtime.build_method(condition("S12"), prompt, extraction)
+
+
+def test_runtime_preflights_debate_judge_family_before_any_provider_call():
+    runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
+    prompt = Prompt("Debate this plan.", Interpretation("Debate this plan"))
+    extraction = aggregate_extractions(())
+    method = runtime.build_method(condition("multi_agent_debate", "heterogeneous"), prompt, extraction)
+    assert isinstance(method, DirectBaselineAdapter)
