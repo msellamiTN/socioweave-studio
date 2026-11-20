@@ -55,8 +55,9 @@ Before a direct E1 runtime is assembled, the registry now requires:
 - immutable 40-character commit revisions for locally loaded Hugging Face
   models, passed to both tokenizer and model loading; the exact API model ID
   must equal its declared revision;
-- at least two distinct families for two-agent strategy rosters and three
-  families for rosters with at least three agents;
+- all three families represented in the complete heterogeneous assignment
+  catalogue, with at least two distinct families in each multi-agent method
+  roster;
 - in heterogeneous mode only, judge-family separation from the authors being
   judged, including the independent judge in the multi-agent-debate baseline.
   The homogeneous condition intentionally assigns MA to all agents, including
