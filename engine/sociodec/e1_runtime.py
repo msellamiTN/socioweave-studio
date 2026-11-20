@@ -24,6 +24,13 @@ from sociodec.catalogue import StrategyId
 class DirectE1Runtime:
     executor: ProviderFixedExecutor
     method_factory: Callable[[E1Condition, Prompt, AggregatedExtraction], DirectMethodAdapter]
+    registry: E1ProviderRegistry
+
+    def assignment_manifest(self, condition: E1Condition, agent_ids: tuple[str, ...]) -> dict[str, object]:
+        """Expose non-secret routing identities for campaign-level freezing."""
+        manifest = self.registry.assignment_manifest(condition, agent_ids)
+        manifest["executor_id"] = self.executor.executor_id
+        return manifest
 
     def build_method(
         self, condition: E1Condition, prompt: Prompt,
@@ -81,4 +88,4 @@ def build_direct_e1_runtime(
             n=n, k=k, T=T,
         )
 
-    return DirectE1Runtime(executor=executor, method_factory=method_factory)
+    return DirectE1Runtime(executor=executor, method_factory=method_factory, registry=registry)
