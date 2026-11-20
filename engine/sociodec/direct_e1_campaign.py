@@ -102,6 +102,19 @@ class DirectE1CampaignConfig:
         }
         if heterogeneous_families != {"MA", "MB", "MC"}:
             raise ValueError("heterogeneous provider manifest must cover MA, MB and MC")
+        for mode, roster in modes.items():
+            for agent_id, assignment in roster.items():
+                family_id = assignment["provenance"]["family_id"]
+                family = families.get(family_id)
+                if not isinstance(family, dict):
+                    raise ValueError(f"provider manifest references unknown family {family_id!r}")
+                if (
+                    assignment["model_id"] != family.get("model_id")
+                    or assignment["backend"] != family.get("backend")
+                    or assignment["provenance"]["model_revision"] != family.get("model_revision")
+                    or assignment["provenance"]["access_date"] != family.get("access_date")
+                ):
+                    raise ValueError(f"provider manifest assignment {mode}/{agent_id} differs from its family catalogue")
         executor = manifest.get("executor")
         if not isinstance(executor, dict) or executor.get("executor_id") != self.executor_id:
             raise ValueError("provider manifest executor identity differs from campaign executor_id")
