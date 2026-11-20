@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 import pytest
 
 from sociodec.extraction import Hypothesis
@@ -638,3 +639,25 @@ def test_s6_counter_plan_receives_original_prompt_and_explicit_negated_assumptio
     assert context.input_content == "output-1"
     assert "do not assume" in context.action_instruction.lower()
     assert "original prompt" in context.action_instruction.lower()
+
+
+def test_runtime_accounting_partitions_model_seeded_and_precomputed_steps():
+    invoker = RecordingInvoker()
+    blueprint = build_strategy_blueprint("S5")
+    steps = list(blueprint.strategy.protocol)
+    steps[3] = replace(steps[3], invokes_model=False)
+    strategy_with_precomputed_judge = replace(blueprint.strategy, protocol=tuple(steps))
+    result = run_strategy(
+        "S5", prompt(), strategy_with_precomputed_judge, invoker,
+        prompt_views=blueprint.prompt_views,
+        seeds={"author": "seeded author draft"},
+        precomputed_outputs={"step:3": "precomputed judge decision"},
+    )
+    assert result.protocol_steps == 4
+    assert result.model_invocations == 2
+    assert result.seeded_steps == 1
+    assert result.precomputed_steps == 1
+    assert result.skipped_steps == 0
+    assert result.skipped_stages == 0
+    assert result.calls_made == 2
+    assert result.accounting_reconciles
