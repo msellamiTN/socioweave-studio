@@ -57,8 +57,10 @@ Before a direct E1 runtime is assembled, the registry now requires:
   must equal its declared revision;
 - at least two distinct families for two-agent strategy rosters and three
   families for rosters with at least three agents;
-- judge-family separation from the authors being judged, including the
-  independent judge in the multi-agent-debate baseline.
+- in heterogeneous mode only, judge-family separation from the authors being
+  judged, including the independent judge in the multi-agent-debate baseline.
+  The homogeneous condition intentionally assigns MA to all agents, including
+  judges.
 
 The registry records exact family/provider/revision/access-date metadata in
 its non-secret assignment manifest. These checks establish consistency of
