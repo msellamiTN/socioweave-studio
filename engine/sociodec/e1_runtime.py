@@ -58,6 +58,8 @@ def build_direct_e1_runtime(
     """
     if not executor_id.strip():
         raise ValueError("executor_id must be non-empty")
+    registry.validate_complete_roster()
+    registry.validate_family_catalogue()
     executor = ProviderFixedExecutor(
         registry.executor_provider(), executor_id=executor_id,
         max_new_tokens=max_executor_tokens,
