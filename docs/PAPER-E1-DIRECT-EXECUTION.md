@@ -124,8 +124,8 @@ review is still required before any real campaign is frozen or run.
 
 ## S6 and S11 decision-semantics safeguards
 
-The direct runtime now exposes an explicit `action_instruction` to the protocol
-invoker for S6's `counter-plan` action. It preserves the original prompt as the
+The direct runtime now exposes and serializes an explicit `action_instruction`
+in the provider request payload for S6's `counter-plan` action. It preserves the original prompt as the
 authoritative problem statement while treating D1 as the proposal to challenge,
 not as binding assumptions. The S6 runtime regression test verifies that the
 counter-planner receives both the original prompt and D1 as distinct context

@@ -69,3 +69,32 @@ def test_invoker_rejects_empty_provider_completion():
         invoker.invoke(Agent("a1", "fake-model", "analyst"), 
                        ProtocolStep("a1", Action.DRAFT, "prompt", 1, 1, True),
                        _context())
+
+
+def test_provider_serializes_explicit_counter_plan_instruction():
+    import json
+
+    provider = FakeProvider()
+    invoker = ProviderProtocolInvoker(provider)
+    agent = Agent("decomposer-2", "fake-model", "counter-planner")
+    step = ProtocolStep("decomposer-2", Action.COUNTER_PLAN, "step:0", 1, 2, True)
+    context = ProtocolContext(
+        prompt_view="Original problem P",
+        agent_context="counter-planner",
+        agent_id="decomposer-2",
+        role=Role.DECOMPOSER,
+        action="counter-plan",
+        input_ref="step:0",
+        input_content="First draft D1",
+        hypotheses=(),
+        visible_history=(),
+        action_instruction=(
+            "Treat D1 as a proposal to challenge; do not assume its assumptions. "
+            "Keep original prompt P authoritative."
+        ),
+    )
+    invoker.invoke(agent, step, context)
+    payload = json.loads(provider.requests[0][0][1].content)
+    assert payload["prompt_view"] == "Original problem P"
+    assert payload["input_content"] == "First draft D1"
+    assert payload["action_instruction"] == context.action_instruction
