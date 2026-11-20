@@ -102,6 +102,18 @@ def test_runtime_builds_separate_shared_executor_and_baseline_adapter():
     }
     assert manifest["executor_provenance"]["model_revision"] == "executor"
 
+def test_runtime_exports_full_non_secret_campaign_model_manifest():
+    runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
+    manifest = runtime.campaign_manifest()
+    assert manifest["schema_version"] == "e1-provider-manifest-v1"
+    assert set(manifest["model_modes"]) == {"homogeneous", "heterogeneous"}
+    assert set(manifest["model_family_catalogue"]) == {"MA", "MB", "MC"}
+    assert manifest["executor"]["executor_id"] == "executor-fixed"
+    assert manifest["executor"]["provenance"]["model_revision"] == "executor"
+    assert "api_key" not in str(manifest).lower()
+    assert "secret" not in str(manifest).lower()
+
+
 def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
     prompt = Prompt("Make a plan.", Interpretation("Make a plan"))
