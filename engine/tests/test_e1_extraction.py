@@ -145,7 +145,7 @@ def test_e1_audit_sample_is_deterministic_and_content_addressed():
     ]
     changed = copy.deepcopy(first)
     changed["audit_tasks"][0]["status"] = "audited"
-    with pytest.raises(ValueError, match="content hash"):
+    with pytest.raises(ValueError, match="SHA-256"):
         validate_e1_extraction_bundle(changed, snapshot=snapshot, require_human_audit=False)
 
 
@@ -182,7 +182,7 @@ def test_e1_extraction_bundle_rejects_wrong_snapshot_and_tampered_union():
     snapshot, bundle = _build()
     changed = copy.deepcopy(bundle)
     changed["union_items"][0]["statement"] = "tampered"
-    with pytest.raises(ValueError, match="content hash"):
+    with pytest.raises(ValueError, match="SHA-256"):
         validate_e1_extraction_bundle(changed, snapshot=snapshot, require_human_audit=False)
     other = _snapshot()
     with pytest.raises(ValueError, match="different frozen dataset"):
