@@ -59,11 +59,11 @@ def _results(snapshot):
         values = []
         for i in range(1, 4):
             requirement = Requirement(
-                statement=f"Provide service step {i}", type=RequirementType.deliverable,
+                statement=f"Provide service step {i}", type=RequirementType("deliverable"),
                 domain="service", source_span=SourceSpan(0, 7), entity_names=(),
             )
             hypothesis = Hypothesis(
-                statement=f"Implicit condition {i}", type=RequirementType.constraint,
+                statement=f"Implicit condition {i}", type=RequirementType("constraint"),
                 domain="service", rationale="synthetic fixture", entity_names=(),
             )
             values.append(ExtractionResult(
