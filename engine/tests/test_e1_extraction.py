@@ -178,6 +178,30 @@ def test_completed_human_audit_is_bound_to_bundle_and_validates():
     validate_e1_extraction_bundle(completed, snapshot=snapshot, require_human_audit=True)
 
 
+
+def test_e1_validator_rejects_union_tampering_even_when_all_hashes_are_recomputed():
+    snapshot, bundle = _build()
+    forged = copy.deepcopy(bundle)
+    sampled = {item["item_id"] for item in forged["audit_tasks"]}
+    target = next(item for item in forged["union_items"] if item["item_id"] not in sampled)
+    target["statement"] = "forged statement with recomputed hashes"
+    target["item_sha256"] = content_hash({"forged": target["statement"]})
+    for record in forged["records"]:
+        prompt_items = [
+            item for item in forged["union_items"]
+            if item["dataset"] == record["dataset"]
+            and item["example_id"] == record["example_id"]
+        ]
+        record["union_sha256"] = content_hash(prompt_items)
+    forged["bundle_sha256"] = content_hash({
+        key: value for key, value in forged.items() if key != "bundle_sha256"
+    })
+    with pytest.raises(ValueError, match="not the exact re-aggregation"):
+        validate_e1_extraction_bundle(
+            forged, snapshot=snapshot, require_human_audit=False,
+        )
+
+
 def test_e1_extraction_bundle_rejects_wrong_snapshot_and_tampered_union():
     snapshot, bundle = _build()
     changed = copy.deepcopy(bundle)
