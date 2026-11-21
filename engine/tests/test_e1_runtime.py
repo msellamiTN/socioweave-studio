@@ -60,6 +60,6 @@ def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
 def test_runtime_refuses_to_invent_jigsaw_facets():
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
     prompt = Prompt("Make a plan.", Interpretation("Make a plan"))
-    extraction = AggregatedExtraction((), ())
+    extraction = aggregate_extractions(())
     with pytest.raises(ValueError, match="explicit prompt_view_factory"):
         runtime.build_method(condition("S12"), prompt, extraction)
