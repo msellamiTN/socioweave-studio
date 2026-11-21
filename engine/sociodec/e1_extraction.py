@@ -14,6 +14,7 @@ import math
 import re
 import unicodedata
 from datetime import datetime
+from dataclasses import asdict, is_dataclass
 from enum import Enum
 from typing import Mapping, Sequence
 
@@ -28,8 +29,8 @@ AUDIT_DECISIONS = {"correct", "incorrect", "incomplete", "ambiguous"}
 def _jsonable(value: object) -> object:
     if isinstance(value, Enum):
         return value.value
-    if hasattr(value, "__dataclass_fields__"):
-        return {key: _jsonable(item) for key, item in vars(value).items()}
+    if is_dataclass(value):
+        return _jsonable(asdict(value))
     if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
@@ -305,9 +306,36 @@ def validate_e1_extraction_bundle(
     task_ids = [item.get("item_id") for item in tasks]
     if len(task_ids) != len(set(task_ids)) or not set(task_ids) <= set(union_ids):
         raise ValueError("E1 audit tasks contain duplicate or out-of-union item IDs")
+    seed = bundle.get("operational_protocol", {}).get("audit_seed")
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise ValueError("E1 extraction bundle audit seed is invalid")
+    expected_sample = [
+        item["item_id"] for item in sorted(
+            union,
+            key=lambda item: (
+                hashlib.sha256(f"{seed}\\0{item['item_id']}".encode("utf-8")).hexdigest(),
+                item["item_id"],
+            ),
+        )[:task_count]
+    ]
+    if task_ids != expected_sample:
+        raise ValueError("E1 audit tasks differ from the deterministic frozen sample")
     if require_human_audit:
         if bundle.get("audit_status") != "complete" or any(item.get("status") != "audited" for item in tasks):
             raise ValueError("E1 human audit is incomplete; pending audit tasks cannot pass campaign validation")
         decisions = bundle.get("audit_decisions")
         if not isinstance(decisions, list) or {item.get("item_id") for item in decisions} != set(task_ids):
             raise ValueError("E1 human audit decisions do not cover the frozen sample")
+        decision_by_id = {item["item_id"]: item for item in decisions}
+        for task in tasks:
+            decision = decision_by_id[task["item_id"]]
+            if task.get("status") != "audited" or any(
+                task.get(field) != decision.get(field)
+                for field in ("decision", "reviewer_id", "rationale", "reviewed_at")
+            ):
+                raise ValueError("E1 audit task and recorded human decision differ")
+            if decision.get("decision") not in AUDIT_DECISIONS or not all(
+                isinstance(decision.get(field), str) and decision[field].strip()
+                for field in ("reviewer_id", "rationale", "reviewed_at")
+            ):
+                raise ValueError("E1 human audit decision is incomplete or invalid")
