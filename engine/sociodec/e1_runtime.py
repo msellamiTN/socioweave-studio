@@ -6,7 +6,7 @@ interpret benchmark prompts, or launch a campaign.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Callable, Mapping
 
 from sociodec.direct_baselines import DirectBaselineAdapter
 from sociodec.direct_e1 import DirectMethodAdapter
@@ -20,10 +20,13 @@ from sociodec.strategy_decoding import DecisionAdjudication
 from sociodec.catalogue import StrategyId
 
 
+MethodFactory = Callable[[E1Condition, Prompt, AggregatedExtraction], DirectMethodAdapter]
+
+
 @dataclass(frozen=True, slots=True)
 class DirectE1Runtime:
     executor: ProviderFixedExecutor
-    method_factory: object
+    method_factory: MethodFactory
 
     def build_method(
         self, condition: E1Condition, prompt: Prompt,
