@@ -19,7 +19,11 @@ from enum import Enum
 from typing import Mapping, Sequence
 
 from sociodec.datasets import E1FrozenSnapshot
-from sociodec.extraction import AggregatedExtraction, ExtractionResult, aggregate_extractions
+from sociodec.extraction import (
+    AggregatedExtraction, AmbiguityFlag, ConflictPair, ExtractionResult,
+    Hypothesis, aggregate_extractions,
+)
+from sociodec.models.prompt import Entity, Requirement, RequirementType, SourceSpan
 from sociodec.experiments import content_hash
 
 E1_EXTRACTION_SCHEMA = "e1-extraction-audit-bundle-v1"
@@ -67,6 +71,66 @@ def _extractor_output(result: ExtractionResult) -> dict[str, object]:
         if result.raw_response is not None else None
     )
     return payload
+
+
+
+def _restore_extraction_result(
+    payload: Mapping[str, object], *, prompt_text: str, expected_extractor_id: str,
+) -> ExtractionResult:
+    """Rebuild a typed extractor result from its frozen JSON-compatible payload."""
+    try:
+        if payload.get("extractor_id") != expected_extractor_id:
+            raise ValueError("extractor identity differs from the frozen roster")
+        requirements = tuple(
+            Requirement(
+                statement=item["statement"],
+                type=RequirementType(item["type"]),
+                domain=item["domain"],
+                source_span=(
+                    SourceSpan(**item["source_span"])
+                    if item.get("source_span") is not None else None
+                ),
+                entity_names=tuple(item.get("entity_names", ())),
+            )
+            for item in payload["requirements"]
+        )
+        for requirement in requirements:
+            requirement.validate_against(prompt_text)
+        hypotheses = tuple(
+            Hypothesis(
+                statement=item["statement"], type=RequirementType(item["type"]),
+                domain=item["domain"], rationale=item.get("rationale", ""),
+                entity_names=tuple(item.get("entity_names", ())),
+            )
+            for item in payload["hypotheses"]
+        )
+        entities = tuple(
+            Entity(name=item["name"], description=item.get("description"))
+            for item in payload["entities"]
+        )
+        ambiguities = tuple(
+            AmbiguityFlag(
+                subject=item["subject"], readings=tuple(item["readings"]),
+                explanation=item.get("explanation", ""),
+            )
+            for item in payload["ambiguities"]
+        )
+        conflicts = tuple(
+            ConflictPair(
+                left=item["left"], right=item["right"],
+                explanation=item.get("explanation", ""),
+            )
+            for item in payload["conflicts"]
+        )
+        return ExtractionResult(
+            requirements=requirements, hypotheses=hypotheses, entities=entities,
+            ambiguities=ambiguities, conflicts=conflicts,
+            extractor_id=expected_extractor_id,
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"invalid frozen typed extraction output for {expected_extractor_id}: {exc}"
+        ) from exc
 
 
 def _union_items(dataset: str, example_id: str, aggregate: AggregatedExtraction) -> list[dict[str, object]]:
@@ -318,18 +382,37 @@ def validate_e1_extraction_bundle(
     union_ids = [item.get("item_id") for item in union]
     if len(union_ids) != len(set(union_ids)):
         raise ValueError("E1 extraction union item IDs are not unique")
-    union_by_id = {item["item_id"]: item for item in union}
     record_by_key = {(item["dataset"], item["example_id"]): item for item in records}
     if set(record_by_key) != set(expected):
         raise ValueError("E1 extraction records do not cover the exact frozen prompt set")
-    for key, record in record_by_key.items():
-        prompt_union = [
-            item for item in union
-            if item.get("dataset") == key[0] and item.get("example_id") == key[1]
-        ]
-        prompt_ids = [item["item_id"] for item in prompt_union]
-        if record.get("union_item_ids") != prompt_ids or record.get("union_sha256") != content_hash(prompt_union):
+
+    # Recompute the aggregate from typed extractor outputs. Hashes alone only
+    # detect mutation when hashes are not recomputed; this checks derivation.
+    reconstructed_union: list[dict[str, object]] = []
+    roster_ids = [item["extractor_id"] for item in roster]
+    for example in snapshot.examples:
+        key = (example.dataset, example.example_id)
+        record = record_by_key[key]
+        outputs_by_id = {item.get("extractor_id"): item for item in record["extractor_outputs"]}
+        if set(outputs_by_id) != set(roster_ids):
+            raise ValueError(f"extractor output identities differ from roster: {key}")
+        restored = tuple(
+            _restore_extraction_result(
+                outputs_by_id[extractor_id], prompt_text=example.prompt_text,
+                expected_extractor_id=extractor_id,
+            )
+            for extractor_id in roster_ids
+        )
+        aggregate = aggregate_extractions(restored)
+        expected_prompt_union = _union_items(example.dataset, example.example_id, aggregate)
+        prompt_ids = [item["item_id"] for item in expected_prompt_union]
+        if record.get("union_item_ids") != prompt_ids:
+            raise ValueError(f"E1 union is not derivable from typed extractor outputs: {key}")
+        if record.get("union_sha256") != content_hash(expected_prompt_union):
             raise ValueError(f"E1 per-prompt union fingerprint mismatch: {key}")
+        reconstructed_union.extend(expected_prompt_union)
+    if union != reconstructed_union:
+        raise ValueError("E1 campaign union is not the exact re-aggregation of its frozen typed extractor outputs")
     task_count = math.ceil(0.20 * len(union))
     if bundle.get("audit_item_count") != task_count:
         raise ValueError("E1 human audit sample is not 20% of the frozen extraction union under the declared ceil rule")
