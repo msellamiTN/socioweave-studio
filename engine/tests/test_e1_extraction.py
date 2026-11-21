@@ -185,5 +185,11 @@ def test_e1_extraction_bundle_rejects_wrong_snapshot_and_tampered_union():
     with pytest.raises(ValueError, match="SHA-256"):
         validate_e1_extraction_bundle(changed, snapshot=snapshot, require_human_audit=False)
     other = _snapshot()
+    other_manifest = copy.deepcopy(other.manifest)
+    other_manifest["datasets"]["smart-administration"]["source_sha256"] = "0" * 64
+    other_manifest["snapshot_sha256"] = content_hash({"datasets": other_manifest["datasets"]})
+    other = E1FrozenSnapshot(
+        other.examples, other.dataset_ids, other_manifest,
+    )
     with pytest.raises(ValueError, match="different frozen dataset"):
         validate_e1_extraction_bundle(bundle, snapshot=other, require_human_audit=False)
