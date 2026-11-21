@@ -270,8 +270,18 @@ def validate_e1_extraction_bundle(
     if protocol != {"extractor_count": 3, "aggregation": "union", "human_audit_fraction": 0.20}:
         raise ValueError("E1 extraction protocol must declare q=3, union and 20% human audit")
     roster = bundle.get("extractor_roster")
+    required_roster_fields = {"extractor_id", "provider_org", "model_id", "model_revision", "config_sha256"}
     if not isinstance(roster, list) or len(roster) != 3 or len({item.get("extractor_id") for item in roster}) != 3:
         raise ValueError("E1 extraction bundle must contain three unique extractor identities")
+    for entry in roster:
+        if set(entry) != required_roster_fields or any(
+            not isinstance(entry.get(field), str) or not entry[field].strip()
+            for field in required_roster_fields
+        ):
+            raise ValueError("E1 extractor roster provenance is incomplete")
+        digest = entry["config_sha256"]
+        if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+            raise ValueError("E1 extractor configuration hash is invalid")
     expected = {(item.dataset, item.example_id): item for item in snapshot.examples}
     records = bundle.get("records")
     if not isinstance(records, list) or len(records) != len(expected):
@@ -289,6 +299,17 @@ def validate_e1_extraction_bundle(
             raise ValueError(f"E1 extraction record must contain three extractor outputs: {key}")
         if {item.get("extractor_id") for item in outputs} != {item["extractor_id"] for item in roster}:
             raise ValueError(f"E1 extraction record has a missing or unexpected extractor: {key}")
+        for output in outputs:
+            typed_payload = {field: value for field, value in output.items()
+                             if field not in {"typed_output_sha256", "raw_response_sha256"}}
+            if output.get("typed_output_sha256") != content_hash(typed_payload):
+                raise ValueError(f"E1 typed extractor output hash mismatch: {key}/{output.get('extractor_id')}")
+            raw_hash = output.get("raw_response_sha256")
+            if raw_hash is not None and (
+                not isinstance(raw_hash, str) or len(raw_hash) != 64
+                or any(char not in "0123456789abcdef" for char in raw_hash)
+            ):
+                raise ValueError(f"E1 raw extractor response hash is invalid: {key}/{output.get('extractor_id')}")
         if len(record.get("union_item_ids", [])) != len(set(record.get("union_item_ids", []))):
             raise ValueError(f"E1 extraction union contains duplicate item IDs: {key}")
     union = bundle.get("union_items")
@@ -297,6 +318,18 @@ def validate_e1_extraction_bundle(
     union_ids = [item.get("item_id") for item in union]
     if len(union_ids) != len(set(union_ids)):
         raise ValueError("E1 extraction union item IDs are not unique")
+    union_by_id = {item["item_id"]: item for item in union}
+    record_by_key = {(item["dataset"], item["example_id"]): item for item in records}
+    if set(record_by_key) != set(expected):
+        raise ValueError("E1 extraction records do not cover the exact frozen prompt set")
+    for key, record in record_by_key.items():
+        prompt_union = [
+            item for item in union
+            if item.get("dataset") == key[0] and item.get("example_id") == key[1]
+        ]
+        prompt_ids = [item["item_id"] for item in prompt_union]
+        if record.get("union_item_ids") != prompt_ids or record.get("union_sha256") != content_hash(prompt_union):
+            raise ValueError(f"E1 per-prompt union fingerprint mismatch: {key}")
     task_count = math.ceil(0.20 * len(union))
     if bundle.get("audit_item_count") != task_count:
         raise ValueError("E1 human audit sample is not 20% of the frozen extraction union under the declared ceil rule")
@@ -320,6 +353,13 @@ def validate_e1_extraction_bundle(
     ]
     if task_ids != expected_sample:
         raise ValueError("E1 audit tasks differ from the deterministic frozen sample")
+    for task in tasks:
+        source = union_by_id[task["item_id"]]
+        if any(task.get(field) != source.get(field) for field in (
+            "item_id", "dataset", "example_id", "kind", "statement",
+            "item_sha256", "extractor_sources",
+        )):
+            raise ValueError("E1 audit task differs from its frozen union item")
     if require_human_audit:
         if bundle.get("audit_status") != "complete" or any(item.get("status") != "audited" for item in tasks):
             raise ValueError("E1 human audit is incomplete; pending audit tasks cannot pass campaign validation")
