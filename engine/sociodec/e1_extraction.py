@@ -346,7 +346,7 @@ def validate_e1_extraction_bundle(
         item["item_id"] for item in sorted(
             union,
             key=lambda item: (
-                hashlib.sha256(f"{seed}\\0{item['item_id']}".encode("utf-8")).hexdigest(),
+                hashlib.sha256(f"{seed}\0{item['item_id']}".encode("utf-8")).hexdigest(),
                 item["item_id"],
             ),
         )[:task_count]
@@ -379,3 +379,9 @@ def validate_e1_extraction_bundle(
                 for field in ("reviewer_id", "rationale", "reviewed_at")
             ):
                 raise ValueError("E1 human audit decision is incomplete or invalid")
+            try:
+                reviewed_at = datetime.fromisoformat(decision["reviewed_at"].replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError("E1 human audit timestamp is not ISO-8601") from exc
+            if reviewed_at.tzinfo is None or reviewed_at.utcoffset() is None:
+                raise ValueError("E1 human audit timestamp must include a timezone offset")
