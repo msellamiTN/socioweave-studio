@@ -380,6 +380,7 @@ def validate_e1_extraction_bundle(
     if not isinstance(union, list) or len(union) != bundle.get("union_item_count"):
         raise ValueError("E1 extraction union item count is inconsistent")
     union_ids = [item.get("item_id") for item in union]
+    union_by_id = {item["item_id"]: item for item in union}
     if len(union_ids) != len(set(union_ids)):
         raise ValueError("E1 extraction union item IDs are not unique")
     record_by_key = {(item["dataset"], item["example_id"]): item for item in records}
