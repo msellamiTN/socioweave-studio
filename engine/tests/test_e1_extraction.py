@@ -196,7 +196,7 @@ def test_e1_validator_rejects_union_tampering_even_when_all_hashes_are_recompute
     forged["bundle_sha256"] = content_hash({
         key: value for key, value in forged.items() if key != "bundle_sha256"
     })
-    with pytest.raises(ValueError, match="not the exact re-aggregation"):
+    with pytest.raises(ValueError, match="union"):
         validate_e1_extraction_bundle(
             forged, snapshot=snapshot, require_human_audit=False,
         )
@@ -213,7 +213,7 @@ def test_e1_extraction_bundle_rejects_wrong_snapshot_and_tampered_union():
     other_manifest["datasets"]["smart-administration"]["source_sha256"] = "0" * 64
     other_manifest["snapshot_sha256"] = content_hash({"datasets": other_manifest["datasets"]})
     other = E1FrozenSnapshot(
-        other.examples, other.dataset_ids, other_manifest,
+        other.examples, other.expected_prompt_ids, other_manifest,
     )
     with pytest.raises(ValueError, match="different frozen dataset"):
         validate_e1_extraction_bundle(bundle, snapshot=other, require_human_audit=False)
