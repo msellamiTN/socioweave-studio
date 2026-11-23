@@ -159,3 +159,41 @@ def test_composition_requires_explicit_composition_executor():
             PlanItem.C8_BRAINSTORM_THEN_REVIEW, _prompt(), _extraction(),
             (decomposition, decomposition), None, 20,
         )
+
+
+@pytest.mark.parametrize("item", [PlanItem.S1, PlanItem.S12])
+def test_partitioned_adapter_rejects_missing_prompt_view_factory(item):
+    decomposition = _decomposition()
+    invoker = EchoInvoker()
+    adapter = ConcreteStrategyAdapter(invoker, lambda sid, run: None)
+    with pytest.raises(ValueError, match="explicit prompt_view_factory"):
+        adapter(item, _prompt(), _extraction(),
+                (decomposition, decomposition), None, 20)
+    assert invoker.calls == []
+
+
+@pytest.mark.parametrize("sid,restricted", [
+    (StrategyId.S1, ("specialist-1", "specialist-2", "specialist-3")),
+    (StrategyId.S12, ("expert-1", "expert-2", "expert-3")),
+])
+def test_partitioned_adapter_rejects_full_prompt_for_restricted_agents(sid, restricted):
+    decomposition = _decomposition()
+    prompt = _prompt()
+
+    def views(strategy_id, source_prompt, extraction, agent_ids):
+        result = {agent_id: f"restricted:{agent_id}" for agent_id in agent_ids}
+        if sid is StrategyId.S1:
+            result["coordinator"] = source_prompt.text
+        else:
+            result["integrator"] = source_prompt.text
+        result[restricted[0]] = source_prompt.text
+        return result
+
+    adapter = ConcreteStrategyAdapter(
+        EchoInvoker(), lambda strategy_id, run: None,
+        prompt_view_factory=views,
+    )
+    item = PlanItem.S1 if sid is StrategyId.S1 else PlanItem.S12
+    with pytest.raises(ValueError, match="must not equal the full prompt"):
+        adapter(item, prompt, _extraction(),
+                (decomposition, decomposition), None, 20)
