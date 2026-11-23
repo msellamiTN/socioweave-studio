@@ -227,3 +227,13 @@ def test_snapshot_rejects_eligible_population_smaller_than_selected_count(tmp_pa
     )
     with pytest.raises(ValueError, match="cannot be smaller"):
         freeze_e1_benchmark_snapshot(sources)
+
+
+def test_jsonl_loader_rejects_missing_split_instead_of_defaulting_to_test(tmp_path):
+    path = tmp_path / "missing-split.jsonl"
+    path.write_text(json.dumps({
+        "example_id": "q1", "prompt_text": "Do task",
+        "reference_data": {"gold_steps": ["step one"]},
+    }) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="split must be explicitly present"):
+        load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
