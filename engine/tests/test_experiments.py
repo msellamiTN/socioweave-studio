@@ -122,3 +122,19 @@ def test_campaign_manifest_rejects_invalid_digests():
     from sociodec.experiments import CampaignManifest
     with pytest.raises(ValueError, match="SHA-256"):
         CampaignManifest("bad", "0" * 64, "commit", "3.11", "1" * 64)
+
+
+def test_benchmark_prompt_preserves_typed_metadata_and_hashes_types():
+    numeric = example(metadata={"number_constraints": 4, "ambiguity": 0.25, "conflict": False})
+    textual = example(metadata={"number_constraints": "4", "ambiguity": "0.25", "conflict": "false"})
+    assert numeric.metadata["number_constraints"] == 4
+    assert type(numeric.metadata["number_constraints"]) is int
+    assert numeric.metadata["ambiguity"] == 0.25
+    assert numeric.metadata["conflict"] is False
+    assert numeric.prompt_hash != textual.prompt_hash
+
+
+@pytest.mark.parametrize("value", [None, [], {}, float("nan"), float("inf"), float("-inf")])
+def test_benchmark_prompt_rejects_non_scalar_or_non_finite_metadata(value):
+    with pytest.raises(ValueError, match="metadata"):
+        example(metadata={"tag": value})

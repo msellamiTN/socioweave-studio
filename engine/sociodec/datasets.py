@@ -212,7 +212,7 @@ def load_jsonl_dataset(
                     prompt_text=prompt_text,
                     split=split,
                     source_version=source_version,
-                    metadata={k: str(v) for k, v in metadata.items()},
+                    metadata=metadata,
                     reference_data=reference_data,
                 ))
             except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
