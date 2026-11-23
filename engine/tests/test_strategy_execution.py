@@ -9,7 +9,7 @@ from sociodec.strategy_execution import (
 )
 
 
-def make_strategy(*, second_stage_ref="output:r1:s1:expert-a:draft"):
+def make_strategy(*, second_stage_ref="output:r1:s1:expert-a:draft", anonymous=False):
     agents = (
         Agent("expert-a", "small-model", "independent specialist"),
         Agent("expert-b", "small-model", "independent specialist"),
@@ -37,7 +37,7 @@ def make_strategy(*, second_stage_ref="output:r1:s1:expert-a:draft"):
     )
     return SocialStrategy(
         agents, roles, assignments, visibility, protocol,
-        DecisionRule.UNION, rounds=1,
+        DecisionRule.UNION, rounds=1, anonymous=anonymous,
     )
 
 
@@ -132,3 +132,33 @@ def test_empty_output_is_rejected():
     strategy = make_strategy()
     with pytest.raises(StrategyExecutionError, match="non-empty"):
         execute_strategy(strategy, "Prompt", model_executor=lambda _: " ")
+
+
+
+def test_anonymous_strategy_hides_agent_and_output_identities_from_executor():
+    strategy = make_strategy(anonymous=True)
+    contexts = []
+
+    def executor(context):
+        contexts.append(context)
+        return f"output-{len(contexts)}"
+
+    result = execute_strategy(strategy, "Build a service", model_executor=executor)
+    integrator_context = contexts[-1]
+
+    assert integrator_context.step.agent_id == "agent-3"
+    assert integrator_context.step.input_ref == "output:r1:s1:o1"
+    assert set(integrator_context.visible_outputs) == {
+        "r1:s1:o1", "r1:s1:o2",
+    }
+    assert integrator_context.visible_author_ids == frozenset({
+        "agent-1", "agent-2", "agent-3",
+    })
+    for context in contexts:
+        assert "expert-a" not in repr(context)
+        assert "expert-b" not in repr(context)
+        assert "integrator" not in repr(context)
+
+    # The audit trace retains real identities, but they were not exposed above.
+    assert result.records[-1].agent_id == "integrator"
+    assert result.records[0].output_id == "r1:s1:expert-a:draft"
