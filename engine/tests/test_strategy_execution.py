@@ -37,7 +37,7 @@ def make_strategy(*, second_stage_ref="output:r1:s1:expert-a:draft", anonymous=F
     )
     return SocialStrategy(
         agents, roles, assignments, visibility, protocol,
-        DecisionRule.UNION, rounds=1,
+        DecisionRule.UNION, rounds=1, anonymous=anonymous,
     )
 
 
