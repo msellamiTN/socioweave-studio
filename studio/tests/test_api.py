@@ -1,0 +1,69 @@
+from fastapi.testclient import TestClient
+
+from socioweave_studio.api.app import app
+
+client = TestClient(app)
+
+
+def test_health_and_capabilities_keep_execution_disabled():
+    assert client.get("/api/v1/health").json()["status"] == "ok"
+    capabilities = client.get("/api/v1/capabilities").json()
+    assert capabilities["configuration_preview"] is True
+    assert capabilities["full_e1_preflight"] is False
+    assert capabilities["run_launch"] is False
+    assert capabilities["provider_execution"] is False
+
+
+def test_dataset_catalogue_exposes_exact_registered_counts():
+    response = client.get("/api/v1/datasets")
+    assert response.status_code == 200
+    rows = response.json()["datasets"]
+    assert {row["id"]: row["expected_prompts"] for row in rows} == {
+        "BREAK": 100,
+        "StrategyQA": 100,
+        "TaskBench": 100,
+        "TravelPlanner": 100,
+        "smart-administration": 60,
+    }
+
+
+def test_config_preview_uses_engine_call_formula_and_never_launches():
+    response = client.post("/api/v1/config-previews", json={
+        "strategy_id": "S1",
+        "datasets": ["BREAK"],
+        "model_mode": "homogeneous",
+        "n": 3,
+        "k": 3,
+        "T": 2,
+        "seed_indices": [0, 1],
+    })
+    assert response.status_code == 200
+    result = response.json()
+    assert result["expected_prompt_count"] == 100
+    assert result["condition_count"] == 2
+    assert result["estimated_method_calls"] == result["method_calls_per_prompt"] * 200
+    assert result["fixed_executor_calls"] is None
+    assert result["live_provider_calls"] == 0
+    assert result["run_launch_enabled"] is False
+
+
+def test_config_preview_rejects_unknown_strategy_duplicate_and_invalid_seed():
+    base = {
+        "strategy_id": "S1",
+        "datasets": ["BREAK"],
+        "model_mode": "homogeneous",
+        "seed_indices": [0],
+    }
+    assert client.post("/api/v1/config-previews", json={**base, "strategy_id": "invented"}).status_code == 422
+    assert client.post("/api/v1/config-previews", json={**base, "datasets": ["BREAK", "BREAK"]}).status_code == 422
+    assert client.post("/api/v1/config-previews", json={**base, "seed_indices": [5]}).status_code == 422
+
+
+def test_config_preview_rejects_extra_fields():
+    response = client.post("/api/v1/config-previews", json={
+        "strategy_id": "S1",
+        "datasets": ["BREAK"],
+        "model_mode": "homogeneous",
+        "run_shell": "echo unsafe",
+    })
+    assert response.status_code == 422
