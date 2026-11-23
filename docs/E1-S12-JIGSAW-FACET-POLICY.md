@@ -69,3 +69,19 @@ The canonical policy manifest and hash are available from:
 - Studio API: `GET /api/v1/jigsaw/policy`
 
 No model/provider calls are made when the policy manifest is read or when facet views are constructed.
+
+
+## 7. Campaign checkpoint binding
+
+`DirectE1Runtime.campaign_manifest()` now includes a
+`runtime_policy.jigsaw` object with this policy ID and SHA-256.
+`DirectE1CampaignConfig` requires that versioned policy identity and
+canonicalizes it into `provider_manifest_json`. The campaign configuration
+hash therefore changes if the Jigsaw policy changes, preventing a resumable
+campaign from silently mixing rows produced under different facet mappings.
+
+The Studio full campaign preflight exports this policy-bound
+`runtime_campaign_manifest` and its SHA-256. Use that exported manifest when
+constructing `DirectE1CampaignConfig`; the input to the Studio preflight
+remains the canonical provider registry manifest, which does not yet include
+runtime-policy metadata.
