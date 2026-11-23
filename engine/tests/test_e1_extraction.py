@@ -217,3 +217,17 @@ def test_e1_extraction_bundle_rejects_wrong_snapshot_and_tampered_union():
     )
     with pytest.raises(ValueError, match="different frozen dataset"):
         validate_e1_extraction_bundle(bundle, snapshot=other, require_human_audit=False)
+
+
+def test_completed_bundle_restores_typed_aggregates_without_provider_calls():
+    from sociodec.e1_extraction import load_e1_extraction_aggregates
+
+    snapshot, bundle = _build()
+    completed = _complete(bundle)
+    restored = load_e1_extraction_aggregates(completed, snapshot=snapshot)
+    assert set(restored) == {(item.dataset, item.example_id) for item in snapshot.examples}
+    for aggregate in restored.values():
+        assert len(aggregate.requirements) == 3
+        assert len(aggregate.hypotheses) == 3
+        assert len(aggregate.ambiguities) == 3
+        assert len(aggregate.conflicts) == 3
