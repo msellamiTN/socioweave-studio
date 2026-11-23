@@ -120,7 +120,7 @@ def _decomposition_payload(text: str) -> dict[str, Any]:
             lines = lines[1:]
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
-        candidate = "\\n".join(lines).strip()
+        candidate = "\n".join(lines).strip()
     value = json.loads(candidate)
     if not isinstance(value, dict):
         raise ValueError("decomposition response root must be a JSON object")
