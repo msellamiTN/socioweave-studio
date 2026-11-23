@@ -67,3 +67,21 @@ def test_config_preview_rejects_extra_fields():
         "run_shell": "echo unsafe",
     })
     assert response.status_code == 422
+
+
+def test_strategy_catalogue_is_served_from_engine_definitions():
+    response = client.get("/api/v1/strategies")
+    assert response.status_code == 200
+    rows = response.json()["strategies"]
+    assert len(rows) == 13
+    assert {row["id"] for row in rows} >= {"S1", "S12", "S10"}
+    assert next(row for row in rows if row["id"] == "S1")["call_formula"] == "n+2"
+
+
+def test_operator_web_interface_is_served_same_origin():
+    page = client.get("/")
+    assert page.status_code == 200
+    assert "SOCIOWEAVE Studio" in page.text
+    script = client.get("/assets/app.js")
+    assert script.status_code == 200
+    assert "config-previews" in script.text
