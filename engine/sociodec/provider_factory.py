@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 import re
 from typing import Callable, Mapping
+from urllib.parse import urlsplit
 
 from sociodec.e1_protocol import E1Condition
 from sociodec.provider_runtime import ProviderProtocolInvoker
@@ -43,6 +44,14 @@ class ProviderSpec:
             or not self.api_key_env or not self.api_key_env.strip()
         ):
             raise ValueError("hosted providers require base_url and api_key_env")
+        if self.backend == "openai-compatible":
+            parsed_url = urlsplit(self.base_url or "")
+            if parsed_url.scheme not in {"https", "http"} or not parsed_url.netloc:
+                raise ValueError("hosted provider base_url must be an absolute HTTP(S) URL")
+            if parsed_url.username or parsed_url.password or parsed_url.query or parsed_url.fragment:
+                raise ValueError("hosted provider base_url must not embed credentials, query parameters or fragments")
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", self.api_key_env or ""):
+                raise ValueError("api_key_env must be a simple environment-variable name")
         if self.backend == "huggingface-local" and (self.base_url or self.api_key_env):
             raise ValueError("local providers must not declare hosted endpoint credentials")
         provenance = (
@@ -318,6 +327,14 @@ class E1ProviderRegistry:
                 agent_id: {
                     "model_id": spec.model_id,
                     "backend": spec.backend,
+                    "connection": {
+                        "provider_name": spec.provider_name,
+                        "base_url": spec.base_url,
+                        "api_key_env": spec.api_key_env,
+                        "load_in_4bit": spec.load_in_4bit,
+                        "max_input_tokens": spec.max_input_tokens,
+                        "timeout_seconds": spec.timeout_seconds,
+                    },
                     "provenance": self._require_provenance(spec, f"{mode}/{agent_id}"),
                 }
                 for agent_id, spec in sorted(roster.items())
@@ -334,6 +351,14 @@ class E1ProviderRegistry:
                 "executor_id": executor_id,
                 "model_id": self.executor_spec.model_id,
                 "backend": self.executor_spec.backend,
+                "connection": {
+                    "provider_name": self.executor_spec.provider_name,
+                    "base_url": self.executor_spec.base_url,
+                    "api_key_env": self.executor_spec.api_key_env,
+                    "load_in_4bit": self.executor_spec.load_in_4bit,
+                    "max_input_tokens": self.executor_spec.max_input_tokens,
+                    "timeout_seconds": self.executor_spec.timeout_seconds,
+                },
                 "provenance": self._require_provenance(self.executor_spec, "fixed executor ME"),
             },
         }

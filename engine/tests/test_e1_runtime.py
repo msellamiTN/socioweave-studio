@@ -112,8 +112,11 @@ def test_runtime_exports_full_non_secret_campaign_model_manifest():
     assert set(manifest["model_family_catalogue"]) == {"MA", "MB", "MC"}
     assert manifest["executor"]["executor_id"] == "executor-fixed"
     assert manifest["executor"]["provenance"]["model_revision"] == "executor"
-    assert "api_key" not in str(manifest).lower()
-    assert "secret" not in str(manifest).lower()
+    assert manifest["executor"]["connection"]["api_key_env"] == "ME_API_KEY"
+    assert manifest["model_modes"]["homogeneous"]["coordinator"]["connection"]["api_key_env"] == "MA_API_KEY"
+    assert manifest["model_modes"]["heterogeneous"]["specialist-2"]["connection"]["base_url"] is None
+    assert "'api_key':" not in str(manifest).lower()
+    assert "'secret':" not in str(manifest).lower()
 
 
 def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
@@ -258,3 +261,19 @@ def test_no_call_preflight_rejects_heterogeneous_judge_family_collision():
     snapshot, conditions = full_conditions_fixture()
     with pytest.raises(ValueError, match="judge editor shares a model family"):
         runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
+
+
+
+def test_provider_spec_rejects_embedded_credentials_and_invalid_secret_variable_names():
+    with pytest.raises(ValueError, match="must not embed credentials"):
+        ProviderSpec(
+            backend="openai-compatible", model_id="unsafe",
+            base_url="https://user:password@example.invalid/v1",
+            api_key_env="MA_API_KEY",
+        )
+    with pytest.raises(ValueError, match="environment-variable name"):
+        ProviderSpec(
+            backend="openai-compatible", model_id="unsafe",
+            base_url="https://example.invalid/v1",
+            api_key_env="MA-API-KEY",
+        )

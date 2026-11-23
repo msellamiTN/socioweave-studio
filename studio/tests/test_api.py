@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from socioweave_studio.api.app import app
+from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
 
 client = TestClient(app)
 
@@ -10,6 +11,7 @@ def test_health_and_capabilities_keep_execution_disabled():
     capabilities = client.get("/api/v1/capabilities").json()
     assert capabilities["configuration_preview"] is True
     assert capabilities["full_e1_preflight"] is False
+    assert capabilities["engine_campaign_preflight"] is True
     assert capabilities["e1_dataset_grid_preflight"] is True
     assert capabilities["run_launch"] is False
     assert capabilities["provider_execution"] is False
@@ -86,6 +88,7 @@ def test_operator_web_interface_is_served_same_origin():
     script = client.get("/assets/app.js")
     assert script.status_code == 200
     assert "config-previews" in script.text
+    assert "preflights/e1/campaign" in script.text
 
 
 def test_execution_and_provider_routes_are_not_exposed():
@@ -123,6 +126,78 @@ def _write_fake_dataset_bundle(tmp_path):
             "selection_seed": 7,
         }
     return declarations
+
+
+
+
+def _provider_manifest_fixture():
+    """Build a complete non-secret Table 13 manifest using identity-only specs."""
+    agents = {
+        "coordinator", "specialist-1", "specialist-2", "specialist-3",
+        "expert-1", "expert-2", "expert-3", "integrator",
+        "participant-1", "participant-2", "participant-3", "aggregator",
+        "member-1", "member-2", "member-3", "voter-1", "voter-2", "voter-3",
+        "facilitator", "author", "critic", "judge", "decomposer-1", "decomposer-2",
+        "synthesizer", "reviewer-1", "reviewer-2", "reviewer-3", "editor",
+        "agent-A", "agent-B", "party-1", "party-2", "mediator", "moderator",
+        "single-decomposer", "self-refiner", "self-consistency-sampler",
+        "decomposer", "separate-evaluator", "debater-1", "debater-2",
+        "independent-judge", "nominal-member-1", "nominal-member-2", "nominal-member-3",
+    }
+    family_a = {
+        "coordinator", "specialist-1", "expert-1", "participant-1", "member-1",
+        "voter-1", "author", "decomposer-1", "reviewer-1", "agent-A", "party-1",
+        "single-decomposer", "self-consistency-sampler", "decomposer", "debater-1",
+        "nominal-member-1",
+    }
+    family_b = {
+        "specialist-2", "expert-2", "participant-2", "member-2", "voter-2",
+        "critic", "decomposer-2", "reviewer-2", "agent-B", "party-2",
+        "self-refiner", "debater-2", "nominal-member-2",
+    }
+
+    def spec(family):
+        if family == "MA":
+            return ProviderSpec(
+                backend="openai-compatible", model_id="model-ma",
+                base_url="https://ma.example.invalid/v1", api_key_env="MA_API_KEY",
+                provider_name="provider-a", family_id="MA", provider_org="Provider-A",
+                weight_access="closed-weight", model_revision="model-ma",
+                access_date="2026-11-20",
+            )
+        if family == "MB":
+            return ProviderSpec(
+                backend="huggingface-local", model_id="org/model-mb",
+                provider_name="huggingface-local", family_id="MB",
+                provider_org="Provider-B", weight_access="open-weight",
+                model_size="small", model_revision="a" * 40,
+                access_date="2026-11-20",
+            )
+        return ProviderSpec(
+            backend="huggingface-local", model_id="org/model-mc",
+            provider_name="huggingface-local", family_id="MC",
+            provider_org="Provider-C", weight_access="open-weight",
+            model_size="large", model_revision="b" * 40,
+            access_date="2026-11-20",
+        )
+
+    homogeneous = {agent: spec("MA") for agent in agents}
+    heterogeneous = {
+        agent: spec("MA" if agent in family_a else "MB" if agent in family_b else "MC")
+        for agent in agents
+    }
+    executor = ProviderSpec(
+        backend="openai-compatible", model_id="fixed-executor-model",
+        base_url="https://me.example.invalid/v1", api_key_env="ME_API_KEY",
+        provider_name="executor-provider", family_id="ME",
+        provider_org="Executor-Provider", weight_access="closed-weight",
+        model_revision="fixed-executor-model", access_date="2026-11-20",
+    )
+    registry = E1ProviderRegistry(
+        assignments={"homogeneous": homogeneous, "heterogeneous": heterogeneous},
+        executor=executor,
+    )
+    return registry.campaign_manifest(executor_id="fixed-me")
 
 
 def test_e1_preflight_validates_complete_grid_without_live_calls(tmp_path):
@@ -173,3 +248,51 @@ def test_e1_preflight_requires_structured_reference_data(tmp_path):
     result = client.post("/api/v1/preflights/e1", json={"sources": sources})
     assert result.status_code == 422
     assert "reference_data is required" in result.json()["detail"]
+
+
+
+def test_engine_campaign_preflight_validates_full_rosters_and_executor_without_calls(tmp_path):
+    response = client.post("/api/v1/preflights/e1/campaign", json={
+        "sources": _write_fake_dataset_bundle(tmp_path),
+        "provider_manifest": _provider_manifest_fixture(),
+        "s12_prompt_view_factory_id": "researcher-facet-view-v1",
+        "s12_prompt_view_factory_sha256": "c" * 64,
+    })
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["readiness"] == "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS"
+    assert report["evidence_state"] == "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS"
+    assert report["e1_ready"] is False
+    assert report["condition_count"] == 4550
+    assert report["provider_rosters_validated"] == 38
+    assert report["model_modes"] == ["heterogeneous", "homogeneous"]
+    assert report["live_provider_calls"] == 0
+    assert report["run_launch_enabled"] is False
+    assert report["s12_prompt_view_factory"]["implementation_loaded_or_executed"] is False
+    assert len(report["engine_report"]["provider_manifest_sha256"]) == 64
+    assert any("S12 facet prompt-view factory implementation" in item for item in report["remaining_evidence_gates"])
+
+
+def test_engine_campaign_preflight_rejects_provider_manifest_credentials(tmp_path):
+    manifest = _provider_manifest_fixture()
+    manifest["api_key"] = "must-not-be-accepted"
+    response = client.post("/api/v1/preflights/e1/campaign", json={
+        "sources": _write_fake_dataset_bundle(tmp_path),
+        "provider_manifest": manifest,
+        "s12_prompt_view_factory_id": "researcher-facet-view-v1",
+        "s12_prompt_view_factory_sha256": "c" * 64,
+    })
+    assert response.status_code == 422
+    assert "forbidden" in response.json()["detail"]
+
+
+def test_engine_campaign_preflight_rejects_tampered_family_catalogue(tmp_path):
+    manifest = _provider_manifest_fixture()
+    manifest["model_family_catalogue"]["MA"]["provider_org"] = "Unverified-Other"
+    response = client.post("/api/v1/preflights/e1/campaign", json={
+        "sources": _write_fake_dataset_bundle(tmp_path),
+        "provider_manifest": manifest,
+        "s12_prompt_view_factory_id": "researcher-facet-view-v1",
+        "s12_prompt_view_factory_sha256": "c" * 64,
+    })
+    assert response.status_code == 422

@@ -1,12 +1,12 @@
-"""First Web Studio API slice: read-only catalogue and safe config preview.
+"""SOCIOWEAVE Studio API for research preview and no-call E1 validation.
 
-This service deliberately does not launch provider calls or experiments. Its
-preview is a budget/configuration calculation, not the engine's full E1
-campaign preflight and not evidence that a dataset snapshot is valid.
+The service exposes a dataset/grid preflight and a separate engine-backed
+campaign configuration preflight. Neither endpoint launches providers or
+experiments, and neither establishes E1_READY.
 """
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,6 +18,8 @@ from sociodec.e1_protocol import (
     e1_metric_obligations, validate_e1_manifest,
 )
 from sociodec.datasets import E1DatasetSource, freeze_e1_benchmark_snapshot
+from sociodec.e1_runtime import build_direct_e1_runtime
+from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
 
 
 class ConfigPreviewRequest(BaseModel):
@@ -42,6 +44,134 @@ class E1PreflightRequest(BaseModel):
     T: int = Field(default=2, ge=1, le=10)
 
 
+class E1CampaignPreflightRequest(BaseModel):
+    """Full no-call campaign configuration inputs; no credentials are accepted."""
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sources: dict[str, dict[str, str | int | None]]
+    provider_manifest: dict[str, Any]
+    s12_prompt_view_factory_id: str = Field(min_length=1, max_length=200)
+    s12_prompt_view_factory_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    n: int = Field(default=3, ge=1, le=12)
+    k: int = Field(default=3, ge=1, le=12)
+    T: int = Field(default=2, ge=1, le=10)
+
+
+class _NoCallProvider:
+    """Identity-only placeholder: deliberately has no generate method."""
+    def __init__(self, spec: ProviderSpec) -> None:
+        self.model_name = spec.model_id
+        self.provider_name = spec.provider_name
+
+
+def _reject_secret_fields(value: object, path: str = "provider_manifest") -> None:
+    forbidden = {"api_key", "secret", "password", "credential", "access_token", "token"}
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).lower() in forbidden:
+                raise ValueError(f"{path}.{key} is forbidden; supply only a secret environment-variable name")
+            _reject_secret_fields(item, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _reject_secret_fields(item, f"{path}[{index}]")
+
+
+def _provider_spec_from_manifest(item: dict[str, Any], label: str) -> ProviderSpec:
+    if set(item) != {"model_id", "backend", "connection", "provenance"}:
+        raise ValueError(f"{label} must contain model_id, backend, connection and provenance")
+    connection = item["connection"]
+    provenance = item["provenance"]
+    connection_fields = {
+        "provider_name", "base_url", "api_key_env", "load_in_4bit",
+        "max_input_tokens", "timeout_seconds",
+    }
+    if not isinstance(connection, dict) or set(connection) != connection_fields:
+        raise ValueError(f"{label} connection settings are incomplete or contain unsupported fields")
+    if not isinstance(connection["provider_name"], str) or not connection["provider_name"].strip():
+        raise ValueError(f"{label} provider_name must be non-empty")
+    if connection["base_url"] is not None and not isinstance(connection["base_url"], str):
+        raise ValueError(f"{label} base_url must be a string or null")
+    if connection["api_key_env"] is not None and not isinstance(connection["api_key_env"], str):
+        raise ValueError(f"{label} api_key_env must be a string or null")
+    if not isinstance(connection["load_in_4bit"], bool):
+        raise ValueError(f"{label} load_in_4bit must be boolean")
+    if type(connection["max_input_tokens"]) is not int or connection["max_input_tokens"] < 1:
+        raise ValueError(f"{label} max_input_tokens must be a positive integer")
+    if isinstance(connection["timeout_seconds"], bool) or not isinstance(connection["timeout_seconds"], (int, float)) or connection["timeout_seconds"] <= 0:
+        raise ValueError(f"{label} timeout_seconds must be positive")
+    if not isinstance(provenance, dict):
+        raise ValueError(f"{label} provenance must be an object")
+    return ProviderSpec(
+        backend=item["backend"],
+        model_id=item["model_id"],
+        provider_name=connection["provider_name"],
+        base_url=connection["base_url"],
+        api_key_env=connection["api_key_env"],
+        load_in_4bit=connection["load_in_4bit"],
+        max_input_tokens=connection["max_input_tokens"],
+        timeout_seconds=connection["timeout_seconds"],
+        family_id=provenance.get("family_id"),
+        provider_org=provenance.get("provider_org"),
+        weight_access=provenance.get("weight_access"),
+        model_size=provenance.get("model_size"),
+        model_revision=provenance.get("model_revision"),
+        access_date=provenance.get("access_date"),
+    )
+
+
+def _build_preflight_runtime(manifest: dict[str, Any], *, n: int, k: int, T: int):
+    _reject_secret_fields(manifest)
+    if set(manifest) != {"schema_version", "model_modes", "model_family_catalogue", "executor"}:
+        raise ValueError("provider manifest must contain exactly schema_version, model_modes, model_family_catalogue and executor")
+    if manifest.get("schema_version") != "e1-provider-manifest-v1":
+        raise ValueError("provider manifest must use schema e1-provider-manifest-v1")
+    modes = manifest.get("model_modes")
+    if not isinstance(modes, dict) or set(modes) != {"homogeneous", "heterogeneous"}:
+        raise ValueError("provider manifest must declare homogeneous and heterogeneous model modes")
+    assignments: dict[str, dict[str, ProviderSpec]] = {}
+    for mode, roster in modes.items():
+        if not isinstance(roster, dict) or not roster:
+            raise ValueError(f"{mode} provider roster must be a non-empty object")
+        assignments[mode] = {
+            agent_id: _provider_spec_from_manifest(item, f"{mode}/{agent_id}")
+            for agent_id, item in roster.items()
+            if isinstance(item, dict)
+        }
+        if len(assignments[mode]) != len(roster):
+            raise ValueError(f"{mode} provider roster contains a malformed assignment")
+    executor_data = manifest.get("executor")
+    if not isinstance(executor_data, dict) or set(executor_data) != {
+        "executor_id", "model_id", "backend", "connection", "provenance"
+    }:
+        raise ValueError("provider manifest executor entry is incomplete or contains unsupported fields")
+    executor_spec = _provider_spec_from_manifest({
+        "model_id": executor_data["model_id"],
+        "backend": executor_data["backend"],
+        "connection": executor_data["connection"],
+        "provenance": executor_data["provenance"],
+    }, "executor")
+    registry = E1ProviderRegistry(
+        assignments=assignments,
+        executor=executor_spec,
+        provider_builder=_NoCallProvider,
+    )
+    executor_id = executor_data["executor_id"]
+    if not isinstance(executor_id, str) or not executor_id.strip():
+        raise ValueError("provider manifest executor_id must be non-empty")
+    runtime = build_direct_e1_runtime(
+        registry=registry,
+        executor_id=executor_id,
+        prompt_view_factory=lambda _strategy, _prompt, _extraction, agent_ids: {
+            agent_id: "DECLARED_S12_FACET_VIEW_NOT_EXECUTED" for agent_id in agent_ids
+        },
+        n=n, k=k, T=T,
+    )
+    generated_manifest = runtime.campaign_manifest()
+    if generated_manifest != manifest:
+        raise ValueError("provider manifest is not canonical for the declared provider roster and connection settings")
+    return runtime
+
+
 app = FastAPI(
     title="SOCIOWEAVE Studio API",
     version="0.1.0",
@@ -61,8 +191,10 @@ def capabilities() -> dict[str, object]:
         "configuration_preview": True,
         "dataset_catalogue": True,
         "full_e1_preflight": False,
+        "engine_campaign_preflight": True,
         "e1_dataset_grid_preflight": True,
         "e1_preflight_mode": "dataset_snapshot_and_condition_grid_only_zero_live_calls",
+        "engine_campaign_preflight_mode": "direct_e1_runtime_configuration_only_zero_live_calls",
         "run_launch": False,
         "provider_execution": False,
         "live_provider_calls_enabled": False,
@@ -232,6 +364,77 @@ def create_e1_preflight(request: E1PreflightRequest) -> dict[str, object]:
             "paper prompt counts, reference-data presence, frozen hashes and the complete "
             "budget-matched E1 condition grid. It does not verify the truth of license or "
             "provider-family declarations, annotation quality, model connectivity, or execution."
+        ),
+    }
+
+
+
+@app.post("/api/v1/preflights/e1/campaign")
+def create_e1_campaign_preflight(request: E1CampaignPreflightRequest) -> dict[str, object]:
+    """Run the engine's complete no-call E1 design/provider preflight.
+
+    This validates frozen inputs, all 4,550 condition rows, all 38 method/mode
+    rosters, model-family routing, judge separation, executor identity and the
+    declared S12 facet-factory metadata. It never invokes a provider.
+    """
+    if set(request.sources) != set(ALL_DATASETS):
+        raise HTTPException(status_code=422, detail="sources must declare exactly the five E1 datasets")
+    parsed_sources: dict[str, E1DatasetSource] = {}
+    try:
+        for dataset_id, raw in request.sources.items():
+            allowed = {
+                "path", "source_version", "split", "selection_protocol",
+                "license_review_status", "selection_seed",
+            }
+            if set(raw) != allowed:
+                raise ValueError(f"{dataset_id} source must provide exactly: {sorted(allowed)}")
+            parsed_sources[dataset_id] = E1DatasetSource(**raw)
+        snapshot = freeze_e1_benchmark_snapshot(parsed_sources)
+        conditions = build_e1_conditions(
+            expected_prompt_ids=snapshot.expected_prompt_ids,
+            n=request.n, k=request.k, T=request.T,
+        )
+        runtime = _build_preflight_runtime(
+            request.provider_manifest, n=request.n, k=request.k, T=request.T,
+        )
+        report = runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
+    except (TypeError, ValueError, OSError, KeyError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return {
+        "schema_version": "e1-campaign-configuration-preflight-v1",
+        "readiness": "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS",
+        "evidence_state": "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS",
+        "e1_ready": False,
+        "preflight_scope": "engine_dataset_grid_provider_roster_model_family_judge_executor_s12_declaration",
+        "engine_report": report.as_dict(),
+        "dataset_prompt_counts": {
+            dataset_id: len(snapshot.expected_prompt_ids[dataset_id])
+            for dataset_id in ALL_DATASETS
+        },
+        "condition_count": report.condition_count,
+        "provider_rosters_validated": report.provider_rosters_validated,
+        "model_modes": list(report.model_modes),
+        "s12_prompt_view_factory": {
+            "factory_id": request.s12_prompt_view_factory_id,
+            "implementation_sha256": request.s12_prompt_view_factory_sha256,
+            "implementation_loaded_or_executed": False,
+        },
+        "live_provider_calls": 0,
+        "run_launch_enabled": False,
+        "remaining_evidence_gates": [
+            "Independent verification of upstream dataset authenticity, licensing rights and prompt selection",
+            "S12 facet prompt-view factory implementation and behavior tests; only its ID and declared source hash were supplied here",
+            "Extractor quality audit and practitioner/human review of reference annotations",
+            "Operator-approved token, cost and concurrency ceilings",
+            "Actual Colab T4 infrastructure smoke and separately authorized provider smoke",
+            "Preregistered paired statistical analysis and failure-accounting protocol",
+            "Production security, filesystem sandboxing, authentication and worker isolation",
+        ],
+        "note": (
+            "The engine campaign preflight validates configuration and routing consistency with zero live calls. "
+            "It does not verify the external truth of provider-family declarations, execute the S12 facet factory, "
+            "validate annotation quality, run a model, authorize a campaign, or establish E1_READY."
         ),
     }
 

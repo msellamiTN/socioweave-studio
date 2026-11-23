@@ -31,3 +31,12 @@
 .report-caveat{font-size:10px;color:#b6a27c;line-height:1.6;margin-top:15px}
 @media(max-width:900px){.source-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.source-fields,.report-columns{grid-template-columns:1fr}.source-field.full{grid-column:auto}.preflight-actions,.report-footer{align-items:flex-start;flex-direction:column}.report-heading{flex-direction:column}}
+
+/* Full engine-backed E1 campaign preflight */
+.manifest-panel{margin-top:20px;border:1px solid var(--line);border-radius:10px;padding:15px;background:#101a28}
+.manifest-panel summary{cursor:pointer;color:#e7eff8;font-size:12px;font-weight:700}
+.manifest-panel .section-intro{margin:12px 0}
+.source-field textarea{width:100%;resize:vertical;min-height:220px;background:#0d1725;border:1px solid #34465d;border-radius:6px;padding:11px;color:#e8eff8;font:11px/1.55 ui-monospace,monospace}
+.source-field textarea:focus{outline:1px solid var(--cyan)}
+.campaign-declaration{margin-top:14px}
+#campaign-preflight-state{white-space:normal;max-width:260px;text-align:center}
