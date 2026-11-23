@@ -328,7 +328,10 @@ def create_e1_preflight(request: E1PreflightRequest) -> dict[str, object]:
         for dataset_id, raw in request.sources.items():
             allowed = {
                 "path", "source_version", "split", "selection_protocol",
-                "license_review_status", "selection_seed",
+                "license_review_status", "selection_seed", "source_url",
+                "source_revision", "license_url", "license_identifier",
+                "license_review_evidence", "license_reviewed_by",
+                "license_reviewed_at", "eligible_population_count",
             }
             if set(raw) != allowed:
                 raise ValueError(f"{dataset_id} source must provide exactly: {sorted(allowed)}")
