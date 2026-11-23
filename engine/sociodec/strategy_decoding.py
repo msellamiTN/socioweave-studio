@@ -126,7 +126,71 @@ class ProtocolDecisionDecoder:
                                  rationale="Coordinator checked the specialist decomposition.")
         elif strategy_id is StrategyId.S12:
             expert_ids = tuple(sorted(x for x in pool if x.startswith("expert-")))
-            decision = union(_required_candidates(pool, expert_ids))
+            experts = _required_candidates(pool, expert_ids)
+            integrator_merges = [
+                message.candidate
+                for agent, message in messages
+                if agent == "integrator" and message.action == "merge"
+                and message.candidate is not None
+            ]
+            if len(integrator_merges) != 1:
+                raise StrategyDecisionError(
+                    "S12 requires exactly one typed merge decomposition from the integrator"
+                )
+            merged = integrator_merges[0].decomposition
+
+            # The integrator may add cross-facet edges, but it may not silently
+            # discard expert subproblems or dependencies. Compare semantic
+            # signatures rather than local IDs, which are intentionally free
+            # to change during integration.
+            merged_by_signature = {}
+            for item in merged.subproblems:
+                signature = subproblem_signature(item)
+                if signature in merged_by_signature:
+                    raise StrategyDecisionError(
+                        "S12 integrator merge contains duplicate equivalent subproblems"
+                    )
+                merged_by_signature[signature] = item.identifier
+
+            expert_edge_signatures = set()
+            for expert in experts:
+                decomposition = expert.decomposition
+                local_by_id = {item.identifier: subproblem_signature(item)
+                               for item in decomposition.subproblems}
+                if len(set(local_by_id.values())) != len(local_by_id):
+                    raise StrategyDecisionError(
+                        f"S12 {expert.identifier} contains duplicate equivalent subproblems"
+                    )
+                missing = set(local_by_id.values()) - set(merged_by_signature)
+                if missing:
+                    raise StrategyDecisionError(
+                        f"S12 integrator merge dropped expert subproblem(s) from {expert.identifier}"
+                    )
+                for source, target in decomposition.E:
+                    expert_edge_signatures.add(
+                        (local_by_id[source], local_by_id[target])
+                    )
+
+            merged_edge_signatures = {
+                (subproblem_signature(next(
+                    item for item in merged.subproblems if item.identifier == source
+                )), subproblem_signature(next(
+                    item for item in merged.subproblems if item.identifier == target
+                )))
+                for source, target in merged.E
+            }
+            missing_edges = expert_edge_signatures - merged_edge_signatures
+            if missing_edges:
+                raise StrategyDecisionError(
+                    "S12 integrator merge dropped an expert dependency edge"
+                )
+
+            decision = DecisionResult(
+                merged, "jigsaw-integrator-merge", "integrator",
+                "Integrator-produced decomposition; expert subproblems and "
+                "dependencies preserved, with integrator-added cross-facet "
+                "dependencies retained.",
+            )
         elif strategy_id is StrategyId.S2:
             participant_ids = tuple(sorted(x for x in pool if x.startswith("participant-")))
             decision = union(_required_candidates(pool, participant_ids))
