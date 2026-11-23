@@ -35,9 +35,13 @@ must be configured in the API process only if/when execution is later enabled.
 The no-call preflight uses an identity-only provider stub and does not read
 those variables or initialize model clients.
 
-The S12 factory ID and SHA-256 fields document the intended implementation;
-they do not load or test the callback. A separate implementation/test gate is
-required before E1 readiness.
+The S12 factory ID and SHA-256 are loaded from the registered
+`paper-s12-3facet-v1` engine policy. The policy groups target+deliverable,
+constraint and actor/resource facets; the grouping is a versioned
+operationalization of the paper's Figure 3(b) example. Empty facets are
+removed without provider calls. The API preflight binds the policy hash but
+does not execute prompt-specific view generation. Per-prompt facet audit and
+the paper's 20% human extraction audit remain required.
 
 Open `/docs` on the local server for the OpenAPI contract.
 
