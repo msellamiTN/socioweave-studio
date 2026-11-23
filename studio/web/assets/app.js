@@ -1,5 +1,7 @@
 const $ = (id) => document.getElementById(id);
-let strategyRows = [];\nlet datasetRows = [];\nlet lastPreflightReport = null;
+let strategyRows = [];
+let datasetRows = [];
+let lastPreflightReport = null;
 
 async function api(path, options) {
   const response = await fetch(path, {
@@ -19,11 +21,13 @@ async function loadCatalogue() {
     api("/api/v1/strategies"),
     api("/api/v1/datasets"),
   ]);
-  strategyRows = strategies.strategies;\n  datasetRows = datasets.datasets;
+  strategyRows = strategies.strategies;
+  datasetRows = datasets.datasets;
   $("strategy").innerHTML = strategyRows.map(row =>
     `<option value="${row.id}">${row.id} — ${row.name}</option>`
   ).join("");
   renderStrategyHint();
+  renderSourceDeclarations();
   $("datasets").innerHTML = datasets.datasets.map(row =>
     `<label class="dataset-option"><input type="checkbox" value="${row.id}" checked><span><b>${row.id}</b><small>${row.expected_prompts} prompts</small></span></label>`
   ).join("");
@@ -68,7 +72,7 @@ function readSourceDeclarations() {
     if (license_review_status !== "approved") {
       throw new Error(`${row.id}: license review must be explicitly approved before snapshot freezing.`);
     }
-    if (seedRaw && (!/^\\d+$/.test(seedRaw) || !Number.isSafeInteger(Number(seedRaw)))) {
+    if (seedRaw && (!/^\d+$/.test(seedRaw) || !Number.isSafeInteger(Number(seedRaw)))) {
       throw new Error(`${row.id}: selection seed must be a non-negative integer.`);
     }
     return [row.id, {
@@ -150,7 +154,8 @@ $("export-preflight").addEventListener("click", () => {
   anchor.remove();
   URL.revokeObjectURL(url);
 });
-\nfunction renderStrategyHint() {
+
+function renderStrategyHint() {
   const row = strategyRows.find(item => item.id === $("strategy").value);
   $("strategy-hint").textContent = row
     ? `Paper formula: ${row.call_formula} calls per prompt · Depth: ${row.depth_formula}`
