@@ -7,8 +7,7 @@ This directory contains the first executable Web Studio backend slice.
 - Versioned health and capability endpoints.
 - Read-only catalogue of the five registered E1 datasets and their expected counts.
 - A configuration preview endpoint that calls the existing engine strategy catalogue for the paper-defined method-call formula.
-- A zero-provider-call E1 preflight endpoint that freezes operator-supplied local JSONL dataset files and validates the complete paper condition grid through the engine.\n- A zero-provider-call E1 preflight endpoint that freezes operator-supplied local JSONL dataset files and validates the complete paper condition grid through the engine.
-- A same-origin operator UI with responsive configuration controls, dataset selection, call-budget preview and explicit execution-lock messaging.
+- A zero-provider-call E1 preflight endpoint that freezes operator-supplied local JSONL dataset files and validates the complete paper condition grid through the engine.\n- A same-origin operator UI with responsive configuration controls, dataset selection, call-budget preview and explicit execution-lock messaging.
 - Strict request schema (`extra=forbid`) and validation of registered strategies, dataset IDs and seed indices.
 
 ## Deliberate limitations
