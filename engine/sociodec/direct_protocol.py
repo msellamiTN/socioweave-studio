@@ -146,7 +146,7 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         views = None
         jigsaw_bundle: JigsawPromptViewBundle | None = None
         dropped_facets: tuple[str, ...] = ()
-        if self.prompt_view_factory:
+        if sid is StrategyId.S12 and self.prompt_view_factory:
             factory_result = self.prompt_view_factory(sid, prompt, self.extraction, agent_ids)
             if isinstance(factory_result, JigsawPromptViewBundle):
                 jigsaw_bundle = factory_result
