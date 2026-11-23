@@ -91,8 +91,8 @@ After freezing the five dataset files and constructing the complete E1 grid, cal
 fail-closed check verifies the snapshot's aggregate and per-prompt hashes,
 source versions/splits, all 4,550 condition rows, paper call-budget formulas,
 the 38 method/model-mode provider rosters, heterogeneous family assignments,
-and judge-family independence. It also refuses S12 unless an explicit facet
-prompt-view factory was configured.
+and judge-family independence. It also requires a registered, versioned
+S12 Jigsaw policy ID and SHA-256.
 
 The returned `E1CampaignPreflightReport` includes the dataset snapshot,
 provider-manifest and condition-grid hashes. Its readiness value is
