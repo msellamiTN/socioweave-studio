@@ -126,6 +126,14 @@ def _write_fake_dataset_bundle(tmp_path):
             "selection_protocol": "test fixture only; not benchmark evidence",
             "license_review_status": "approved",
             "selection_seed": 7,
+            "source_url": f"https://fixture.invalid/{dataset_id}",
+            "source_revision": "fixture-commit-0123456789abcdef",
+            "license_url": "https://fixture.invalid/license",
+            "license_identifier": "TEST-FIXTURE-ONLY",
+            "license_review_evidence": "unit-test fixture; not benchmark data",
+            "license_reviewed_by": "test-suite",
+            "license_reviewed_at": "2026-01-01T00:00:00Z",
+            "eligible_population_count": EXPECTED_PROMPTS[dataset_id],
         }
     return declarations
 
