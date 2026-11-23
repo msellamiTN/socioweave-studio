@@ -79,8 +79,16 @@ class DirectE1Runtime:
         return manifest
 
     def campaign_manifest(self) -> dict[str, object]:
-        """Return the full model/executor identity manifest to freeze with E1."""
-        return self.registry.campaign_manifest(executor_id=self.executor.executor_id)
+        """Return the model/executor and versioned runtime-policy manifest to freeze with E1."""
+        manifest = self.registry.campaign_manifest(executor_id=self.executor.executor_id)
+        manifest["runtime_policy"] = {
+            "schema_version": "sociodec-runtime-policy-v1",
+            "jigsaw": {
+                "factory_id": self.jigsaw_policy_id,
+                "policy_sha256": self.jigsaw_policy_sha256,
+            },
+        }
+        return manifest
 
 
     def preflight_campaign(
