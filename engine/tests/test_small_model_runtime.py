@@ -47,9 +47,11 @@ class FakeProvider:
     def __init__(self):
         self.responses = [extraction_response()] * 3 + [decomposition_response()]
         self.calls = 0
+        self.seeds = []
 
     def generate(self, messages, config=None):
         self.calls += 1
+        self.seeds.append(config.seed if config is not None else None)
         return GenerationResult(
             text=self.responses.pop(0), provider="fake", model=self.model_name,
             input_tokens=100, output_tokens=80, finish_reason="stop",
@@ -70,6 +72,7 @@ def test_small_model_core_runs_extraction_aggregation_decomposition_and_validati
     run = run_small_model_core(PROMPT, provider=provider)
     assert provider.calls == 4
     assert run.provider_calls == 4
+    assert provider.seeds == [17, 18, 19, 18]
     assert len(run.extraction.extractor_results) == 3
     assert len(run.extraction.requirements) == 2
     assert len(run.decomposition.subproblems) == 2
