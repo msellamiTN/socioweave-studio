@@ -351,3 +351,37 @@ def test_direct_s12_skips_empty_facets_without_model_calls():
     assert set(invokers) == {"expert-1", "integrator"}
     assert result.metadata["trace_complete"] is True
 
+
+
+
+def test_direct_s12_rejects_heterogeneity_if_empty_facet_removal_leaves_one_family():
+    model_by_agent = {
+        "expert-1": "model-MA",
+        "expert-2": "model-MB",
+        "expert-3": "model-MC",
+        "integrator": "model-MA",
+    }
+    family_by_agent = {
+        "expert-1": "MA",
+        "expert-2": "MB",
+        "expert-3": "MC",
+        "integrator": "MA",
+    }
+    adapter = DirectProtocolStrategyAdapter(
+        extraction=EXTRACTION,
+        model_resolver=lambda _condition, ids: {
+            agent_id: model_by_agent[agent_id] for agent_id in ids
+        },
+        model_family_resolver=lambda _condition, ids: {
+            agent_id: family_by_agent[agent_id] for agent_id in ids
+        },
+        invoker_factory=lambda _agent, _seed: TracedInvoker(
+            "unused", lambda _a, _s, _c: json.dumps(candidate("Create a report"))
+        ),
+        n=3,
+    )
+    condition = E1Condition(
+        "smart-administration", "S12", "heterogeneous", 0, ("p-001",), 4,
+    )
+    with pytest.raises(ValueError, match="active facets and integrator"):
+        adapter.run(condition=condition, prompt=PROMPT, seed=37)
