@@ -45,7 +45,7 @@ A repository's code license is not automatically the license for its datasets. F
 Each selected row contains:
 - example_id: stable native identifier (or a documented stable ID derived from source-native keys);
 - prompt_text: exact user request text used in the experiment;
-- split: exact native split;
+- split: exact native split; it must be present on every row (the loader does not infer or default it);
 - metadata: scalar tags and provenance such as domain, source-native ID, constraint/ambiguity/coupling labels and source configuration;
 - reference_data: structured dataset-native reference material required by Table 12.
 
