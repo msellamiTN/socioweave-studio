@@ -317,6 +317,29 @@ def apply_human_audit(
     return updated
 
 
+
+def load_e1_extraction_aggregates(
+    bundle: Mapping[str, object], *, snapshot: E1FrozenSnapshot,
+) -> dict[tuple[str, str], AggregatedExtraction]:
+    """Validate and restore the frozen typed aggregates without provider calls."""
+    validate_e1_extraction_bundle(bundle, snapshot=snapshot, require_human_audit=True)
+    roster_ids = [item["extractor_id"] for item in bundle["extractor_roster"]]
+    records = {(item["dataset"], item["example_id"]): item for item in bundle["records"]}
+    examples = {(item.dataset, item.example_id): item for item in snapshot.examples}
+    restored: dict[tuple[str, str], AggregatedExtraction] = {}
+    for key, record in records.items():
+        example = examples[key]
+        outputs = {item["extractor_id"]: item for item in record["extractor_outputs"]}
+        results = tuple(
+            _restore_extraction_result(
+                outputs[extractor_id], prompt_text=example.prompt_text,
+                expected_extractor_id=extractor_id,
+            )
+            for extractor_id in roster_ids
+        )
+        restored[key] = aggregate_extractions(results)
+    return restored
+
 def validate_e1_extraction_bundle(
     bundle: Mapping[str, object],
     *,
