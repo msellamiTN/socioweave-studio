@@ -168,8 +168,12 @@ def _build_preflight_runtime(manifest: dict[str, Any], *, n: int, k: int, T: int
         executor_id=executor_id,
         n=n, k=k, T=T,
     )
-    generated_manifest = runtime.campaign_manifest()
-    if generated_manifest != manifest:
+    # The submitted manifest is the provider-registry manifest. The runtime
+    # campaign manifest intentionally adds hash-bound runtime policy metadata
+    # (including S12 Jigsaw), so comparing those two different schemas rejects
+    # every otherwise canonical provider manifest.
+    generated_provider_manifest = registry.campaign_manifest(executor_id=executor_id)
+    if generated_provider_manifest != manifest:
         raise ValueError("provider manifest is not canonical for the declared provider roster and connection settings")
     return runtime
 
