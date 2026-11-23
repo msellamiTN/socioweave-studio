@@ -57,12 +57,37 @@ def _write_fixture(path, dataset, count, split="test"):
     ), encoding="utf-8")
 
 
+def _source(path, version, split, protocol="synthetic test fixture only", status="approved", **overrides):
+    fields = {
+        "source_url": "https://fixture.invalid/source",
+        "source_revision": "fixture-commit-0123456789abcdef",
+        "license_url": "https://fixture.invalid/license",
+        "license_identifier": "TEST-FIXTURE-ONLY",
+        "license_review_evidence": "unit-test fixture; not benchmark data",
+        "license_reviewed_by": "test-suite",
+        "license_reviewed_at": "2026-01-01T00:00:00Z",
+        "eligible_population_count": 100,
+    }
+    fields.update(overrides)
+    return E1DatasetSource(path, version, split, protocol, status, **fields)
+
+
 def _sources(tmp_path, *, split="test"):
     sources = {}
     for dataset in ALL_DATASETS:
         path = tmp_path / f"{dataset}.jsonl"
         _write_fixture(path, dataset, EXPECTED_PROMPTS[dataset], split=split)
-        sources[dataset] = E1DatasetSource(path, f"{dataset}-fixture-v1", split, "synthetic test fixture only", "approved")
+        sources[dataset] = E1DatasetSource(
+            path, f"{dataset}-fixture-v1", split, "synthetic test fixture only", "approved",
+            source_url=f"https://fixture.invalid/{dataset}",
+            source_revision="fixture-commit-0123456789abcdef",
+            license_url="https://fixture.invalid/license",
+            license_identifier="TEST-FIXTURE-ONLY",
+            license_review_evidence="unit-test fixture; not benchmark data",
+            license_reviewed_by="test-suite",
+            license_reviewed_at="2026-01-01T00:00:00Z",
+            eligible_population_count=EXPECTED_PROMPTS[dataset],
+        )
     return sources
 
 
@@ -77,6 +102,10 @@ def test_freeze_e1_snapshot_validates_all_five_files_and_exports_grid_ids(tmp_pa
         entry = snapshot.manifest["datasets"][dataset]
         assert entry["prompt_count"] == EXPECTED_PROMPTS[dataset]
         assert len(entry["source_sha256"]) == 64
+        assert entry["source_revision"] == "fixture-commit-0123456789abcdef"
+        assert entry["license_identifier"] == "TEST-FIXTURE-ONLY"
+        assert entry["eligible_population_count"] >= entry["prompt_count"]
+        assert entry["license_reviewed_at"].endswith("Z")
         assert len(entry["prompt_sha256"]) == EXPECTED_PROMPTS[dataset]
         assert len(entry["reference_data_sha256"]) == EXPECTED_PROMPTS[dataset]
 
@@ -87,7 +116,7 @@ def test_freeze_e1_snapshot_rejects_missing_dataset_and_wrong_count(tmp_path):
         freeze_e1_benchmark_snapshot({k: v for k, v in sources.items() if k != "BREAK"})
     path = tmp_path / "BREAK.jsonl"
     _write_fixture(path, "BREAK", EXPECTED_PROMPTS["BREAK"] - 1)
-    sources["BREAK"] = E1DatasetSource(path, "BREAK-v1", "test", "synthetic test fixture only", "approved")
+    sources["BREAK"] = _source(path, "BREAK-v1", "test")
     with pytest.raises(ValueError, match="expected 100 examples"):
         freeze_e1_benchmark_snapshot(sources)
 
@@ -163,8 +192,38 @@ def test_freeze_rejects_missing_required_reference_data(tmp_path):
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     rows[0].pop("reference_data")
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
-    sources["BREAK"] = E1DatasetSource(
-        path, "BREAK-v1", "test", "synthetic test fixture only", "approved",
-    )
+    sources["BREAK"] = _source(path, "BREAK-v1", "test")
     with pytest.raises(ValueError, match="reference_data is required"):
+        freeze_e1_benchmark_snapshot(sources)
+
+
+def test_dataset_source_requires_immutable_source_and_license_evidence():
+    base = {
+        "source_url": "https://fixture.invalid/source",
+        "source_revision": "abc123",
+        "license_url": "https://fixture.invalid/license",
+        "license_identifier": "TEST",
+        "license_review_evidence": "review record",
+        "license_reviewed_by": "reviewer",
+        "license_reviewed_at": "2026-01-01T00:00:00Z",
+        "eligible_population_count": 100,
+    }
+    for field in base:
+        values = dict(base)
+        values[field] = ""
+        with pytest.raises(ValueError, match=field):
+            E1DatasetSource("data.jsonl", "v1", "test", "fixed IDs", "approved", **values)
+
+
+def test_dataset_source_requires_timezone_aware_review_timestamp():
+    with pytest.raises(ValueError, match="include a timezone"):
+        _source("data.jsonl", "v1", "test", license_reviewed_at="2026-01-01T00:00:00")
+
+
+def test_snapshot_rejects_eligible_population_smaller_than_selected_count(tmp_path):
+    sources = _sources(tmp_path)
+    sources["BREAK"] = _source(
+        tmp_path / "BREAK.jsonl", "BREAK-v1", "test", eligible_population_count=99,
+    )
+    with pytest.raises(ValueError, match="cannot be smaller"):
         freeze_e1_benchmark_snapshot(sources)
