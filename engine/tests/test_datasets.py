@@ -237,3 +237,17 @@ def test_jsonl_loader_rejects_missing_split_instead_of_defaulting_to_test(tmp_pa
     }) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="split must be explicitly present"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
+
+
+def test_jsonl_loader_preserves_metadata_scalar_types(tmp_path):
+    path = tmp_path / "typed-metadata.jsonl"
+    path.write_text(json.dumps({
+        "example_id": "q1", "prompt_text": "Do task", "split": "test",
+        "metadata": {"number_constraints": 4, "ambiguity": 0.25, "is_conflicting": False, "domain": "public"},
+        "reference_data": {"gold_steps": ["step one"]},
+    }) + "\n", encoding="utf-8")
+    row = load_jsonl_dataset(path, dataset="BREAK", source_version="v1")[0]
+    assert row.metadata == {"number_constraints": 4, "ambiguity": 0.25, "is_conflicting": False, "domain": "public"}
+    assert type(row.metadata["number_constraints"]) is int
+    assert type(row.metadata["ambiguity"]) is float
+    assert type(row.metadata["is_conflicting"]) is bool
