@@ -273,6 +273,9 @@ def test_engine_campaign_preflight_validates_full_rosters_and_executor_without_c
     assert report["s12_prompt_view_factory"]["callback_executed_during_preflight"] is False
     assert report["s12_prompt_view_factory"]["factory_id"] == PAPER_S12_POLICY_ID
     assert report["s12_prompt_view_factory"]["policy_sha256"] == PAPER_S12_POLICY_SHA256
+    assert report["runtime_campaign_manifest"]["runtime_policy"]["jigsaw"]["factory_id"] == PAPER_S12_POLICY_ID
+    assert report["runtime_campaign_manifest"]["runtime_policy"]["jigsaw"]["policy_sha256"] == PAPER_S12_POLICY_SHA256
+    assert len(report["runtime_campaign_manifest_sha256"]) == 64
     assert len(report["engine_report"]["provider_manifest_sha256"]) == 64
     assert any("S12 per-prompt facet-generation audit" in item for item in report["remaining_evidence_gates"])
 
