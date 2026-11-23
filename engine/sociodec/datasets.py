@@ -7,6 +7,7 @@ and selected splits before the E1 condition grid can be built.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -92,6 +93,14 @@ class E1DatasetSource:
     selection_protocol: str
     license_review_status: str
     selection_seed: int | None = None
+    source_url: str = ""
+    source_revision: str = ""
+    license_url: str = ""
+    license_identifier: str = ""
+    license_review_evidence: str = ""
+    license_reviewed_by: str = ""
+    license_reviewed_at: str = ""
+    eligible_population_count: int = 0
 
     def __post_init__(self) -> None:
         if not str(self.path).strip():
@@ -100,10 +109,31 @@ class E1DatasetSource:
             raise ValueError("source_version and split must be non-empty")
         if not self.selection_protocol.strip():
             raise ValueError("selection_protocol must record the exact prompt-selection procedure")
+        for name in (
+            "source_url", "source_revision", "license_url", "license_identifier",
+            "license_review_evidence", "license_reviewed_by", "license_reviewed_at",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be explicitly declared before snapshot freezing")
+        try:
+            reviewed_at = datetime.fromisoformat(self.license_reviewed_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("license_reviewed_at must be an ISO-8601 timestamp") from exc
+        if reviewed_at.tzinfo is None or reviewed_at.utcoffset() is None:
+            raise ValueError("license_reviewed_at must include a timezone")
+        if (
+            isinstance(self.eligible_population_count, bool)
+            or not isinstance(self.eligible_population_count, int)
+            or self.eligible_population_count < 1
+        ):
+            raise ValueError("eligible_population_count must be an integer >= 1")
         if self.license_review_status != "approved":
             raise ValueError("dataset usage must be explicitly approved before snapshot freezing")
         if self.selection_seed is not None and (
-            not isinstance(self.selection_seed, int) or self.selection_seed < 0
+            isinstance(self.selection_seed, bool)
+            or not isinstance(self.selection_seed, int)
+            or self.selection_seed < 0
         ):
             raise ValueError("selection_seed must be a non-negative integer when supplied")
 
@@ -222,17 +252,30 @@ def freeze_e1_benchmark_snapshot(
             expected_count=EXPECTED_PROMPTS[dataset],
             expected_split=source.split,
         )
+        if source.eligible_population_count < EXPECTED_PROMPTS[dataset]:
+            raise ValueError(
+                f"{dataset} eligible_population_count cannot be smaller than selected prompt count"
+            )
         ids = tuple(x.example_id for x in examples)
         prompt_ids[dataset] = ids
         all_examples.extend(examples)
         dataset_entries[dataset] = {
             "source_file": path.name,
             "source_sha256": sha256_file(path),
+            "source_url": source.source_url,
+            "source_revision": source.source_revision,
             "source_version": source.source_version,
             "split": source.split,
+            "eligible_population_count": source.eligible_population_count,
             "selection_protocol": source.selection_protocol,
+            "selection_method": "operator-declared; exact selected IDs are recorded below",
             "selection_seed": source.selection_seed,
             "license_review_status": source.license_review_status,
+            "license_url": source.license_url,
+            "license_identifier": source.license_identifier,
+            "license_review_evidence": source.license_review_evidence,
+            "license_reviewed_by": source.license_reviewed_by,
+            "license_reviewed_at": source.license_reviewed_at,
             "paper_source_url": DATASET_REGISTRY[dataset]["paper_source_url"],
             "prompt_case": DATASET_REGISTRY[dataset]["prompt_case"],
             "reference_provided": DATASET_REGISTRY[dataset]["reference_provided"],
