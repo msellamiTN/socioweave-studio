@@ -88,6 +88,7 @@ def test_operator_web_interface_is_served_same_origin():
     script = client.get("/assets/app.js")
     assert script.status_code == 200
     assert "config-previews" in script.text
+    assert "preflights/e1/campaign" in script.text
 
 
 def test_execution_and_provider_routes_are_not_exposed():
