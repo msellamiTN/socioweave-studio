@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 let strategyRows = [];
 let datasetRows = [];
 let lastPreflightReport = null;
+let lastCampaignPreflightReport = null;
 
 async function api(path, options) {
   const response = await fetch(path, {
@@ -149,6 +150,78 @@ $("export-preflight").addEventListener("click", () => {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = `socioweave-e1-preflight-${lastPreflightReport.snapshot_sha256.slice(0, 12)}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+});
+
+
+
+function showCampaignPreflight(report) {
+  lastCampaignPreflightReport = report;
+  $("campaign-preflight-results").classList.remove("hidden");
+  $("campaign-preflight-title").textContent = "Engine-backed E1 campaign configuration validation";
+  $("campaign-preflight-summary").textContent = report.note;
+  $("campaign-preflight-state").textContent = report.readiness;
+  $("campaign-preflight-state").className = "pill warning";
+  $("campaign-condition-count").textContent = report.condition_count.toLocaleString();
+  $("campaign-roster-count").textContent = report.provider_rosters_validated;
+  $("campaign-model-modes").textContent = report.model_modes.join(" + ");
+  $("campaign-provider-hash").textContent = report.engine_report.provider_manifest_sha256;
+  $("campaign-remaining-gates").innerHTML = report.remaining_evidence_gates
+    .map(item => `<li>${item}</li>`).join("");
+  $("campaign-preflight-results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("run-campaign-preflight").addEventListener("click", async () => {
+  const button = $("run-campaign-preflight");
+  button.disabled = true;
+  $("campaign-preflight-status").textContent = "Running engine campaign preflight — zero provider calls…";
+  $("campaign-preflight-results").classList.add("hidden");
+  try {
+    const manifestText = $("provider-manifest-json").value.trim();
+    if (!manifestText) throw new Error("Paste the canonical non-secret provider campaign manifest first.");
+    const provider_manifest = JSON.parse(manifestText);
+    if (!provider_manifest || typeof provider_manifest !== "object" || Array.isArray(provider_manifest)) {
+      throw new Error("Provider manifest must be a JSON object.");
+    }
+    const s12_prompt_view_factory_id = $("s12-factory-id").value.trim();
+    const s12_prompt_view_factory_sha256 = $("s12-factory-sha").value.trim();
+    const report = await api("/api/v1/preflights/e1/campaign", {
+      method: "POST",
+      body: JSON.stringify({
+        sources: readSourceDeclarations(),
+        provider_manifest,
+        s12_prompt_view_factory_id,
+        s12_prompt_view_factory_sha256,
+        n: Number($("n").value),
+        k: Number($("k").value),
+        T: Number($("rounds").value),
+      }),
+    });
+    showCampaignPreflight(report);
+    $("campaign-preflight-status").textContent = "Engine configuration preflight passed · no live calls · E1_READY false";
+  } catch (error) {
+    $("campaign-preflight-status").textContent = error.message;
+    $("campaign-preflight-status").style.color = "#e8bd72";
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("export-campaign-preflight").addEventListener("click", () => {
+  if (!lastCampaignPreflightReport) return;
+  const payload = {
+    schema_version: "socioweave-studio-e1-campaign-preflight-export-v1",
+    exported_at: new Date().toISOString(),
+    report: lastCampaignPreflightReport,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `socioweave-e1-campaign-preflight-${lastCampaignPreflightReport.engine_report.provider_manifest_sha256.slice(0, 12)}.json`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
