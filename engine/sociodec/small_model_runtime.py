@@ -7,7 +7,7 @@ paper-faithful MA/MB/MC/ME experiment and its outputs are not scientific results
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 from sociodec.extraction import (
@@ -255,13 +255,10 @@ def run_small_model_core(
         result.text, requirements=requirements, constraints=constraints,
     )
     validation = validate_decomposition(prompt, requirements, decomposition)
-    extraction_usage = [
-        getattr(item, "raw_response", None) for item in extraction.extractor_results
-    ]
     # Token usage for extraction is not currently exposed by ExtractionResult;
     # count only the decomposition call exactly and report extraction as unknown.
     return SmallModelRun(
-        model_id=model.model_name,
+        model_id=getattr(model, "model_name", "injected-provider"),
         prompt_text=prompt_text,
         extraction=extraction,
         prompt=prompt,
