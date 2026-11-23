@@ -261,3 +261,19 @@ def test_no_call_preflight_rejects_heterogeneous_judge_family_collision():
     snapshot, conditions = full_conditions_fixture()
     with pytest.raises(ValueError, match="judge editor shares a model family"):
         runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
+
+
+
+def test_provider_spec_rejects_embedded_credentials_and_invalid_secret_variable_names():
+    with pytest.raises(ValueError, match="must not embed credentials"):
+        ProviderSpec(
+            backend="openai-compatible", model_id="unsafe",
+            base_url="https://user:password@example.invalid/v1",
+            api_key_env="MA_API_KEY",
+        )
+    with pytest.raises(ValueError, match="environment-variable name"):
+        ProviderSpec(
+            backend="openai-compatible", model_id="unsafe",
+            base_url="https://example.invalid/v1",
+            api_key_env="MA-API-KEY",
+        )
