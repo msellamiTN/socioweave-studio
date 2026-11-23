@@ -210,3 +210,26 @@ registry controls whether coverage is emitted.
 
 The adaptive trial path remains available for adaptive-strategy research, but
 is not a substitute for the direct E1 comparison.
+
+
+## S12 Jigsaw facet construction
+
+The direct strategy adapter now includes the versioned `paper-s12-3facet-v1`
+factory. It derives the goals/deliverables facet from target and deliverable
+requirements, the constraints facet from constraint requirements, and the
+actors/resources facet from `N_hat` plus requirements linked by
+`entity_names`. The target+deliverable grouping is an explicit
+operationalization of the paper's Figure 3(b) example; it is not presented as
+a verbatim type partition from the paper.
+
+The integrator receives the full prompt and visible expert outputs. The
+experts receive only their facet views. Empty facets are removed from the
+prompt-specific agent roster and incur no provider call. The run artifact
+retains declared call budget, active schedule, actual calls, dropped facets,
+and policy hash. Heterogeneous identity/family diversity is rechecked after
+empty-facet removal. See [E1 S12 Jigsaw facet policy](E1-S12-JIGSAW-FACET-POLICY.md).
+
+The no-call campaign preflight binds the registered policy ID/hash but does
+not execute prompt-specific view construction. The latter is covered by
+deterministic unit tests and must still be audited on the frozen E1 extraction
+bundle; it does not replace the paper's 20% human extraction audit.
