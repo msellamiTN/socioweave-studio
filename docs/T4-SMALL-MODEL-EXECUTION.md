@@ -11,7 +11,7 @@ This profile provides a low-cost, single-GPU path for exercising the existing So
 The runtime executes:
 
 1. Load one local quantized Hugging Face model.
-2. Run three requirement extractors (`q=3)) using distinct generation seeds but the same model family.
+2. Run three requirement extractors (`q=3`) using distinct generation seeds but the same model family.
 3. Parse typed requirements, implicit hypotheses, entities, ambiguities and conflicts.
 4. Aggregate extractor outputs using the existing conservative union/deduplication implementation.
 5. Construct the typed prompt interpretation.
