@@ -32,6 +32,16 @@ class ConfigPreviewRequest(BaseModel):
     seed_indices: list[int] = Field(default_factory=lambda: [0], min_length=1)
 
 
+class E1PreflightRequest(BaseModel):
+    """Operator-declared local inputs for a zero-call E1 preflight."""
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sources: dict[str, dict[str, str | int | None]]
+    n: int = Field(default=3, ge=1, le=12)
+    k: int = Field(default=3, ge=1, le=12)
+    T: int = Field(default=2, ge=1, le=10)
+
+
 app = FastAPI(
     title="SOCIOWEAVE Studio API",
     version="0.1.0",
@@ -50,6 +60,8 @@ def capabilities() -> dict[str, object]:
         "api_version": "v1",
         "configuration_preview": True,
         "dataset_catalogue": True,
+        "full_e1_preflight": True,
+        "e1_preflight_mode": "local_operator_declared_sources_zero_live_calls",
         "run_launch": False,
         "provider_execution": False,
         "live_provider_calls_enabled": False,
