@@ -10,6 +10,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from math import isfinite
 from typing import Callable, Iterable, Mapping
 
 
@@ -32,7 +33,7 @@ class BenchmarkPrompt:
     prompt_text: str
     split: str = "test"
     source_version: str = "unspecified"
-    metadata: Mapping[str, str] = field(default_factory=dict)
+    metadata: Mapping[str, str | int | float | bool] = field(default_factory=dict)
     reference_data: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -40,11 +41,15 @@ class BenchmarkPrompt:
             raise ValueError("dataset, example_id and prompt_text must be non-empty")
         if not self.split.strip() or not self.source_version.strip():
             raise ValueError("split and source_version must be non-empty")
-        if not isinstance(self.metadata, Mapping) or any(
-            not isinstance(key, str) or not isinstance(value, str)
-            for key, value in self.metadata.items()
-        ):
-            raise ValueError("metadata must map string keys to string values")
+        if not isinstance(self.metadata, Mapping):
+            raise ValueError("metadata must be a JSON object")
+        for key, value in self.metadata.items():
+            if not isinstance(key, str):
+                raise ValueError("metadata keys must be strings")
+            if type(value) not in (str, int, float, bool):
+                raise ValueError("metadata values must be scalar strings, integers, finite floats or booleans")
+            if isinstance(value, float) and not isfinite(value):
+                raise ValueError("metadata floating-point values must be finite")
         if not isinstance(self.reference_data, Mapping):
             raise ValueError("reference_data must be a JSON object")
         try:
