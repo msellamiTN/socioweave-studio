@@ -172,6 +172,7 @@ function showCampaignPreflight(report) {
   $("campaign-roster-count").textContent = report.provider_rosters_validated;
   $("campaign-model-modes").textContent = report.model_modes.join(" + ");
   $("campaign-provider-hash").textContent = report.engine_report.provider_manifest_sha256;
+  $("campaign-runtime-hash").textContent = report.runtime_campaign_manifest_sha256;
   $("campaign-remaining-gates").innerHTML = report.remaining_evidence_gates
     .map(item => `<li>${item}</li>`).join("");
   $("campaign-preflight-results").scrollIntoView({ behavior: "smooth", block: "start" });
