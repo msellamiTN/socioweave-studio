@@ -193,6 +193,7 @@ def capabilities() -> dict[str, object]:
         "dataset_catalogue": True,
         "full_e1_preflight": False,
         "engine_campaign_preflight": True,
+        "registered_s12_policy": PAPER_S12_POLICY_ID,
         "e1_dataset_grid_preflight": True,
         "e1_preflight_mode": "dataset_snapshot_and_condition_grid_only_zero_live_calls",
         "engine_campaign_preflight_mode": "direct_e1_runtime_configuration_only_zero_live_calls",
@@ -445,7 +446,7 @@ def create_e1_campaign_preflight(request: E1CampaignPreflightRequest) -> dict[st
         "run_launch_enabled": False,
         "remaining_evidence_gates": [
             "Independent verification of upstream dataset authenticity, licensing rights and prompt selection",
-            ""S12 per-prompt facet-generation audit against the frozen extraction bundles; policy unit tests do not replace the required 20% human extraction audit",
+            "S12 per-prompt facet-generation audit against the frozen extraction bundles; policy unit tests do not replace the required 20% human extraction audit",
             "Extractor quality audit and practitioner/human review of reference annotations",
             "Operator-approved token, cost and concurrency ceilings",
             "Actual Colab T4 infrastructure smoke and separately authorized provider smoke",
