@@ -1,6 +1,7 @@
 """Direct non-adaptive E1 execution of one paper strategy."""
 from __future__ import annotations
 import json
+from dataclasses import replace
 from typing import Callable, Mapping
 from sociodec.catalogue import StrategyId
 from sociodec.decisions import decomposition_distance
@@ -8,16 +9,48 @@ from sociodec.direct_e1 import DirectMethodAdapter, MethodRun
 from sociodec.e1_protocol import E1Condition, BASELINES
 from sociodec.extraction import AggregatedExtraction
 from sociodec.models.prompt import Prompt
-from sociodec.models.strategy import Agent, ProtocolStep, Role
+from sociodec.models.strategy import Agent, ProtocolStep, Role, SocialStrategy
 from sociodec.runtime import ProtocolContext, ProtocolInvoker, run_strategy
 from sociodec.protocol_decoding import parse_candidate
 from sociodec.strategy_decoding import DecisionAdjudication, ProtocolDecisionDecoder
+from sociodec.jigsaw import JigsawPromptViewBundle, PaperJigsawPromptViewFactory
 from sociodec.strategy_protocols import build_strategy_blueprint
 
 ModelResolver = Callable[[E1Condition, tuple[str, ...]], Mapping[str, str]]
 ModelFamilyResolver = Callable[[E1Condition, tuple[str, ...]], Mapping[str, str]]
-PromptViewFactory = Callable[[StrategyId, Prompt, AggregatedExtraction, tuple[str, ...]], Mapping[str, str]]
+PromptViewFactory = Callable[[StrategyId, Prompt, AggregatedExtraction, tuple[str, ...]], Mapping[str, str] | JigsawPromptViewBundle]
 InvokerFactory = Callable[[Agent, int], ProtocolInvoker]
+
+
+def _drop_empty_jigsaw_facets(strategy: SocialStrategy, dropped_facets: tuple[str, ...]) -> SocialStrategy:
+    """Remove empty S12 experts from the prompt-specific protocol and visibility graph."""
+    dropped = set(dropped_facets)
+    if not dropped:
+        return strategy
+    if "integrator" in dropped or not dropped.issubset(
+        {f"expert-{index}" for index in range(1, 4)}
+    ):
+        raise ValueError("S12 may drop only empty expert facets; integrator must remain")
+    active = {agent.identifier for agent in strategy.agents} - dropped
+    if not any(agent_id.startswith("expert-") for agent_id in active):
+        raise ValueError("S12 cannot run when every extracted facet is empty")
+    return replace(
+        strategy,
+        agents=tuple(agent for agent in strategy.agents if agent.identifier in active),
+        assignments=tuple(item for item in strategy.assignments if item.agent_id in active),
+        visibility=tuple(
+            replace(
+                item,
+                visible_pairs=tuple(
+                    (observer, author) for observer, author in item.visible_pairs
+                    if observer in active and author in active
+                ),
+            )
+            for item in strategy.visibility
+        ),
+        protocol=tuple(step for step in strategy.protocol if step.agent_id in active),
+    )
+
 
 class _RoutedInvoker:
     def __init__(self, routes: Mapping[str, ProtocolInvoker]):
@@ -52,6 +85,8 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         if min(n, k, T) < 1: raise ValueError("n, k and T must be >= 1")
         self.extraction, self.model_resolver, self.invoker_factory = extraction, model_resolver, invoker_factory
         self.model_family_resolver = model_family_resolver
+        if prompt_view_factory is None and n == 3:
+            prompt_view_factory = PaperJigsawPromptViewFactory()
         self.prompt_view_factory, self.agent_contexts = prompt_view_factory, dict(agent_contexts or {})
         if not 0.0 <= delphi_epsilon <= 1.0:
             raise ValueError("delphi_epsilon must be in [0, 1]")
@@ -77,11 +112,10 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         if set(models) != set(agent_ids) or any(not isinstance(v, str) or not v.strip() for v in models.values()):
             raise ValueError("model_resolver must return a non-empty model ID for every agent")
         distinct = set(models.values())
-        required_models = 1 if condition.model_mode == "homogeneous" else 2
-        if len(distinct) < required_models:
-            raise ValueError(
-                f"{condition.model_mode} condition requires at least {required_models} distinct model identities"
-            )
+        if condition.model_mode == "homogeneous" and len(distinct) != 1:
+            raise ValueError("homogeneous condition requires exactly one model identity")
+        if condition.model_mode == "heterogeneous" and len(distinct) < 2:
+            raise ValueError("heterogeneous condition requires at least two distinct model identities")
         model_families: dict[str, str] = {}
         if self.model_family_resolver is not None:
             model_families = dict(self.model_family_resolver(condition, agent_ids))
@@ -90,10 +124,12 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 for value in model_families.values()
             ):
                 raise ValueError("model_family_resolver must return one non-empty family ID per agent")
-            required_families = 1 if condition.model_mode == "homogeneous" else min(2, len(agent_ids))
-            if len(set(model_families.values())) < required_families:
+            distinct_families = set(model_families.values())
+            if condition.model_mode == "homogeneous" and len(distinct_families) != 1:
+                raise ValueError("homogeneous condition requires exactly one model family")
+            if condition.model_mode == "heterogeneous" and len(distinct_families) < min(2, len(agent_ids)):
                 raise ValueError(
-                    f"{condition.model_mode} condition requires at least {required_families} distinct model families"
+                    f"heterogeneous condition requires at least {min(2, len(agent_ids))} distinct model families"
                 )
             for assignment in roster.strategy.assignments:
                 if condition.model_mode != "heterogeneous" or assignment.role is not Role.JUDGE:
@@ -109,15 +145,46 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                         f"judge {assignment.agent_id} must use a model family distinct from the authors it judges"
                     )
         views = None
-        if self.prompt_view_factory:
-            views = dict(self.prompt_view_factory(sid, prompt, self.extraction, agent_ids))
+        jigsaw_bundle: JigsawPromptViewBundle | None = None
+        dropped_facets: tuple[str, ...] = ()
+        if sid is StrategyId.S12 and self.prompt_view_factory:
+            factory_result = self.prompt_view_factory(sid, prompt, self.extraction, agent_ids)
+            if isinstance(factory_result, JigsawPromptViewBundle):
+                jigsaw_bundle = factory_result
+                views = dict(factory_result.views)
+                dropped_facets = factory_result.dropped_facets
+            else:
+                views = dict(factory_result)
             if set(views) != set(agent_ids) or any(not isinstance(v, str) or not v.strip() for v in views.values()):
                 raise ValueError("prompt_view_factory must return one non-empty view per agent")
         elif sid is StrategyId.S12:
-            raise ValueError("S12 requires explicit facet prompt views; S1 partitions are generated by its coordinator")
+            raise ValueError("S12 requires a registered facet prompt-view factory")
         blueprint = build_strategy_blueprint(sid, model_ids=models, prompt_views=views,
             agent_contexts=self.agent_contexts, n=self.n, k=self.k, T=self.T)
-        routes = {a.identifier: self.invoker_factory(a, seed) for a in blueprint.strategy.agents}
+        strategy = blueprint.strategy
+        if dropped_facets:
+            if sid is not StrategyId.S12:
+                raise ValueError("Only S12 may drop empty facets")
+            strategy = _drop_empty_jigsaw_facets(strategy, dropped_facets)
+        active_agent_ids = tuple(
+            agent_id for agent_id in agent_ids if agent_id not in set(dropped_facets)
+        )
+        if sid is StrategyId.S12 and condition.model_mode == "heterogeneous":
+            if len({models[agent_id] for agent_id in active_agent_ids}) < 2:
+                raise ValueError(
+                    "heterogeneous S12 must retain at least two distinct model identities among active facets and integrator"
+                )
+            if model_families and len({
+                model_families[agent_id] for agent_id in active_agent_ids
+            }) < 2:
+                raise ValueError(
+                    "heterogeneous S12 must retain at least two distinct model families among active facets and integrator"
+                )
+        active_views = {
+            agent_id: value for agent_id, value in (blueprint.prompt_views or {}).items()
+            if agent_id not in set(dropped_facets)
+        }
+        routes = {a.identifier: self.invoker_factory(a, seed) for a in strategy.agents}
         invoker = _RoutedInvoker(routes)
         run_options = {}
         if sid in {StrategyId.S4, StrategyId.S10, StrategyId.S11}:
@@ -151,8 +218,8 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                     "mediation_epsilon": self.mediation_epsilon,
                     "mediation_candidate_distance": candidate_distance,
                 }
-        run = run_strategy(sid.value, prompt, blueprint.strategy, invoker,
-            prompt_views=blueprint.prompt_views, hypotheses=self.extraction.hypotheses,
+        run = run_strategy(sid.value, prompt, strategy, invoker,
+            prompt_views=active_views, hypotheses=self.extraction.hypotheses,
             **run_options)
         if run.seeded_agents: raise RuntimeError("Direct E1 must not contain seeded agents")
         traces = invoker.trace_dicts()
@@ -163,7 +230,13 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
             decoded.hypothesis_verdicts, {
                 "execution_path": "direct_protocol", "strategy_id": sid.value,
                 "strategy_calls_declared": blueprint.strategy.calls,
+                "strategy_calls_scheduled_after_empty_facet_drop": strategy.calls,
                 "strategy_calls_executed": run.calls_made,
+                "jigsaw_policy_id": jigsaw_bundle.policy_id if jigsaw_bundle else None,
+                "jigsaw_policy_sha256": jigsaw_bundle.policy_sha256 if jigsaw_bundle else None,
+                "jigsaw_active_facets": list(jigsaw_bundle.active_facets) if jigsaw_bundle else [],
+                "jigsaw_dropped_facets": list(jigsaw_bundle.dropped_facets) if jigsaw_bundle else [],
+                "jigsaw_facet_manifest": [dict(item) for item in jigsaw_bundle.facet_manifest] if jigsaw_bundle else [],
                 "strategy_depth_declared": blueprint.strategy.depth,
                 "strategy_depth_executed": run.depth_executed,
                 "strategy_base_calls": 5 if sid is StrategyId.S11 else blueprint.strategy.calls,
@@ -179,7 +252,10 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 "mediation_converged": run.mediation_converged if sid is StrategyId.S11 else None,
                 "mediation_stop_round": run.mediation_stop_round if sid is StrategyId.S11 else None,
                 "mediation_distance": run.mediation_distance if sid is StrategyId.S11 else None,
-                "agent_model_ids": models, "agent_model_families": model_families or None,
+                "configured_agent_model_ids": models,
+                "configured_agent_model_families": model_families or None,
+                "agent_model_ids": {agent_id: models[agent_id] for agent_id in active_agent_ids},
+                "agent_model_families": ({agent_id: model_families[agent_id] for agent_id in active_agent_ids} if model_families else None),
                 "seeded_agents": list(run.seeded_agents),
                 "output_count": len(run.outputs), "decision_rule": decoded.decision.rule,
                 "decision_selected_candidate": decoded.decision.selected_candidate_id,

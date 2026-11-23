@@ -64,6 +64,21 @@ class DirectE1CampaignConfig:
             raise ValueError("provider_manifest_json must be valid JSON") from exc
         if not isinstance(manifest, dict) or manifest.get("schema_version") != "e1-provider-manifest-v1":
             raise ValueError("provider manifest must use schema e1-provider-manifest-v1")
+        runtime_policy = manifest.get("runtime_policy")
+        if not isinstance(runtime_policy, dict) or set(runtime_policy) != {"schema_version", "jigsaw"}:
+            raise ValueError("provider manifest must bind the versioned runtime_policy used by the campaign")
+        if runtime_policy.get("schema_version") != "sociodec-runtime-policy-v1":
+            raise ValueError("runtime_policy must use schema sociodec-runtime-policy-v1")
+        jigsaw_policy = runtime_policy.get("jigsaw")
+        if not isinstance(jigsaw_policy, dict) or set(jigsaw_policy) != {"factory_id", "policy_sha256"}:
+            raise ValueError("runtime_policy must bind the Jigsaw factory ID and policy SHA-256")
+        if not isinstance(jigsaw_policy.get("factory_id"), str) or not jigsaw_policy["factory_id"].strip():
+            raise ValueError("runtime_policy Jigsaw factory_id must be non-empty")
+        policy_hash = jigsaw_policy.get("policy_sha256")
+        if not isinstance(policy_hash, str) or len(policy_hash) != 64 or any(
+            char not in "0123456789abcdef" for char in policy_hash.lower()
+        ):
+            raise ValueError("runtime_policy Jigsaw policy_sha256 must be a 64-character hexadecimal digest")
         modes = manifest.get("model_modes")
         if not isinstance(modes, dict) or set(modes) != {"homogeneous", "heterogeneous"}:
             raise ValueError("provider manifest must declare homogeneous and heterogeneous model modes")

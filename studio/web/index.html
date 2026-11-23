@@ -59,11 +59,11 @@
         </div>
         <details class="manifest-panel">
           <summary>Full E1 campaign configuration — provider manifest</summary>
-          <p class="section-intro">Paste the canonical non-secret JSON returned by <code>E1ProviderRegistry.campaign_manifest()</code>. It must contain both model modes, the MA/MB/MC family catalogue, exact model revisions, non-secret connection settings and fixed executor identity. Never paste API keys or credentials.</p>
+          <p class="section-intro">Paste the canonical non-secret JSON returned by <code>E1ProviderRegistry.campaign_manifest()</code>. It must contain both model modes, the MA/MB/MC family catalogue, exact model revisions, non-secret connection settings and fixed executor identity. Never paste API keys or credentials. The S12 policy identity below is loaded from the registered engine implementation; it is not user-defined.</p>
           <label class="source-field full"><span>Provider campaign manifest (JSON)</span><textarea id="provider-manifest-json" rows="14" spellcheck="false" placeholder='{"schema_version":"e1-provider-manifest-v1", ...}'></textarea></label>
           <div class="source-fields campaign-declaration">
-            <label class="source-field"><span>S12 facet prompt-view factory ID</span><input id="s12-factory-id" placeholder="Registered factory identifier"></label>
-            <label class="source-field"><span>S12 factory source SHA-256</span><input id="s12-factory-sha" placeholder="64-character source digest"></label>
+            <label class="source-field"><span>Registered S12 facet policy ID</span><input id="s12-factory-id" readonly placeholder="Loading registered policy…"></label>
+            <label class="source-field"><span>Registered S12 policy SHA-256</span><input id="s12-factory-sha" readonly placeholder="Loading registered policy…"></label>
           </div>
           <div class="preflight-actions"><button id="run-campaign-preflight" class="primary">Run engine-backed campaign preflight <span>→</span></button><span id="campaign-preflight-status" class="subtle" role="status">Full campaign configuration not checked</span></div>
           <div id="campaign-preflight-results" class="preflight-report hidden" aria-live="polite">
@@ -75,9 +75,10 @@
               <div class="metric"><span>Live provider calls</span><b>0</b></div>
             </div>
             <div class="report-hash"><span>Provider manifest SHA-256</span><code id="campaign-provider-hash">—</code></div>
+            <div class="report-hash"><span>Frozen runtime campaign manifest SHA-256</span><code id="campaign-runtime-hash">—</code></div>
             <div class="panel"><h4>Remaining E1 readiness gates</h4><ul id="campaign-remaining-gates"></ul></div>
             <div class="report-footer"><button id="export-campaign-preflight" class="secondary">Export campaign report (.json)</button><span class="subtle">E1_READY remains false · execution disabled</span></div>
-            <p class="report-caveat">This is a zero-call configuration validation. The S12 factory ID/hash are declarations only; the implementation is not loaded or executed. Dataset and provider provenance remain operator-declared, not independently verified.</p>
+            <p class="report-caveat">This is a zero-call configuration validation. The registered S12 policy is hash-bound; prompt-specific views are generated at run time, not during preflight. Dataset and provider provenance remain operator-declared, not independently verified.</p>
           </div>
         </details>
       </section>

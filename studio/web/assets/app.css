@@ -40,3 +40,5 @@
 .source-field textarea:focus{outline:1px solid var(--cyan)}
 .campaign-declaration{margin-top:14px}
 #campaign-preflight-state{white-space:normal;max-width:260px;text-align:center}
+
+#s12-factory-id,#s12-factory-sha{opacity:.8;cursor:not-allowed}

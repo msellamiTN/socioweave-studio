@@ -20,6 +20,11 @@ from sociodec.e1_protocol import (
 from sociodec.datasets import E1DatasetSource, freeze_e1_benchmark_snapshot
 from sociodec.e1_runtime import build_direct_e1_runtime
 from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
+from sociodec.experiments import content_hash
+from sociodec.jigsaw import (
+    PAPER_S12_POLICY_ID, PAPER_S12_POLICY_MANIFEST,
+    PAPER_S12_POLICY_SHA256,
+)
 
 
 class ConfigPreviewRequest(BaseModel):
@@ -161,13 +166,14 @@ def _build_preflight_runtime(manifest: dict[str, Any], *, n: int, k: int, T: int
     runtime = build_direct_e1_runtime(
         registry=registry,
         executor_id=executor_id,
-        prompt_view_factory=lambda _strategy, _prompt, _extraction, agent_ids: {
-            agent_id: "DECLARED_S12_FACET_VIEW_NOT_EXECUTED" for agent_id in agent_ids
-        },
         n=n, k=k, T=T,
     )
-    generated_manifest = runtime.campaign_manifest()
-    if generated_manifest != manifest:
+    # The submitted manifest is the provider-registry manifest. The runtime
+    # campaign manifest intentionally adds hash-bound runtime policy metadata
+    # (including S12 Jigsaw), so comparing those two different schemas rejects
+    # every otherwise canonical provider manifest.
+    generated_provider_manifest = registry.campaign_manifest(executor_id=executor_id)
+    if generated_provider_manifest != manifest:
         raise ValueError("provider manifest is not canonical for the declared provider roster and connection settings")
     return runtime
 
@@ -192,6 +198,7 @@ def capabilities() -> dict[str, object]:
         "dataset_catalogue": True,
         "full_e1_preflight": False,
         "engine_campaign_preflight": True,
+        "registered_s12_policy": PAPER_S12_POLICY_ID,
         "e1_dataset_grid_preflight": True,
         "e1_preflight_mode": "dataset_snapshot_and_condition_grid_only_zero_live_calls",
         "engine_campaign_preflight_mode": "direct_e1_runtime_configuration_only_zero_live_calls",
@@ -221,6 +228,20 @@ def datasets() -> dict[str, object]:
         ]
     }
 
+
+
+@app.get("/api/v1/jigsaw/policy")
+def jigsaw_policy() -> dict[str, object]:
+    """Expose the registered, versioned paper S12 facet policy."""
+    return {
+        "factory_id": PAPER_S12_POLICY_ID,
+        "policy_sha256": PAPER_S12_POLICY_SHA256,
+        "policy_manifest": PAPER_S12_POLICY_MANIFEST,
+        "source_boundary": (
+            "The three-facet grouping follows the paper's goals, constraints and actors example. "
+            "Grouping target and deliverable requirements together is an explicit operationalization."
+        ),
+    }
 
 
 @app.get("/api/v1/strategies")
@@ -397,12 +418,19 @@ def create_e1_campaign_preflight(request: E1CampaignPreflightRequest) -> dict[st
         runtime = _build_preflight_runtime(
             request.provider_manifest, n=request.n, k=request.k, T=request.T,
         )
+        if request.s12_prompt_view_factory_id != runtime.jigsaw_policy_id:
+            raise ValueError("S12 factory ID does not match the registered engine policy")
+        if request.s12_prompt_view_factory_sha256 != runtime.jigsaw_policy_sha256:
+            raise ValueError("S12 factory SHA-256 does not match the registered engine policy")
         report = runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
     except (TypeError, ValueError, OSError, KeyError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    runtime_campaign_manifest = runtime.campaign_manifest()
     return {
         "schema_version": "e1-campaign-configuration-preflight-v1",
+        "runtime_campaign_manifest": runtime_campaign_manifest,
+        "runtime_campaign_manifest_sha256": content_hash(runtime_campaign_manifest),
         "readiness": "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS",
         "evidence_state": "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS",
         "e1_ready": False,
@@ -416,15 +444,17 @@ def create_e1_campaign_preflight(request: E1CampaignPreflightRequest) -> dict[st
         "provider_rosters_validated": report.provider_rosters_validated,
         "model_modes": list(report.model_modes),
         "s12_prompt_view_factory": {
-            "factory_id": request.s12_prompt_view_factory_id,
-            "implementation_sha256": request.s12_prompt_view_factory_sha256,
-            "implementation_loaded_or_executed": False,
+            "factory_id": report.jigsaw_policy_id,
+            "policy_sha256": report.jigsaw_policy_sha256,
+            "registered_builtin": report.jigsaw_policy_id == PAPER_S12_POLICY_ID,
+            "callback_executed_during_preflight": False,
+            "policy_manifest": PAPER_S12_POLICY_MANIFEST,
         },
         "live_provider_calls": 0,
         "run_launch_enabled": False,
         "remaining_evidence_gates": [
             "Independent verification of upstream dataset authenticity, licensing rights and prompt selection",
-            "S12 facet prompt-view factory implementation and behavior tests; only its ID and declared source hash were supplied here",
+            "S12 per-prompt facet-generation audit against the frozen extraction bundles; policy unit tests do not replace the required 20% human extraction audit",
             "Extractor quality audit and practitioner/human review of reference annotations",
             "Operator-approved token, cost and concurrency ceilings",
             "Actual Colab T4 infrastructure smoke and separately authorized provider smoke",
@@ -433,8 +463,9 @@ def create_e1_campaign_preflight(request: E1CampaignPreflightRequest) -> dict[st
         ],
         "note": (
             "The engine campaign preflight validates configuration and routing consistency with zero live calls. "
-            "It does not verify the external truth of provider-family declarations, execute the S12 facet factory, "
-            "validate annotation quality, run a model, authorize a campaign, or establish E1_READY."
+            "The registered S12 policy is hash-bound, but the prompt-specific facet callback is not executed during preflight. "
+            "It does not verify the external truth of provider-family declarations, validate annotation quality, "
+            "run a model, authorize a campaign, or establish E1_READY."
         ),
     }
 

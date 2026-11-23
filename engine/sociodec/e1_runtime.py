@@ -25,6 +25,7 @@ from sociodec.provider_factory import E1ProviderRegistry
 from sociodec.provider_executor import ProviderFixedExecutor
 from sociodec.strategy_decoding import DecisionAdjudication
 from sociodec.catalogue import StrategyId
+from sociodec.jigsaw import PaperJigsawPromptViewFactory
 
 
 
@@ -37,6 +38,8 @@ class E1CampaignPreflightReport:
     prompt_count: int
     provider_rosters_validated: int
     model_modes: tuple[str, ...]
+    jigsaw_policy_id: str
+    jigsaw_policy_sha256: str
     readiness: str = "configuration_validated_no_live_calls"
     live_provider_calls: int = 0
 
@@ -51,6 +54,8 @@ class E1CampaignPreflightReport:
             "prompt_count": self.prompt_count,
             "provider_rosters_validated": self.provider_rosters_validated,
             "model_modes": list(self.model_modes),
+            "jigsaw_policy_id": self.jigsaw_policy_id,
+            "jigsaw_policy_sha256": self.jigsaw_policy_sha256,
             "live_provider_calls": self.live_provider_calls,
         }
 
@@ -64,6 +69,8 @@ class DirectE1Runtime:
     k: int = 3
     T: int = 2
     supports_jigsaw_facets: bool = False
+    jigsaw_policy_id: str | None = None
+    jigsaw_policy_sha256: str | None = None
 
     def assignment_manifest(self, condition: E1Condition, agent_ids: tuple[str, ...]) -> dict[str, object]:
         """Expose non-secret routing identities for one method condition."""
@@ -72,8 +79,16 @@ class DirectE1Runtime:
         return manifest
 
     def campaign_manifest(self) -> dict[str, object]:
-        """Return the full model/executor identity manifest to freeze with E1."""
-        return self.registry.campaign_manifest(executor_id=self.executor.executor_id)
+        """Return the model/executor and versioned runtime-policy manifest to freeze with E1."""
+        manifest = self.registry.campaign_manifest(executor_id=self.executor.executor_id)
+        manifest["runtime_policy"] = {
+            "schema_version": "sociodec-runtime-policy-v1",
+            "jigsaw": {
+                "factory_id": self.jigsaw_policy_id,
+                "policy_sha256": self.jigsaw_policy_sha256,
+            },
+        }
+        return manifest
 
 
     def preflight_campaign(
@@ -173,7 +188,9 @@ class DirectE1Runtime:
             prompt_views = None
             if strategy is StrategyId.S12:
                 if not self.supports_jigsaw_facets:
-                    raise ValueError("S12 preflight requires an explicit Jigsaw facet prompt-view factory")
+                    raise ValueError("S12 preflight requires a Jigsaw facet prompt-view factory")
+                if not self.jigsaw_policy_id or not self.jigsaw_policy_sha256:
+                    raise ValueError("S12 preflight requires a versioned Jigsaw facet policy ID and SHA-256")
                 # Structural sentinel views only: the real callback is exercised
                 # with each actual prompt/extraction at method construction time.
                 prompt_views = {
@@ -210,6 +227,8 @@ class DirectE1Runtime:
             prompt_count=sum(len(ids) for ids in expected_ids.values()),
             provider_rosters_validated=len(seen_rosters),
             model_modes=("heterogeneous", "homogeneous"),
+            jigsaw_policy_id=self.jigsaw_policy_id or "",
+            jigsaw_policy_sha256=self.jigsaw_policy_sha256 or "",
         )
 
     def build_method(
@@ -233,11 +252,14 @@ def build_direct_e1_runtime(
 ) -> DirectE1Runtime:
     """Build the common executor and per-condition method adapter factory.
 
-    S12 (Jigsaw) requires an explicit, operator-defined facet prompt-view
-    factory. This function refuses to invent domain partitions for it.
+    For the paper E1 setting n=3, S12 uses the versioned built-in
+    paper-s12-3facet-v1 policy. Custom factories must expose factory_id and
+    policy_sha256 so the preflight can bind the policy identity.
     """
     if not executor_id.strip():
         raise ValueError("executor_id must be non-empty")
+    if prompt_view_factory is None and n == 3:
+        prompt_view_factory = PaperJigsawPromptViewFactory()
     registry.validate_complete_roster(n=n, k=k)
     registry.validate_family_catalogue()
     executor = ProviderFixedExecutor(
@@ -275,4 +297,6 @@ def build_direct_e1_runtime(
     return DirectE1Runtime(
         executor=executor, method_factory=method_factory, registry=registry,
         n=n, k=k, T=T, supports_jigsaw_facets=prompt_view_factory is not None,
+        jigsaw_policy_id=getattr(prompt_view_factory, "factory_id", None),
+        jigsaw_policy_sha256=getattr(prompt_view_factory, "policy_sha256", None),
     )

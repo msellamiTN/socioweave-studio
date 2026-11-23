@@ -66,6 +66,13 @@ PROVIDER_MANIFEST = {
         "provenance": {"family_id": "ME", "model_revision": "ME-v1",
                        "access_date": "2026-11-20"},
     },
+    "runtime_policy": {
+        "schema_version": "sociodec-runtime-policy-v1",
+        "jigsaw": {
+            "factory_id": "paper-s12-3facet-v1",
+            "policy_sha256": "c" * 64,
+        },
+    },
 }
 
 
@@ -450,3 +457,29 @@ def test_changed_dataset_source_provenance_cannot_resume_checkpoint(tmp_path: Pa
     )
     with pytest.raises(ValueError, match="campaign manifest differs"):
         second.run(checkpoint)
+
+
+
+def test_campaign_config_requires_versioned_jigsaw_runtime_policy():
+    manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    manifest.pop("runtime_policy")
+    with pytest.raises(ValueError, match="must bind the versioned runtime_policy"):
+        DirectE1CampaignConfig(
+            campaign_id="campaign-no-policy", code_commit="a" * 40,
+            executor_id="ME-fixed-v1",
+            provider_manifest_json=json.dumps(manifest),
+            dataset_snapshot_manifest_json=dataset_snapshot_json([
+                BenchmarkPrompt("BREAK", "p1", "Create a report.", reference_data={"steps": ["report"]})
+            ]),
+        )
+    manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    manifest["runtime_policy"]["jigsaw"]["policy_sha256"] = "not-a-hash"
+    with pytest.raises(ValueError, match="64-character hexadecimal"):
+        DirectE1CampaignConfig(
+            campaign_id="campaign-bad-policy", code_commit="a" * 40,
+            executor_id="ME-fixed-v1",
+            provider_manifest_json=json.dumps(manifest),
+            dataset_snapshot_manifest_json=dataset_snapshot_json([
+                BenchmarkPrompt("BREAK", "p1", "Create a report.", reference_data={"steps": ["report"]})
+            ]),
+        )

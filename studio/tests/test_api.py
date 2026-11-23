@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from socioweave_studio.api.app import app
 from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
+from sociodec.jigsaw import PAPER_S12_POLICY_ID, PAPER_S12_POLICY_SHA256
 
 client = TestClient(app)
 
@@ -89,6 +90,7 @@ def test_operator_web_interface_is_served_same_origin():
     assert script.status_code == 200
     assert "config-previews" in script.text
     assert "preflights/e1/campaign" in script.text
+    assert "jigsaw/policy" in script.text
 
 
 def test_execution_and_provider_routes_are_not_exposed():
@@ -255,8 +257,8 @@ def test_engine_campaign_preflight_validates_full_rosters_and_executor_without_c
     response = client.post("/api/v1/preflights/e1/campaign", json={
         "sources": _write_fake_dataset_bundle(tmp_path),
         "provider_manifest": _provider_manifest_fixture(),
-        "s12_prompt_view_factory_id": "researcher-facet-view-v1",
-        "s12_prompt_view_factory_sha256": "c" * 64,
+        "s12_prompt_view_factory_id": PAPER_S12_POLICY_ID,
+        "s12_prompt_view_factory_sha256": PAPER_S12_POLICY_SHA256,
     })
     assert response.status_code == 200, response.text
     report = response.json()
@@ -268,9 +270,14 @@ def test_engine_campaign_preflight_validates_full_rosters_and_executor_without_c
     assert report["model_modes"] == ["heterogeneous", "homogeneous"]
     assert report["live_provider_calls"] == 0
     assert report["run_launch_enabled"] is False
-    assert report["s12_prompt_view_factory"]["implementation_loaded_or_executed"] is False
+    assert report["s12_prompt_view_factory"]["callback_executed_during_preflight"] is False
+    assert report["s12_prompt_view_factory"]["factory_id"] == PAPER_S12_POLICY_ID
+    assert report["s12_prompt_view_factory"]["policy_sha256"] == PAPER_S12_POLICY_SHA256
+    assert report["runtime_campaign_manifest"]["runtime_policy"]["jigsaw"]["factory_id"] == PAPER_S12_POLICY_ID
+    assert report["runtime_campaign_manifest"]["runtime_policy"]["jigsaw"]["policy_sha256"] == PAPER_S12_POLICY_SHA256
+    assert len(report["runtime_campaign_manifest_sha256"]) == 64
     assert len(report["engine_report"]["provider_manifest_sha256"]) == 64
-    assert any("S12 facet prompt-view factory implementation" in item for item in report["remaining_evidence_gates"])
+    assert any("S12 per-prompt facet-generation audit" in item for item in report["remaining_evidence_gates"])
 
 
 def test_engine_campaign_preflight_rejects_provider_manifest_credentials(tmp_path):
@@ -279,8 +286,8 @@ def test_engine_campaign_preflight_rejects_provider_manifest_credentials(tmp_pat
     response = client.post("/api/v1/preflights/e1/campaign", json={
         "sources": _write_fake_dataset_bundle(tmp_path),
         "provider_manifest": manifest,
-        "s12_prompt_view_factory_id": "researcher-facet-view-v1",
-        "s12_prompt_view_factory_sha256": "c" * 64,
+        "s12_prompt_view_factory_id": PAPER_S12_POLICY_ID,
+        "s12_prompt_view_factory_sha256": PAPER_S12_POLICY_SHA256,
     })
     assert response.status_code == 422
     assert "forbidden" in response.json()["detail"]
@@ -292,7 +299,17 @@ def test_engine_campaign_preflight_rejects_tampered_family_catalogue(tmp_path):
     response = client.post("/api/v1/preflights/e1/campaign", json={
         "sources": _write_fake_dataset_bundle(tmp_path),
         "provider_manifest": manifest,
-        "s12_prompt_view_factory_id": "researcher-facet-view-v1",
-        "s12_prompt_view_factory_sha256": "c" * 64,
+        "s12_prompt_view_factory_id": PAPER_S12_POLICY_ID,
+        "s12_prompt_view_factory_sha256": PAPER_S12_POLICY_SHA256,
     })
     assert response.status_code == 422
+
+
+
+def test_registered_jigsaw_policy_endpoint_is_versioned_and_hash_addressed():
+    response = client.get("/api/v1/jigsaw/policy")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["factory_id"] == PAPER_S12_POLICY_ID
+    assert result["policy_sha256"] == PAPER_S12_POLICY_SHA256
+    assert result["policy_manifest"]["policy_id"] == PAPER_S12_POLICY_ID

@@ -18,12 +18,15 @@ async function api(path, options) {
 }
 
 async function loadCatalogue() {
-  const [strategies, datasets] = await Promise.all([
+  const [strategies, datasets, jigsawPolicy] = await Promise.all([
     api("/api/v1/strategies"),
     api("/api/v1/datasets"),
+    api("/api/v1/jigsaw/policy"),
   ]);
   strategyRows = strategies.strategies;
   datasetRows = datasets.datasets;
+  $("s12-factory-id").value = jigsawPolicy.factory_id;
+  $("s12-factory-sha").value = jigsawPolicy.policy_sha256;
   $("strategy").innerHTML = strategyRows.map(row =>
     `<option value="${row.id}">${row.id} — ${row.name}</option>`
   ).join("");
@@ -169,6 +172,7 @@ function showCampaignPreflight(report) {
   $("campaign-roster-count").textContent = report.provider_rosters_validated;
   $("campaign-model-modes").textContent = report.model_modes.join(" + ");
   $("campaign-provider-hash").textContent = report.engine_report.provider_manifest_sha256;
+  $("campaign-runtime-hash").textContent = report.runtime_campaign_manifest_sha256;
   $("campaign-remaining-gates").innerHTML = report.remaining_evidence_gates
     .map(item => `<li>${item}</li>`).join("");
   $("campaign-preflight-results").scrollIntoView({ behavior: "smooth", block: "start" });
