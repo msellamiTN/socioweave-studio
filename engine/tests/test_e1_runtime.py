@@ -126,12 +126,12 @@ def test_runtime_builds_direct_strategy_adapter_without_adaptive_selector():
     method = runtime.build_method(condition("S1", "heterogeneous"), prompt, extraction)
     assert isinstance(method, DirectProtocolStrategyAdapter)
 
-def test_runtime_refuses_to_invent_jigsaw_facets():
+def test_runtime_registers_versioned_paper_jigsaw_factory_by_default():
+    from sociodec.jigsaw import PAPER_S12_POLICY_ID, PAPER_S12_POLICY_SHA256
     runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
-    prompt = Prompt("Make a plan.", Interpretation("Make a plan"))
-    extraction = aggregate_extractions(())
-    with pytest.raises(ValueError, match="explicit prompt_view_factory"):
-        runtime.build_method(condition("S12"), prompt, extraction)
+    assert runtime.supports_jigsaw_facets is True
+    assert runtime.jigsaw_policy_id == PAPER_S12_POLICY_ID
+    assert runtime.jigsaw_policy_sha256 == PAPER_S12_POLICY_SHA256
 
 
 def test_runtime_rejects_debate_judge_from_an_author_family_before_adapter_creation():
@@ -236,12 +236,7 @@ def test_no_call_preflight_rejects_unversioned_custom_jigsaw_factory():
 
 
 def test_no_call_preflight_rejects_snapshot_manifest_tampering():
-    runtime = build_direct_e1_runtime(
-        registry=registry(), executor_id="executor-fixed",
-        prompt_view_factory=lambda _sid, _prompt, _extraction, ids: {
-            agent_id: "explicit facet fixture" for agent_id in ids
-        },
-    )
+    runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
     snapshot, conditions = full_conditions_fixture()
     changed = dict(snapshot.manifest)
     changed_entries = dict(changed["datasets"])
@@ -257,12 +252,7 @@ def test_no_call_preflight_rejects_snapshot_manifest_tampering():
 def test_no_call_preflight_rejects_heterogeneous_judge_family_collision():
     providers = registry()
     providers.assignments["heterogeneous"]["editor"] = spec("m1")
-    runtime = build_direct_e1_runtime(
-        registry=providers, executor_id="executor-fixed",
-        prompt_view_factory=lambda _sid, _prompt, _extraction, ids: {
-            agent_id: "explicit facet fixture" for agent_id in ids
-        },
-    )
+    runtime = build_direct_e1_runtime(registry=providers, executor_id="executor-fixed")
     snapshot, conditions = full_conditions_fixture()
     with pytest.raises(ValueError, match="judge editor shares a model family"):
         runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
