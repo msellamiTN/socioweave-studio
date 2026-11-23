@@ -87,6 +87,18 @@ def _provider_spec_from_manifest(item: dict[str, Any], label: str) -> ProviderSp
     }
     if not isinstance(connection, dict) or set(connection) != connection_fields:
         raise ValueError(f"{label} connection settings are incomplete or contain unsupported fields")
+    if not isinstance(connection["provider_name"], str) or not connection["provider_name"].strip():
+        raise ValueError(f"{label} provider_name must be non-empty")
+    if connection["base_url"] is not None and not isinstance(connection["base_url"], str):
+        raise ValueError(f"{label} base_url must be a string or null")
+    if connection["api_key_env"] is not None and not isinstance(connection["api_key_env"], str):
+        raise ValueError(f"{label} api_key_env must be a string or null")
+    if not isinstance(connection["load_in_4bit"], bool):
+        raise ValueError(f"{label} load_in_4bit must be boolean")
+    if type(connection["max_input_tokens"]) is not int or connection["max_input_tokens"] < 1:
+        raise ValueError(f"{label} max_input_tokens must be a positive integer")
+    if isinstance(connection["timeout_seconds"], bool) or not isinstance(connection["timeout_seconds"], (int, float)) or connection["timeout_seconds"] <= 0:
+        raise ValueError(f"{label} timeout_seconds must be positive")
     if not isinstance(provenance, dict):
         raise ValueError(f"{label} provenance must be an object")
     return ProviderSpec(
