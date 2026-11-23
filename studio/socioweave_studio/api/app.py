@@ -74,6 +74,24 @@ def datasets() -> dict[str, object]:
     }
 
 
+
+@app.get("/api/v1/strategies")
+def strategies() -> dict[str, object]:
+    return {
+        "strategies": [
+            {
+                "id": item.identifier.value,
+                "name": item.name,
+                "call_formula": item.call_formula,
+                "depth_formula": item.depth_formula,
+                "decision_rule": item.decision_rule,
+                "protocol_summary": item.protocol_summary,
+            }
+            for item in STRATEGIES
+        ]
+    }
+
+
 @app.post("/api/v1/config-previews")
 def create_config_preview(request: ConfigPreviewRequest) -> dict[str, object]:
     if request.strategy_id not in {item.identifier.value for item in STRATEGIES}:
@@ -125,3 +143,13 @@ def create_config_preview(request: ConfigPreviewRequest) -> dict[str, object]:
         "live_provider_calls": 0,
         "run_launch_enabled": False,
     }
+
+
+# Serve the operator interface from the same-origin API process. API routes
+# are registered first so the static mount cannot shadow versioned endpoints.
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+_web_root = Path(__file__).resolve().parents[2] / "web"
+if _web_root.is_dir():
+    app.mount("/", StaticFiles(directory=_web_root, html=True), name="studio-web")
