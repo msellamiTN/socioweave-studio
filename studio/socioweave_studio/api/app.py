@@ -20,6 +20,7 @@ from sociodec.e1_protocol import (
 from sociodec.datasets import E1DatasetSource, freeze_e1_benchmark_snapshot
 from sociodec.e1_runtime import build_direct_e1_runtime
 from sociodec.provider_factory import E1ProviderRegistry, ProviderSpec
+from sociodec.experiments import content_hash
 from sociodec.jigsaw import (
     PAPER_S12_POLICY_ID, PAPER_S12_POLICY_MANIFEST,
     PAPER_S12_POLICY_SHA256,
@@ -421,8 +422,11 @@ def create_e1_campaign_preflight(request: E1CampaignPreflightRequest) -> dict[st
     except (TypeError, ValueError, OSError, KeyError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    runtime_campaign_manifest = runtime.campaign_manifest()
     return {
         "schema_version": "e1-campaign-configuration-preflight-v1",
+        "runtime_campaign_manifest": runtime_campaign_manifest,
+        "runtime_campaign_manifest_sha256": content_hash(runtime_campaign_manifest),
         "readiness": "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS",
         "evidence_state": "CAMPAIGN_CONFIGURATION_PREFLIGHT_PASS",
         "e1_ready": False,
