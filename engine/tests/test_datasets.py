@@ -10,7 +10,7 @@ from sociodec.e1_protocol import ALL_DATASETS, EXPECTED_PROMPTS
 
 def test_registry_covers_paper_benchmarks_and_marks_license_review():
     assert {"BREAK", "StrategyQA", "TaskBench", "TravelPlanner", "smart-administration"} <= set(DATASET_REGISTRY)
-    assert all(DATASET_REGISTRY[name]["license_review_required"] for name in ("BREAK", "StrategyQA", "TaskBench", "TravelPlanner"))
+    assert all(DATASET_REGISTRY[name]["license_review_required"] for name in ("BREAK", "StrategyQA", "TaskBench", "TravelPlanner", "smart-administration"))
 
 
 def test_jsonl_loader_preserves_ids_splits_and_source_version(tmp_path):
