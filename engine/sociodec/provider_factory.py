@@ -318,6 +318,14 @@ class E1ProviderRegistry:
                 agent_id: {
                     "model_id": spec.model_id,
                     "backend": spec.backend,
+                    "connection": {
+                        "provider_name": spec.provider_name,
+                        "base_url": spec.base_url,
+                        "api_key_env": spec.api_key_env,
+                        "load_in_4bit": spec.load_in_4bit,
+                        "max_input_tokens": spec.max_input_tokens,
+                        "timeout_seconds": spec.timeout_seconds,
+                    },
                     "provenance": self._require_provenance(spec, f"{mode}/{agent_id}"),
                 }
                 for agent_id, spec in sorted(roster.items())
@@ -334,6 +342,14 @@ class E1ProviderRegistry:
                 "executor_id": executor_id,
                 "model_id": self.executor_spec.model_id,
                 "backend": self.executor_spec.backend,
+                "connection": {
+                    "provider_name": self.executor_spec.provider_name,
+                    "base_url": self.executor_spec.base_url,
+                    "api_key_env": self.executor_spec.api_key_env,
+                    "load_in_4bit": self.executor_spec.load_in_4bit,
+                    "max_input_tokens": self.executor_spec.max_input_tokens,
+                    "timeout_seconds": self.executor_spec.timeout_seconds,
+                },
                 "provenance": self._require_provenance(self.executor_spec, "fixed executor ME"),
             },
         }
