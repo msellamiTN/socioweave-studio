@@ -15,11 +15,11 @@ CORE 07 represents a social strategy as a formal object. CORE 08 introduces a ge
 4. For a step authored by agent `a`, only prior outputs authored by agents `b` for which `(a,b) ∈ V_round` are placed in its visible-output context.
 5. An `output:<output_id>` input reference must resolve to an earlier output and must pass the visibility check. `prompt` is the only built-in initial input reference.
 6. Steps marked `invokes_model=True` use the model executor. Steps marked false require a separately supplied local executor and do not increment model-call accounting.
-7. The final trace is checked against the strategy's declared `calls(σ)` and `depth(σ)`.
+7. For `anonymous=True`, executor-facing agent IDs, output IDs, and input references are replaced by deterministic opaque aliases; visibility is enforced against internal identities before aliases are exposed. The internal audit trace retains real identities.\n8. The final trace is checked against the strategy's declared `calls(σ)` and `depth(σ)`.
 
 ## Trace contract
 
-Each step record retains output identity, agent, action, round, stage, input reference, model-call flag, visible output IDs and output text. This supports later audit and replay work. The kernel does not currently persist traces to a database or implement a decision-rule adjudicator.
+Each internal step record retains output identity, agent, action, round, stage, input reference, model-call flag, visible output IDs and output text. In anonymous mode this internal trace is not passed to the executor: the executor receives a sanitized step object, opaque visible-output keys, and opaque author aliases. The kernel does not currently persist traces to a database or implement a decision-rule adjudicator.
 
 ## Explicit limitations
 
@@ -38,7 +38,7 @@ Tests cover:
 - rejection of forward/same-stage references;
 - separation of model and local steps;
 - exact call and depth accounting;
-- rejection of empty executor outputs.
+- rejection of empty executor outputs;\n- anonymous-context regression: no original agent identifier or identity-bearing output key is exposed to the executor.
 
 Run:
 
