@@ -36,12 +36,12 @@ def test_jsonl_loader_rejects_unknown_dataset_duplicate_and_bad_rows(tmp_path):
     with pytest.raises(ValueError, match="line 1"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
     path.write_text(
-        '{"example_id":"x","prompt_text":"A","reference_data":{"gold":"A"}}\n{"example_id":"x","prompt_text":"B","reference_data":{"gold":"B"}}\n',
+        '{"example_id":"x","prompt_text":"A","split":"test","reference_data":{"gold":"A"}}\n{"example_id":"x","prompt_text":"B","split":"test","reference_data":{"gold":"B"}}\n',
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="duplicate"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
-    path.write_text(json.dumps({"example_id": "y", "prompt_text": "A", "reference_data": {"gold": "A"}}) + chr(10), encoding="utf-8")
+    path.write_text(json.dumps({"example_id": "y", "prompt_text": "A", "split": "test", "reference_data": {"gold": "A"}}) + chr(10), encoding="utf-8")
     with pytest.raises(ValueError, match="expected"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1", expected_count=3)
 
@@ -179,7 +179,7 @@ def test_dataset_source_requires_explicit_selection_and_usage_approval(tmp_path)
 def test_jsonl_loader_rejects_non_object_reference_data(tmp_path):
     path = tmp_path / "bad-reference.jsonl"
     path.write_text(json.dumps({
-        "example_id": "q1", "prompt_text": "Do task", "reference_data": ["not", "an", "object"],
+        "example_id": "q1", "prompt_text": "Do task", "split": "test", "reference_data": ["not", "an", "object"],
     }) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="reference_data must be a JSON object"):
         load_jsonl_dataset(path, dataset="BREAK", source_version="v1")
