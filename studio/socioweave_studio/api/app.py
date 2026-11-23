@@ -50,7 +50,6 @@ def capabilities() -> dict[str, object]:
         "api_version": "v1",
         "configuration_preview": True,
         "dataset_catalogue": True,
-        "full_e1_preflight": True,\n        "e1_preflight_mode": "local_operator_declared_sources_zero_live_calls",
         "run_launch": False,
         "provider_execution": False,
         "live_provider_calls_enabled": False,
