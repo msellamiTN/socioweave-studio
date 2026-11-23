@@ -93,8 +93,10 @@ def test_execution_and_provider_routes_are_not_exposed():
 
 
 
+
+
 def _write_fake_dataset_bundle(tmp_path):
-    """Create paper-sized fixtures for API tests only; never benchmark evidence."""
+    """Paper-count-sized test fixtures, explicitly not benchmark evidence."""
     import json
     from sociodec.e1_protocol import ALL_DATASETS, EXPECTED_PROMPTS
 
@@ -105,27 +107,26 @@ def _write_fake_dataset_bundle(tmp_path):
             for index in range(EXPECTED_PROMPTS[dataset_id]):
                 row = {
                     "example_id": f"{dataset_id}-{index:03d}",
-                    "prompt_text": f"Test-only fixture prompt {index} for {dataset_id}",
+                    "prompt_text": f"Test fixture prompt {index} for {dataset_id}",
                     "split": "test",
                     "metadata": {"fixture": True},
                     "reference_data": {"fixture_reference": index},
                 }
-                stream.write(json.dumps(row) + "\\n")
+                stream.write(json.dumps(row) + "\n")
         declarations[dataset_id] = {
             "path": str(path),
             "source_version": "test-fixture-v1",
             "split": "test",
-            "selection_protocol": "unit-test fixture; not benchmark evidence",
+            "selection_protocol": "test fixture only; not benchmark evidence",
             "license_review_status": "approved",
             "selection_seed": 7,
         }
     return declarations
 
 
-def test_e1_preflight_validates_full_grid_with_zero_provider_calls(tmp_path):
+def test_e1_preflight_validates_complete_grid_without_live_calls(tmp_path):
     response = client.post("/api/v1/preflights/e1", json={
         "sources": _write_fake_dataset_bundle(tmp_path),
-        "n": 3, "k": 3, "T": 2,
     })
     assert response.status_code == 200, response.text
     report = response.json()
@@ -139,119 +140,33 @@ def test_e1_preflight_validates_full_grid_with_zero_provider_calls(tmp_path):
     assert len(report["snapshot_sha256"]) == 64
 
 
-def test_e1_preflight_rejects_pending_license_and_nested_extra_keys(tmp_path):
+def test_e1_preflight_fails_closed_for_pending_license_and_extra_metadata(tmp_path):
     sources = _write_fake_dataset_bundle(tmp_path)
     sources["BREAK"]["license_review_status"] = "pending"
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
-    assert "approved" in response.json()["detail"]
+    result = client.post("/api/v1/preflights/e1", json={"sources": sources})
+    assert result.status_code == 422
+    assert "approved" in result.json()["detail"]
 
     sources = _write_fake_dataset_bundle(tmp_path)
-    sources["BREAK"]["unexpected"] = "no"
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
+    sources["BREAK"]["secret"] = "not-allowed"
+    result = client.post("/api/v1/preflights/e1", json={"sources": sources})
+    assert result.status_code == 422
 
 
-def test_e1_preflight_requires_exact_five_dataset_sources(tmp_path):
+def test_e1_preflight_requires_all_five_dataset_files(tmp_path):
     sources = _write_fake_dataset_bundle(tmp_path)
-    sources.pop("BREAK")
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
+    del sources["BREAK"]
+    result = client.post("/api/v1/preflights/e1", json={"sources": sources})
+    assert result.status_code == 422
 
 
-def test_e1_preflight_rejects_missing_structured_reference(tmp_path):
+def test_e1_preflight_requires_structured_reference_data(tmp_path):
     import json
     sources = _write_fake_dataset_bundle(tmp_path)
     source = tmp_path / "BREAK.jsonl"
     rows = [json.loads(line) for line in source.read_text(encoding="utf-8").splitlines()]
     rows[0]["reference_data"] = {}
-    source.write_text("".join(json.dumps(row) + "\\n" for row in rows), encoding="utf-8")
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
-    assert "reference_data is required" in response.json()["detail"]
-
-
-def test_e1_preflight_never_exposes_run_launch_route():
-    assert client.post("/api/v1/runs", json={}).status_code in {404, 405}
-
-
-def _write_fake_dataset_bundle(tmp_path):
-    """Create paper-sized fixtures for API tests only; never benchmark evidence."""
-    import json
-    from sociodec.e1_protocol import ALL_DATASETS, EXPECTED_PROMPTS
-
-    declarations = {}
-    for dataset_id in ALL_DATASETS:
-        path = tmp_path / f"{dataset_id}.jsonl"
-        with path.open("w", encoding="utf-8") as stream:
-            for index in range(EXPECTED_PROMPTS[dataset_id]):
-                row = {
-                    "example_id": f"{dataset_id}-{index:03d}",
-                    "prompt_text": f"Test-only fixture prompt {index} for {dataset_id}",
-                    "split": "test",
-                    "metadata": {"fixture": True},
-                    "reference_data": {"fixture_reference": index},
-                }
-                stream.write(json.dumps(row) + "\\n")
-        declarations[dataset_id] = {
-            "path": str(path),
-            "source_version": "test-fixture-v1",
-            "split": "test",
-            "selection_protocol": "unit-test fixture; not benchmark evidence",
-            "license_review_status": "approved",
-            "selection_seed": 7,
-        }
-    return declarations
-
-
-def test_e1_preflight_validates_full_grid_with_zero_provider_calls(tmp_path):
-    response = client.post("/api/v1/preflights/e1", json={
-        "sources": _write_fake_dataset_bundle(tmp_path),
-        "n": 3, "k": 3, "T": 2,
-    })
-    assert response.status_code == 200, response.text
-    report = response.json()
-    assert report["readiness"] == "CONFIG_PREFLIGHT_PASS"
-    assert report["condition_count"] == 4550
-    assert report["method_condition_count"] == 650
-    assert report["matched_baseline_condition_count"] == 3900
-    assert report["live_provider_calls"] == 0
-    assert report["run_launch_enabled"] is False
-    assert report["grid_errors"] == []
-    assert len(report["snapshot_sha256"]) == 64
-
-
-def test_e1_preflight_rejects_pending_license_and_nested_extra_keys(tmp_path):
-    sources = _write_fake_dataset_bundle(tmp_path)
-    sources["BREAK"]["license_review_status"] = "pending"
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
-    assert "approved" in response.json()["detail"]
-
-    sources = _write_fake_dataset_bundle(tmp_path)
-    sources["BREAK"]["unexpected"] = "no"
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
-
-
-def test_e1_preflight_requires_exact_five_dataset_sources(tmp_path):
-    sources = _write_fake_dataset_bundle(tmp_path)
-    sources.pop("BREAK")
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
-
-
-def test_e1_preflight_rejects_missing_structured_reference(tmp_path):
-    import json
-    sources = _write_fake_dataset_bundle(tmp_path)
-    source = tmp_path / "BREAK.jsonl"
-    rows = [json.loads(line) for line in source.read_text(encoding="utf-8").splitlines()]
-    rows[0]["reference_data"] = {}
-    source.write_text("".join(json.dumps(row) + "\\n" for row in rows), encoding="utf-8")
-    response = client.post("/api/v1/preflights/e1", json={"sources": sources})
-    assert response.status_code == 422
-    assert "reference_data is required" in response.json()["detail"]
-
-
-def test_e1_preflight_never_exposes_run_launch_route():
-    assert client.post("/api/v1/runs", json={}).status_code in {404, 405}
+    source.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    result = client.post("/api/v1/preflights/e1", json={"sources": sources})
+    assert result.status_code == 422
+    assert "reference_data is required" in result.json()["detail"]
