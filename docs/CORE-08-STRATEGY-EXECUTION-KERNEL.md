@@ -1,6 +1,6 @@
 # Social Strategy Execution Kernel — CORE 08
 
-**Status:** execution-kernel implementation submitted for CI validation  
+**Status:** merged implementation; validation scope limited to kernel contracts  
 **Scientific basis:** Definitions 9–10 and the visibility/protocol representation documented in CORE 07.
 
 ## Purpose
@@ -15,7 +15,8 @@ CORE 07 represents a social strategy as a formal object. CORE 08 introduces a ge
 4. For a step authored by agent `a`, only prior outputs authored by agents `b` for which `(a,b) ∈ V_round` are placed in its visible-output context.
 5. An `output:<output_id>` input reference must resolve to an earlier output and must pass the visibility check. `prompt` is the only built-in initial input reference.
 6. Steps marked `invokes_model=True` use the model executor. Steps marked false require a separately supplied local executor and do not increment model-call accounting.
-7. For `anonymous=True`, executor-facing agent IDs, output IDs, and input references are replaced by deterministic opaque aliases; visibility is enforced against internal identities before aliases are exposed. The internal audit trace retains real identities.\n8. The final trace is checked against the strategy's declared `calls(σ)` and `depth(σ)`.
+7. For `anonymous=True`, executor-facing agent IDs, output IDs, and input references are replaced by deterministic opaque aliases; visibility is enforced against internal identities before aliases are exposed. The internal audit trace retains real identities.
+8. The final trace is checked against the strategy's declared `calls(σ)` and `depth(σ)`.
 
 ## Trace contract
 
@@ -38,7 +39,8 @@ Tests cover:
 - rejection of forward/same-stage references;
 - separation of model and local steps;
 - exact call and depth accounting;
-- rejection of empty executor outputs;\n- anonymous-context regression: no original agent identifier or identity-bearing output key is exposed to the executor.
+- rejection of empty executor outputs;
+- anonymous-context regression: no original agent identifier or identity-bearing output key is exposed to the executor.
 
 Run:
 
