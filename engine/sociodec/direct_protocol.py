@@ -112,11 +112,10 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         if set(models) != set(agent_ids) or any(not isinstance(v, str) or not v.strip() for v in models.values()):
             raise ValueError("model_resolver must return a non-empty model ID for every agent")
         distinct = set(models.values())
-        required_models = 1 if condition.model_mode == "homogeneous" else 2
-        if len(distinct) < required_models:
-            raise ValueError(
-                f"{condition.model_mode} condition requires at least {required_models} distinct model identities"
-            )
+        if condition.model_mode == "homogeneous" and len(distinct) != 1:
+            raise ValueError("homogeneous condition requires exactly one model identity")
+        if condition.model_mode == "heterogeneous" and len(distinct) < 2:
+            raise ValueError("heterogeneous condition requires at least two distinct model identities")
         model_families: dict[str, str] = {}
         if self.model_family_resolver is not None:
             model_families = dict(self.model_family_resolver(condition, agent_ids))
@@ -125,10 +124,12 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 for value in model_families.values()
             ):
                 raise ValueError("model_family_resolver must return one non-empty family ID per agent")
-            required_families = 1 if condition.model_mode == "homogeneous" else min(2, len(agent_ids))
-            if len(set(model_families.values())) < required_families:
+            distinct_families = set(model_families.values())
+            if condition.model_mode == "homogeneous" and len(distinct_families) != 1:
+                raise ValueError("homogeneous condition requires exactly one model family")
+            if condition.model_mode == "heterogeneous" and len(distinct_families) < min(2, len(agent_ids)):
                 raise ValueError(
-                    f"{condition.model_mode} condition requires at least {required_families} distinct model families"
+                    f"heterogeneous condition requires at least {min(2, len(agent_ids))} distinct model families"
                 )
             for assignment in roster.strategy.assignments:
                 if condition.model_mode != "heterogeneous" or assignment.role is not Role.JUDGE:
