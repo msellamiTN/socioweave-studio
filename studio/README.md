@@ -25,6 +25,20 @@ python -m pip install -e "engine[dev]" -e ./studio "httpx>=0.27,<1.0"
 uvicorn socioweave_studio.api.app:app --app-dir studio --reload
 ```
 
+To create the canonical provider manifest, construct the operator's validated
+`E1ProviderRegistry` and call `registry.campaign_manifest(executor_id=...)`
+(or `runtime.campaign_manifest()` after `build_direct_e1_runtime`). Serialize
+that return value as JSON and paste it into the Studio. The manifest includes
+non-secret provider routing settings and environment-variable *names* only;
+it must never contain credential values. Hosted-provider environment variables
+must be configured in the API process only if/when execution is later enabled.
+The no-call preflight uses an identity-only provider stub and does not read
+those variables or initialize model clients.
+
+The S12 factory ID and SHA-256 fields document the intended implementation;
+they do not load or test the callback. A separate implementation/test gate is
+required before E1 readiness.
+
 Open `/docs` on the local server for the OpenAPI contract.
 
 ## API
