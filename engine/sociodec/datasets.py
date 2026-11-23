@@ -79,7 +79,7 @@ DATASET_REGISTRY = {
         "coverage_applicable": True,
         "source_release_status": "to_be_released_with_code",
         "selection_protocol": "author-curated 60-prompt set; exact version and IDs must be supplied",
-        "license_review_required": False,
+        "license_review_required": True,
     },
 }
 
