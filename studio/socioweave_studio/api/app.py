@@ -13,7 +13,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sociodec.catalogue import STRATEGIES, get_strategy
 from sociodec.datasets import DATASET_REGISTRY
-from sociodec.e1_protocol import (\n    ALL_DATASETS, BASELINES, MODEL_MODES, build_e1_conditions,\n    e1_metric_obligations, validate_e1_manifest,\n)\nfrom sociodec.datasets import E1DatasetSource, freeze_e1_benchmark_snapshot
+from sociodec.e1_protocol import (
+    ALL_DATASETS, BASELINES, MODEL_MODES, build_e1_conditions,
+    e1_metric_obligations, validate_e1_manifest,
+)
+from sociodec.datasets import E1DatasetSource, freeze_e1_benchmark_snapshot
 
 
 class ConfigPreviewRequest(BaseModel):
@@ -31,7 +35,7 @@ class ConfigPreviewRequest(BaseModel):
 app = FastAPI(
     title="SOCIOWEAVE Studio API",
     version="0.1.0",
-    description="Research configuration preview; execution remains disabled.",
+    description="Research configuration preview and zero-call E1 preflight; execution remains disabled.",
 )
 
 
@@ -142,6 +146,78 @@ def create_config_preview(request: ConfigPreviewRequest) -> dict[str, object]:
         ],
         "live_provider_calls": 0,
         "run_launch_enabled": False,
+    }
+
+
+@app.post("/api/v1/preflights/e1")
+def create_e1_preflight(request: E1PreflightRequest) -> dict[str, object]:
+    """Freeze operator-supplied local inputs and validate the paper E1 grid.
+
+    This is configuration validation only: no provider/model calls are made.
+    """
+    if set(request.sources) != set(ALL_DATASETS):
+        raise HTTPException(status_code=422, detail="sources must declare exactly the five E1 datasets")
+
+    parsed_sources: dict[str, E1DatasetSource] = {}
+    try:
+        for dataset_id, raw in request.sources.items():
+            allowed = {
+                "path", "source_version", "split", "selection_protocol",
+                "license_review_status", "selection_seed",
+            }
+            if set(raw) != allowed:
+                raise ValueError(f"{dataset_id} source must provide exactly: {sorted(allowed)}")
+            parsed_sources[dataset_id] = E1DatasetSource(**raw)
+        snapshot = freeze_e1_benchmark_snapshot(parsed_sources)
+        conditions = build_e1_conditions(
+            expected_prompt_ids=snapshot.expected_prompt_ids,
+            n=request.n, k=request.k, T=request.T,
+        )
+        errors = validate_e1_manifest(
+            conditions, expected_prompt_ids=snapshot.expected_prompt_ids,
+            require_complete_grid=True,
+        )
+    except (TypeError, ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    method_count = sum(1 for row in conditions if row.method_id not in BASELINES)
+    return {
+        "schema_version": "e1-preflight-report-v1",
+        "readiness": "CONFIG_PREFLIGHT_PASS",
+        "evidence_state": "CONFIG_PREFLIGHT_PASS",
+        "snapshot_sha256": snapshot.manifest["snapshot_sha256"],
+        "snapshot_manifest": snapshot.manifest,
+        "dataset_prompt_counts": {
+            dataset_id: len(snapshot.expected_prompt_ids[dataset_id])
+            for dataset_id in ALL_DATASETS
+        },
+        "condition_count": len(conditions),
+        "method_condition_count": method_count,
+        "matched_baseline_condition_count": len(conditions) - method_count,
+        "model_modes": list(MODEL_MODES),
+        "seed_indices": list(range(5)),
+        "strategy_count": len(STRATEGIES),
+        "baseline_count": len(BASELINES),
+        "metric_obligations": {
+            dataset_id: sorted(e1_metric_obligations(dataset_id))
+            for dataset_id in ALL_DATASETS
+        },
+        "grid_errors": list(errors),
+        "live_provider_calls": 0,
+        "run_launch_enabled": False,
+        "blocking_requirements": [
+            "provider/model family provenance and immutable revisions",
+            "fixed executor identity and execution protocol",
+            "extractor/human audit evidence and reference annotation review",
+            "token/cost ceiling and explicit operator authorization",
+            "T4 infrastructure smoke and provider smoke, where required",
+        ],
+        "note": (
+            "The preflight validates local files, declared provenance and license approval, "
+            "paper prompt counts, reference-data presence, frozen hashes and the complete "
+            "budget-matched E1 condition grid. It does not verify the truth of license or "
+            "provider-family declarations, annotation quality, model connectivity, or execution."
+        ),
     }
 
 
