@@ -385,3 +385,30 @@ def test_direct_s12_rejects_heterogeneity_if_empty_facet_removal_leaves_one_fami
     )
     with pytest.raises(ValueError, match="active facets and integrator"):
         adapter.run(condition=condition, prompt=PROMPT, seed=37)
+
+
+
+def test_paper_s12_factory_fails_closed_on_unresolved_entity_reference():
+    requirement = Requirement(
+        "The agency signs the agreement",
+        RequirementType.CONSTRAINT,
+        "legal",
+        SourceSpan(0, 32),
+        entity_names=("Missing agency",),
+    )
+    extraction = aggregate_extractions((
+        ExtractionResult(requirements=(requirement,), extractor_id="extractor-1"),
+    ))
+    with pytest.raises(ValueError, match="absent from N_hat"):
+        PaperJigsawPromptViewFactory()(
+            StrategyId.S12, PROMPT, extraction,
+            ("expert-1", "expert-2", "expert-3", "integrator"),
+        )
+
+
+def test_paper_s12_factory_fails_when_all_facets_are_empty():
+    with pytest.raises(ValueError, match="all three extracted facets are empty"):
+        PaperJigsawPromptViewFactory()(
+            StrategyId.S12, PROMPT, aggregate_extractions(()),
+            ("expert-1", "expert-2", "expert-3", "integrator"),
+        )
