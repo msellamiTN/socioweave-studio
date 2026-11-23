@@ -179,7 +179,9 @@ def load_jsonl_dataset(
                     raise ValueError("row must be a JSON object")
                 example_id = item.get("example_id")
                 prompt_text = item.get("prompt_text")
-                split = item.get("split", "test")
+                split = item.get("split")
+                if split is None:
+                    raise ValueError("split must be explicitly present on every row; implicit defaults are forbidden")
                 metadata = item.get("metadata", {})
                 reference_data = item.get("reference_data", {})
                 if not isinstance(example_id, str) or not example_id.strip():
