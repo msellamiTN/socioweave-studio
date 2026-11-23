@@ -168,7 +168,7 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
         active_agent_ids = tuple(
             agent_id for agent_id in agent_ids if agent_id not in set(dropped_facets)
         )
-        if condition.model_mode == "heterogeneous":
+        if sid is StrategyId.S12 and condition.model_mode == "heterogeneous":
             if len({models[agent_id] for agent_id in active_agent_ids}) < 2:
                 raise ValueError(
                     "heterogeneous S12 must retain at least two distinct model identities among active facets and integrator"
