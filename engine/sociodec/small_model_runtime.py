@@ -77,6 +77,7 @@ class SmallModelRun:
             "provider_calls": self.provider_calls,
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
+            "token_accounting_scope": "decomposition_call_only; extraction token usage unavailable in current ExtractionResult contract",
             "requirements": len(self.extraction.requirements),
             "hypotheses": len(self.extraction.hypotheses),
             "entities": len(self.extraction.entities),
@@ -112,7 +113,15 @@ def build_t4_provider(config: SmallModelConfig | None = None) -> HuggingFaceLoca
 
 
 def _decomposition_payload(text: str) -> dict[str, Any]:
-    value = json.loads(text.strip())
+    candidate = text.strip()
+    if candidate.startswith("```"):
+        lines = candidate.splitlines()
+        if lines and lines[0].strip().lower() in {"```", "```json"}:
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        candidate = "\\n".join(lines).strip()
+    value = json.loads(candidate)
     if not isinstance(value, dict):
         raise ValueError("decomposition response root must be a JSON object")
     required = {"subproblems", "dependencies", "composition"}
@@ -186,12 +195,11 @@ def run_small_model_core(
     if hasattr(model, "load"):
         model.load()  # type: ignore[attr-defined]
 
-    extraction_generation = GenerationConfig(
-        temperature=0.7, max_new_tokens=cfg.extraction_tokens, seed=cfg.seed,
-    )
     extractors = tuple(
         ProviderRequirementExtractor(
-            model, f"small-model-extractor-{index + 1}", extraction_generation,
+            model,
+            f"small-model-extractor-{index + 1}",
+            GenerationConfig(temperature=0.7, max_new_tokens=cfg.extraction_tokens, seed=cfg.seed + index),
         )
         for index in range(cfg.extractor_count)
     )
