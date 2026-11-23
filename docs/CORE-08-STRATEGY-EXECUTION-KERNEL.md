@@ -1,6 +1,6 @@
 # Social Strategy Execution Kernel — CORE 08
 
-**Status:** execution-kernel implementation submitted for CI validation  
+**Status:** merged implementation; validation scope limited to kernel contracts  
 **Scientific basis:** Definitions 9–10 and the visibility/protocol representation documented in CORE 07.
 
 ## Purpose
