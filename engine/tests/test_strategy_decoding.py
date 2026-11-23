@@ -167,8 +167,12 @@ def test_s12_rejects_missing_integrator_output():
 def test_s12_rejects_integrator_that_drops_expert_subproblem():
     prompt, extraction, _, raw = fixture()
     dropped = dict(raw)
-    dropped["subproblems"] = []
-    dropped["kappa"] = {}
+    dropped["subproblems"] = [{
+        "id": "replacement", "question": "Unrelated replacement task",
+        "inputs": [], "output": "Different output",
+        "local_constraints": [], "covered_requirements": [],
+    }]
+    dropped["kappa"] = {"Service plan": ["replacement"]}
     outputs = (
         candidate_out(0, "expert-1"),
         out(1, "integrator", "merge", {"candidate": dropped}),
