@@ -207,9 +207,7 @@ def test_no_call_preflight_validates_complete_e1_grid_and_all_provider_rosters()
     providers = registry()
     runtime = build_direct_e1_runtime(
         registry=providers, executor_id="executor-fixed",
-        prompt_view_factory=lambda _sid, _prompt, _extraction, ids: {
-            agent_id: "explicit facet fixture" for agent_id in ids
-        },
+        
     )
     snapshot, conditions = full_conditions_fixture()
     report = runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
@@ -223,10 +221,15 @@ def test_no_call_preflight_validates_complete_e1_grid_and_all_provider_rosters()
     assert len(report.conditions_sha256) == 64
 
 
-def test_no_call_preflight_rejects_missing_jigsaw_facet_factory():
-    runtime = build_direct_e1_runtime(registry=registry(), executor_id="executor-fixed")
+def test_no_call_preflight_rejects_unversioned_custom_jigsaw_factory():
+    runtime = build_direct_e1_runtime(
+        registry=registry(), executor_id="executor-fixed",
+        prompt_view_factory=lambda _sid, _prompt, _extraction, ids: {
+            agent_id: "custom facet view" for agent_id in ids
+        },
+    )
     snapshot, conditions = full_conditions_fixture()
-    with pytest.raises(ValueError, match="S12 preflight requires an explicit Jigsaw"):
+    with pytest.raises(ValueError, match="versioned Jigsaw facet policy"):
         runtime.preflight_campaign(snapshot=snapshot, conditions=conditions)
 
 
