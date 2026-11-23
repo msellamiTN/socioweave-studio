@@ -48,8 +48,9 @@ Section 8.1 states that 100 prompts are sampled from each public benchmark and t
 - Official Hugging Face dataset: https://huggingface.co/datasets/microsoft/Taskbench
 - The inspected Hub structure exposes three test configurations: `huggingface` (about 7.5K rows), `multimedia` (about 5.6K), and `dailylifeapis` (about 4.3K), about 17.3K rows total. The Hub card declares MIT.
 - The published schema contains IDs, sampled tool nodes/links, instruction, tool steps, tool nodes and tool links. The dataset README explains that the task solution is represented as a tool invocation graph with dependencies, which is consistent with the paper's reference-graph requirement.
+- **Material source discrepancy:** the Microsoft JARVIS repository README reports 28,271 samples across the three domains (12,217 Hugging Face Tools, 8,904 Multimedia Tools, 7,150 Daily Life APIs), and its badge identifies Apache-2.0. The Hugging Face `microsoft/Taskbench` card/structure currently advertises MIT and exposes only about 17,300 rows (about 7.5K / 5.6K / 4.3K across its three test configs). These counts and license declarations do not match. Do not treat the Hub conversion as interchangeable with the canonical repository data until the exact revision, subset, conversion, and applicable license are reconciled.
 - Candidate reference mapping: `instruction` -> `prompt_text`; preserve `tool_steps`, `tool_nodes`, `tool_links`, `sampled_nodes`, `sampled_links`, domain/config and row ID in structured `reference_data`.
-- **Blocker:** the paper requires 100 prompts but does not specify domain proportions. The study must preregister whether it samples 100 from one domain or stratifies across all three, with exact counts and deterministic selection. Pin the exact Hub/repository revision and retain all graph fields.
+- **Blocker:** the paper requires 100 prompts but does not specify domain proportions. The study must preregister whether it samples 100 from one domain or stratifies across all three, with exact counts and deterministic selection. Prefer the canonical Microsoft repository artifact after resolving the 28,271-vs-17,300 and Apache-2.0-vs-MIT discrepancies. Pin exact source revisions and retain all graph fields.
 
 ### 2.4 TravelPlanner
 
@@ -99,7 +100,7 @@ The existing loader enforces exact counts (100/100/100/100/60), unique IDs, spli
 |---|---|---|---|---|---|
 | BREAK | Yes | Yes | **Open**: underlying sources and Hub license metadata | No | BLOCKED |
 | StrategyQA | Canonical page identified; access not verified | Yes | **Open**: canonical data terms/package | No | BLOCKED |
-| TaskBench | Yes | Yes | Hub declares MIT; exact revision/domain protocol open | No | BLOCKED |
+| TaskBench | Yes, but two published representations differ | Yes | **Open**: repository says Apache-2.0/28,271; Hub says MIT/~17,300 | No | BLOCKED |
 | TravelPlanner | Yes | Yes | Hub declares CC-BY-4.0; exact revision/attribution open | No | BLOCKED |
 | smart-administration | No public artifact found | Specified by paper | Author release/review evidence pending | No | BLOCKED |
 
