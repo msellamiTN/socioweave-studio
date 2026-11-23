@@ -45,7 +45,7 @@ class E1PreflightRequest(BaseModel):
 app = FastAPI(
     title="SOCIOWEAVE Studio API",
     version="0.1.0",
-    description="Research configuration preview and zero-call E1 preflight; execution remains disabled.",
+    description="Research configuration preview and zero-call E1 dataset/grid preflight; full campaign validation and execution remain disabled.",
 )
 
 
@@ -60,8 +60,9 @@ def capabilities() -> dict[str, object]:
         "api_version": "v1",
         "configuration_preview": True,
         "dataset_catalogue": True,
-        "full_e1_preflight": True,
-        "e1_preflight_mode": "local_operator_declared_sources_zero_live_calls",
+        "full_e1_preflight": False,
+        "e1_dataset_grid_preflight": True,
+        "e1_preflight_mode": "dataset_snapshot_and_condition_grid_only_zero_live_calls",
         "run_launch": False,
         "provider_execution": False,
         "live_provider_calls_enabled": False,
@@ -193,9 +194,10 @@ def create_e1_preflight(request: E1PreflightRequest) -> dict[str, object]:
 
     method_count = sum(1 for row in conditions if row.method_id not in BASELINES)
     return {
-        "schema_version": "e1-preflight-report-v1",
-        "readiness": "CONFIG_PREFLIGHT_PASS",
-        "evidence_state": "CONFIG_PREFLIGHT_PASS",
+        "schema_version": "e1-dataset-grid-preflight-report-v1",
+        "preflight_scope": "dataset_snapshot_and_condition_grid_only",
+        "readiness": "DATASET_GRID_PREFLIGHT_PASS",
+        "evidence_state": "DATASET_GRID_PREFLIGHT_PASS",
         "snapshot_sha256": snapshot.manifest["snapshot_sha256"],
         "snapshot_manifest": snapshot.manifest,
         "dataset_prompt_counts": {
@@ -217,8 +219,10 @@ def create_e1_preflight(request: E1PreflightRequest) -> dict[str, object]:
         "live_provider_calls": 0,
         "run_launch_enabled": False,
         "blocking_requirements": [
-            "provider/model family provenance and immutable revisions",
+            "complete provider manifest: 38 method/model-mode rosters and immutable model revisions",
+            "verified MA/MB/MC family and provider-organization declarations for heterogeneous mode",
             "fixed executor identity and execution protocol",
+            "S12 explicit facet prompt-view factory",
             "extractor/human audit evidence and reference annotation review",
             "token/cost ceiling and explicit operator authorization",
             "T4 infrastructure smoke and provider smoke, where required",
