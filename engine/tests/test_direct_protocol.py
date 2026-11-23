@@ -8,8 +8,9 @@ from sociodec.direct_protocol import DirectProtocolStrategyAdapter
 from sociodec.e1_protocol import E1Condition
 from sociodec.extraction import ExtractionResult, aggregate_extractions
 from sociodec.models.decomposition import Decomposition, DeliverableComposition, Subproblem
-from sociodec.models.prompt import Interpretation, Prompt, Requirement, RequirementType, SourceSpan
+from sociodec.models.prompt import Entity, Interpretation, Prompt, Requirement, RequirementType, SourceSpan
 from sociodec.strategy_decoding import DecisionAdjudication
+from sociodec.jigsaw import PaperJigsawPromptViewFactory, PAPER_S12_POLICY_ID
 
 
 PROMPT = Prompt(
@@ -286,3 +287,67 @@ def test_heterogeneous_strategy_rejects_judge_sharing_author_family():
     )
     with pytest.raises(ValueError, match="judge editor must use a model family distinct"):
         adapter.run(condition=condition, prompt=PROMPT, seed=21)
+
+
+def test_paper_s12_factory_builds_goal_constraint_and_actor_facets_from_extraction():
+    requirement = Requirement(
+        "The agency signs the agreement",
+        RequirementType.CONSTRAINT,
+        "legal",
+        SourceSpan(0, 32),
+        entity_names=("Agency",),
+    )
+    extraction = aggregate_extractions((
+        ExtractionResult(
+            requirements=(requirement,),
+            entities=(Entity("Agency", "Public authority"),),
+            extractor_id="extractor-1",
+        ),
+    ))
+    bundle = PaperJigsawPromptViewFactory()(
+        StrategyId.S12, PROMPT, extraction,
+        ("expert-1", "expert-2", "expert-3", "integrator"),
+    )
+    assert bundle.policy_id == PAPER_S12_POLICY_ID
+    assert bundle.active_facets == ("expert-2", "expert-3")
+    assert bundle.dropped_facets == ("expert-1",)
+    actor_view = json.loads(bundle.views["expert-3"])
+    assert actor_view["facet_id"] == "actors_resources"
+    assert actor_view["entities"][0]["name"] == "Agency"
+    assert actor_view["entities"][0]["requirements"][0]["statement"] == requirement.statement
+    constraint_view = json.loads(bundle.views["expert-2"])
+    assert [item["type"] for item in constraint_view["requirements"]] == ["constraint"]
+
+
+def test_direct_s12_skips_empty_facets_without_model_calls():
+    candidate_json = json.dumps(candidate("Create a report"))
+    invokers = {}
+
+    def factory(agent, seed):
+        provider = TracedInvoker(
+            agent.identifier,
+            lambda _agent, _step, _context: candidate_json,
+        )
+        invokers[agent.identifier] = provider
+        return provider
+
+    adapter = DirectProtocolStrategyAdapter(
+        extraction=EXTRACTION,
+        model_resolver=lambda _condition, ids: {agent_id: "model-A" for agent_id in ids},
+        invoker_factory=factory,
+        n=3,
+    )
+    condition = E1Condition(
+        "smart-administration", "S12", "homogeneous", 0, ("p-001",), 4,
+    )
+    result = adapter.run(condition=condition, prompt=PROMPT, seed=31)
+
+    assert result.calls_made == 2
+    assert result.metadata["strategy_calls_declared"] == 4
+    assert result.metadata["strategy_calls_scheduled_after_empty_facet_drop"] == 2
+    assert result.metadata["jigsaw_policy_id"] == PAPER_S12_POLICY_ID
+    assert result.metadata["jigsaw_active_facets"] == ["expert-1"]
+    assert result.metadata["jigsaw_dropped_facets"] == ["expert-2", "expert-3"]
+    assert set(invokers) == {"expert-1", "integrator"}
+    assert result.metadata["trace_complete"] is True
+
