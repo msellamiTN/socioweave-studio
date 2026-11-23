@@ -26,9 +26,12 @@ uvicorn socioweave_studio.api.app:app --app-dir studio --reload
 ```
 
 To create the canonical provider manifest, construct the operator's validated
-`E1ProviderRegistry` and call `registry.campaign_manifest(executor_id=...)`
-(or `runtime.campaign_manifest()` after `build_direct_e1_runtime`). Serialize
-that return value as JSON and paste it into the Studio. The manifest includes
+`E1ProviderRegistry` and call `registry.campaign_manifest(executor_id=...)`.
+Serialize that provider manifest as JSON and paste it into the Studio. The
+preflight returns a separate `runtime_campaign_manifest` that adds the
+registered Jigsaw policy ID/hash. Use this returned runtime manifest (not the
+input registry manifest) as `DirectE1CampaignConfig.provider_manifest_json`.
+The manifest includes
 non-secret provider routing settings and environment-variable *names* only;
 it must never contain credential values. Hosted-provider environment variables
 must be configured in the API process only if/when execution is later enabled.
@@ -39,9 +42,9 @@ The S12 factory ID and SHA-256 are loaded from the registered
 `paper-s12-3facet-v1` engine policy. The policy groups target+deliverable,
 constraint and actor/resource facets; the grouping is a versioned
 operationalization of the paper's Figure 3(b) example. Empty facets are
-removed without provider calls. The API preflight binds the policy hash but
-does not execute prompt-specific view generation. Per-prompt facet audit and
-the paper's 20% human extraction audit remain required.
+removed without provider calls. The API preflight binds the policy hash into the exported runtime campaign
+manifest but does not execute prompt-specific view generation. Per-prompt
+facet audit and the paper's 20% human extraction audit remain required.
 
 Open `/docs` on the local server for the OpenAPI contract.
 
