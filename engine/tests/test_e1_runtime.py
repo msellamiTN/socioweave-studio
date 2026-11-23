@@ -219,6 +219,8 @@ def test_no_call_preflight_validates_complete_e1_grid_and_all_provider_rosters()
     assert len(report.dataset_snapshot_sha256) == 64
     assert len(report.provider_manifest_sha256) == 64
     assert len(report.conditions_sha256) == 64
+    assert report.jigsaw_policy_id == "paper-s12-3facet-v1"
+    assert len(report.jigsaw_policy_sha256) == 64
 
 
 def test_no_call_preflight_rejects_unversioned_custom_jigsaw_factory():
