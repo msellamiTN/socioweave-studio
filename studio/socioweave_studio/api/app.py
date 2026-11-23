@@ -1,8 +1,8 @@
-"""First Web Studio API slice: read-only catalogue and safe config preview.
+"""SOCIOWEAVE Studio API for research preview and no-call E1 validation.
 
-This service deliberately does not launch provider calls or experiments. Its
-preview is a budget/configuration calculation, not the engine's full E1
-campaign preflight and not evidence that a dataset snapshot is valid.
+The service exposes a dataset/grid preflight and a separate engine-backed
+campaign configuration preflight. Neither endpoint launches providers or
+experiments, and neither establishes E1_READY.
 """
 from __future__ import annotations
 
@@ -194,6 +194,7 @@ def capabilities() -> dict[str, object]:
         "engine_campaign_preflight": True,
         "e1_dataset_grid_preflight": True,
         "e1_preflight_mode": "dataset_snapshot_and_condition_grid_only_zero_live_calls",
+        "engine_campaign_preflight_mode": "direct_e1_runtime_configuration_only_zero_live_calls",
         "run_launch": False,
         "provider_execution": False,
         "live_provider_calls_enabled": False,
