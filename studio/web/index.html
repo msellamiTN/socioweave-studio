@@ -24,7 +24,7 @@
         <div><div class="eyebrow accent">PAPER-ALIGNED CONFIGURATION</div><h2>Design your next<br>decomposition study.</h2><p>Configure a strategy, inspect its paper-defined call budget, and review the outstanding requirements before any execution is enabled.</p></div>
         <div class="hero-art"><div class="node n1">PROMPT</div><div class="node n2">AGENTS</div><div class="node n3">DECISION</div><div class="node n4">OUTPUT</div><div class="connector c1"></div><div class="connector c2"></div><div class="connector c3"></div></div>
       </section>
-      <div class="notice"><span class="notice-icon">i</span><div><b>Safe research configuration environment</b><p>Configuration preview and E1 preflight do not launch models or contact providers. A successful preflight validates declared local inputs and the paper condition grid, not execution readiness.</p></div><span class="pill warning">0 live calls</span></div>
+      <div class="notice"><span class="notice-icon">i</span><div><b>Safe research configuration environment</b><p>Configuration preview and E1 preflight do not launch models or contact providers. A successful dataset/grid preflight does not validate provider rosters, model-family provenance, fixed executor identity or S12 prompt-view configuration.</p></div><span class="pill warning">0 live calls</span></div>
       <section class="workspace" id="configuration">
         <div class="section-heading"><div><span class="eyebrow">01 / CONFIGURATION</span><h3>Study parameters</h3></div><span class="subtle">All fields required unless marked optional</span></div>
         <div class="form-grid">
@@ -40,12 +40,12 @@
       </section>
 
       <section class="workspace" id="e1-preflight">
-        <div class="section-heading"><div><span class="eyebrow">02 / SCIENTIFIC VALIDATION</span><h3>E1 dataset preflight</h3></div><span class="pill warning">Local files · no uploads</span></div>
+        <div class="section-heading"><div><span class="eyebrow">02 / DATASET + GRID VALIDATION</span><h3>E1 dataset & condition-grid preflight</h3></div><span class="pill warning">Local files · no uploads</span></div>
         <p class="section-intro">Declare the exact local JSONL source files available to this Studio server. The engine checks paper prompt counts, row structure, declared split, source metadata, reference data and frozen content hashes. It never downloads or synthesizes benchmark data.</p>
         <div id="source-declarations" class="source-grid"><span class="subtle">Loading registered dataset requirements…</span></div>
-        <div class="preflight-actions"><button id="run-preflight" class="primary">Validate E1 dataset snapshot <span>→</span></button><span id="preflight-status" class="subtle" role="status">No E1 preflight generated</span></div>
+        <div class="preflight-actions"><button id="run-preflight" class="primary">Validate dataset snapshot + E1 grid <span>→</span></button><span id="preflight-status" class="subtle" role="status">No E1 preflight generated</span></div>
         <div id="preflight-results" class="preflight-report hidden" aria-live="polite">
-          <div class="report-heading"><div><span class="eyebrow">PREFLIGHT REPORT</span><h4 id="preflight-title">—</h4><p id="preflight-summary" class="muted"></p></div><span id="preflight-state" class="pill warning">—</span></div>
+          <div class="report-heading"><div><span class="eyebrow">DATASET / GRID REPORT</span><h4 id="preflight-title">—</h4><p id="preflight-summary" class="muted"></p></div><span id="preflight-state" class="pill warning">—</span></div>
           <div class="metrics preflight-metrics">
             <div class="metric"><span>Frozen datasets</span><b id="frozen-datasets">—</b></div>
             <div class="metric"><span>Conditions</span><b id="preflight-conditions">—</b></div>
@@ -54,7 +54,7 @@
           </div>
           <div class="report-hash"><span>Snapshot SHA-256</span><code id="snapshot-hash">—</code><button id="copy-hash" class="secondary">Copy hash</button></div>
           <div class="report-columns"><div class="panel"><h4>Dataset prompt counts</h4><ul id="dataset-counts"></ul></div><div class="panel"><h4>Remaining evidence gates</h4><ul id="preflight-blockers"></ul></div></div>
-          <div class="report-footer"><button id="export-preflight" class="secondary">Export preflight report (.json)</button><span class="subtle">Configuration evidence only · run launch disabled</span></div>
+          <div class="report-footer"><button id="export-preflight" class="secondary">Export preflight report (.json)</button><span class="subtle">Dataset/grid validation only · full campaign preflight pending</span></div>
           <p class="report-caveat" id="preflight-caveat"></p>
         </div>
       </section>
