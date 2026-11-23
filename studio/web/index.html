@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>SOCIOWEAVE Studio</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">S</div><div><strong>SOCIOWEAVE</strong><small>RESEARCH STUDIO</small></div></div>
+      <div class="nav-label">WORKSPACE</div>
+      <a class="nav-item active" href="#configuration"><span>◫</span> Experiment setup</a>
+      <a class="nav-item disabled" aria-disabled="true"><span>◷</span> Run monitor <em>soon</em></a>
+      <a class="nav-item disabled" aria-disabled="true"><span>⌘</span> Trace explorer <em>soon</em></a>
+      <div class="sidebar-bottom"><div class="status-dot"></div><div><b>Local research mode</b><small>Provider execution disabled</small></div></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><span class="eyebrow">RESEARCH WORKSPACE / CONFIGURATION</span><h1>Experiment setup</h1></div><div class="top-meta"><span class="pill neutral">API v1</span><span class="pill warning">Preview only</span></div></header>
+      <section class="hero">
+        <div><div class="eyebrow accent">PAPER-ALIGNED CONFIGURATION</div><h2>Design your next<br>decomposition study.</h2><p>Configure a strategy, inspect its paper-defined call budget, and review the outstanding requirements before any execution is enabled.</p></div>
+        <div class="hero-art"><div class="node n1">PROMPT</div><div class="node n2">AGENTS</div><div class="node n3">DECISION</div><div class="node n4">OUTPUT</div><div class="connector c1"></div><div class="connector c2"></div><div class="connector c3"></div></div>
+      </section>
+      <div class="notice"><span class="notice-icon">i</span><div><b>Safe preview environment</b><p>This interface does not launch models, contact providers, or generate experimental results. A valid preview is not an E1 preflight.</p></div><span class="pill warning">0 live calls</span></div>
+      <section class="workspace" id="configuration">
+        <div class="section-heading"><div><span class="eyebrow">01 / CONFIGURATION</span><h3>Study parameters</h3></div><span class="subtle">All fields required unless marked optional</span></div>
+        <div class="form-grid">
+          <label class="field wide"><span>Decomposition strategy</span><select id="strategy"><option>Loading strategies…</option></select><small id="strategy-hint">Paper catalogue definition</small></label>
+          <label class="field wide"><span>Benchmark datasets</span><div id="datasets" class="dataset-list"><span class="subtle">Loading registered datasets…</span></div><small>Registered paper counts; real snapshot files are not loaded by this preview.</small></label>
+          <label class="field"><span>Model mode</span><select id="mode"><option value="homogeneous">Homogeneous</option><option value="heterogeneous">Heterogeneous</option></select></label>
+          <label class="field"><span>Seed indices</span><input id="seeds" value="0" inputmode="numeric"><small>Comma-separated E1 seed indices (0–4)</small></label>
+          <label class="field"><span>Number of agents (n)</span><input id="n" type="number" min="1" max="12" value="3"></label>
+          <label class="field"><span>Reviewers / groups (k)</span><input id="k" type="number" min="1" max="12" value="3"></label>
+          <label class="field"><span>Rounds (T)</span><input id="rounds" type="number" min="1" max="10" value="2"></label>
+        </div>
+        <div class="actions"><button id="preview" class="primary">Calculate configuration preview <span>→</span></button><span id="form-status" class="subtle" role="status">No preview generated</span></div>
+      </section>
+      <section id="results" class="results hidden" aria-live="polite">
+        <div class="section-heading"><div><span class="eyebrow">02 / ESTIMATE</span><h3>Configuration preview</h3></div><span class="pill warning">Not validated for execution</span></div>
+        <div class="metrics">
+          <div class="metric"><span>Expected prompts</span><b id="prompt-count">—</b></div>
+          <div class="metric"><span>Conditions</span><b id="condition-count">—</b></div>
+          <div class="metric"><span>Method calls estimate</span><b id="method-calls">—</b></div>
+          <div class="metric"><span>Live provider calls</span><b>0</b></div>
+        </div>
+        <div class="result-grid"><div class="panel"><h4>Paper formula</h4><p id="formula" class="formula">—</p><p id="strategy-description" class="muted"></p><p class="muted">Executor calls are deliberately not estimated here because the fixed-executor configuration is not yet part of this preview contract.</p></div><div class="panel"><h4>Blocking requirements</h4><ul id="blockers"></ul></div></div>
+        <div class="notice compact"><span class="notice-icon">!</span><div><b>Execution remains locked</b><p id="preview-note"></p></div></div>
+      </section>
+      <footer> SOCIOWEAVE Studio <span>Research-grade configuration · Evidence before claims</span></footer>
+    </main>
+  </div>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
