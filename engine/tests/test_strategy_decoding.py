@@ -66,7 +66,10 @@ def _s7_complete_trace():
     "sid,outputs,expected",
     [
         (StrategyId.S1, (candidate_out(0, "coordinator", "check"),), "authority"),
-        (StrategyId.S12, (candidate_out(0, "expert-1"), candidate_out(1, "expert-2")), "union"),
+        (StrategyId.S12, (
+            candidate_out(0, "expert-1"), candidate_out(1, "expert-2"),
+            candidate_out(2, "integrator", "merge"),
+        ), "jigsaw-integrator-merge"),
         (StrategyId.S2, (candidate_out(0, "participant-1"), candidate_out(1, "participant-2")), "union"),
         (StrategyId.S3, (
             candidate_out(0, "member-1"), candidate_out(1, "member-2"),
@@ -118,6 +121,60 @@ def test_strategy_decision_assembly_applies_paper_operator(sid, outputs, expecte
     assert len(result.decision.decomposition.kappa["Service plan"]) == 1
     assert result.decision.decomposition.subproblems[0].question == "Create service"
 
+
+
+def test_s12_requires_integrator_merge_and_preserves_cross_facet_dependency():
+    prompt, extraction, _, raw = fixture()
+    first = dict(raw)
+    first["subproblems"] = [
+        {"id": "goal", "question": "Create service", "inputs": [],
+         "output": "Service plan", "local_constraints": [], "covered_requirements": []}
+    ]
+    first["kappa"] = {"Service plan": ["goal"]}
+    second = dict(raw)
+    second["subproblems"] = [
+        {"id": "constraint", "question": "Validate service constraints", "inputs": [],
+         "output": "Validated constraints", "local_constraints": [], "covered_requirements": []}
+    ]
+    second["kappa"] = {"Service plan": ["constraint"]}
+    merged = dict(raw)
+    merged["subproblems"] = first["subproblems"] + second["subproblems"]
+    merged["subproblems"][0] = dict(merged["subproblems"][0], id="merged-goal")
+    merged["subproblems"][1] = dict(merged["subproblems"][1], id="merged-constraint")
+    merged["dependencies"] = [{"source": "merged-constraint", "target": "merged-goal"}]
+    merged["kappa"] = {"Service plan": ["merged-goal", "merged-constraint"]}
+
+    outputs = (
+        out(0, "expert-1", "draft", {"candidate": first}),
+        out(1, "expert-2", "draft", {"candidate": second}),
+        out(2, "integrator", "merge", {"candidate": merged}),
+    )
+    result = ProtocolDecisionDecoder(prompt, extraction)(
+        StrategyId.S12, run(*outputs)
+    )
+    assert result.decision.rule == "jigsaw-integrator-merge"
+    assert result.decision.selected_candidate_id == "integrator"
+    assert ("merged-constraint", "merged-goal") in result.decision.decomposition.E
+
+
+def test_s12_rejects_missing_integrator_output():
+    prompt, extraction, _, _ = fixture()
+    outputs = (candidate_out(0, "expert-1"), candidate_out(1, "expert-2"))
+    with pytest.raises(StrategyDecisionError, match="exactly one typed merge"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S12, run(*outputs))
+
+
+def test_s12_rejects_integrator_that_drops_expert_subproblem():
+    prompt, extraction, _, raw = fixture()
+    dropped = dict(raw)
+    dropped["subproblems"] = []
+    dropped["kappa"] = {}
+    outputs = (
+        candidate_out(0, "expert-1"),
+        out(1, "integrator", "merge", {"candidate": dropped}),
+    )
+    with pytest.raises(StrategyDecisionError, match="dropped expert subproblem"):
+        ProtocolDecisionDecoder(prompt, extraction)(StrategyId.S12, run(*outputs))
 
 def test_s11_returns_party_one_latest_draft_when_runtime_confirms_paper_stop_rule():
     prompt, extraction, _, raw = fixture()
