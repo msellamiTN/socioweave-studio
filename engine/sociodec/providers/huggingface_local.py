@@ -19,6 +19,8 @@ class HuggingFaceLocalProvider:
         return self._model_id
 
     def load(self) -> None:
+        if self._model is not None and self._tokenizer is not None:
+            return
         try:
             import torch
             from transformers import AutoModelForCausalLM, AutoTokenizer
