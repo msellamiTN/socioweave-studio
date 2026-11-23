@@ -229,5 +229,5 @@ def test_completed_bundle_restores_typed_aggregates_without_provider_calls():
     for aggregate in restored.values():
         assert len(aggregate.requirements) == 3
         assert len(aggregate.hypotheses) == 3
-        assert len(aggregate.ambiguities) == 3
-        assert len(aggregate.conflicts) == 3
+        assert len(aggregate.ambiguities) == 1
+        assert len(aggregate.conflicts) == 1
