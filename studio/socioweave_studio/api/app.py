@@ -179,6 +179,7 @@ def capabilities() -> dict[str, object]:
         "configuration_preview": True,
         "dataset_catalogue": True,
         "full_e1_preflight": False,
+        "engine_campaign_preflight": True,
         "e1_dataset_grid_preflight": True,
         "e1_preflight_mode": "dataset_snapshot_and_condition_grid_only_zero_live_calls",
         "run_launch": False,
