@@ -150,7 +150,7 @@ A T4 infrastructure pass does not unlock E1. The complete E1 grid remains blocke
 - The Core 19 notebook explicitly leaves the provider-backed trial adapter unimplemented.
 - Historical baseline note: no Web Studio application/API/worker existed at the baseline SHA. Since then PR #66 delivered the API/configuration slice, PR #68 delivered dataset/grid preflight, and PR #69 delivered the researcher-facing preflight workflow.
 - Current Studio preflight validates dataset snapshots and the complete condition grid only. It is not the full `DirectE1Runtime.preflight_campaign`, does not validate the 38 provider/model-mode rosters, MA/MB/MC provenance, judge-family separation, fixed executor or S12 prompt-view factory, and is not a connectivity smoke.
-- Full E1 remains blocked by smart-administration source/annotations, provider/model provenance, fixed executor configuration, S12 prompt-view configuration, source/annotation/statistical obligations and actual runtime acceptance. A dataset/grid pass is not `E1_READY`.
+- Full E1 remains blocked by smart-administration source/annotations, provider/model provenance, fixed executor configuration, registered S12 Jigsaw facet policy identity, source/annotation/statistical obligations and actual runtime acceptance. A dataset/grid pass is not `E1_READY`.
 
 These are release blockers, not reasons to weaken the scientific gate.
 
