@@ -7,12 +7,12 @@ This directory contains the first executable Web Studio backend slice.
 - Versioned health and capability endpoints.
 - Read-only catalogue of the five registered E1 datasets and their expected counts.
 - A configuration preview endpoint that calls the existing engine strategy catalogue for the paper-defined method-call formula.
-- A same-origin operator UI with responsive configuration controls, dataset selection, call-budget preview and explicit execution-lock messaging.
+- A same-origin operator UI with responsive configuration controls, dataset selection, call-budget preview, local-source E1 preflight declarations, hash inspection and JSON report export.
 - Strict request schema (`extra=forbid`) and validation of registered strategies, dataset IDs and seed indices.
 
 ## Deliberate limitations
 
-The E1 preflight validates operator-supplied local dataset files, declared provenance/license approval, paper prompt counts, reference-data presence, frozen snapshot hashes and the complete matched-baseline condition grid. It does not validate provider/model family truth, executor identity, token/cost ceiling, extractor audit quality or runtime connectivity. It does not launch experiments.
+The E1 preflight UI submits operator-supplied local dataset paths and declarations to the API. The engine validates dataset counts, declared provenance/license approval, row splits, reference-data presence, frozen snapshot hashes and the complete matched-baseline condition grid. The browser can export the returned preflight report. It does not upload files, validate provider/model family truth, executor identity, token/cost ceiling, extractor audit quality or runtime connectivity. It does not launch experiments.
 
 No run-launch, worker, provider execution, arbitrary code execution, uploads or secret management endpoint is exposed. Capability metadata reports these as disabled. Both configuration preview and E1 preflight make zero live provider calls and cannot create a scientific run.
 
@@ -35,4 +35,4 @@ Open `/docs` on the local server for the OpenAPI contract.
 - `POST /api/v1/config-previews`
 - `POST /api/v1/preflights/e1`
 
-The service is a single-process development component, not yet a deployable multi-user service. Authentication, authorization, persistence, worker isolation, observability and production security controls remain future gates.
+The service is a single-process development component, not yet a deployable multi-user service. Dataset paths are read by the API process and must only be supplied by a trusted local operator. Authentication, authorization, filesystem sandboxing, persistence, worker isolation, observability and production security controls remain future gates.
