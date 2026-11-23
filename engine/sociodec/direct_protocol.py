@@ -165,6 +165,20 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
             if sid is not StrategyId.S12:
                 raise ValueError("Only S12 may drop empty facets")
             strategy = _drop_empty_jigsaw_facets(strategy, dropped_facets)
+        active_agent_ids = tuple(
+            agent_id for agent_id in agent_ids if agent_id not in set(dropped_facets)
+        )
+        if condition.model_mode == "heterogeneous":
+            if len({models[agent_id] for agent_id in active_agent_ids}) < 2:
+                raise ValueError(
+                    "heterogeneous S12 must retain at least two distinct model identities among active facets and integrator"
+                )
+            if model_families and len({
+                model_families[agent_id] for agent_id in active_agent_ids
+            }) < 2:
+                raise ValueError(
+                    "heterogeneous S12 must retain at least two distinct model families among active facets and integrator"
+                )
         active_views = {
             agent_id: value for agent_id, value in (blueprint.prompt_views or {}).items()
             if agent_id not in set(dropped_facets)
@@ -237,7 +251,10 @@ class DirectProtocolStrategyAdapter(DirectMethodAdapter):
                 "mediation_converged": run.mediation_converged if sid is StrategyId.S11 else None,
                 "mediation_stop_round": run.mediation_stop_round if sid is StrategyId.S11 else None,
                 "mediation_distance": run.mediation_distance if sid is StrategyId.S11 else None,
-                "agent_model_ids": models, "agent_model_families": model_families or None,
+                "configured_agent_model_ids": models,
+                "configured_agent_model_families": model_families or None,
+                "agent_model_ids": {agent_id: models[agent_id] for agent_id in active_agent_ids},
+                "agent_model_families": ({agent_id: model_families[agent_id] for agent_id in active_agent_ids} if model_families else None),
                 "seeded_agents": list(run.seeded_agents),
                 "output_count": len(run.outputs), "decision_rule": decoded.decision.rule,
                 "decision_selected_candidate": decoded.decision.selected_candidate_id,
