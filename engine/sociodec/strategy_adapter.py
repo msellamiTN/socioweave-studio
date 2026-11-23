@@ -139,16 +139,23 @@ class ConcreteStrategyAdapter:
             return result
 
         sid = self._strategy_id(item)
+        partitioned = sid in {StrategyId.S1, StrategyId.S12}
+        if partitioned and self.prompt_view_factory is None:
+            raise ValueError(
+                f"{sid.value} requires an explicit prompt_view_factory; "
+                "full-prompt fallback is forbidden for partitioned strategies"
+            )
+        # Build only the role/agent manifest here. These sentinels are never
+        # passed to the runtime; the final blueprint uses caller-derived views.
+        preliminary_views = None
         if sid is StrategyId.S1:
-            preliminary_views = {"coordinator": prompt.text, **{
-                f"specialist-{i}": prompt.text for i in range(1, self.n + 1)
+            preliminary_views = {"coordinator": "FULL_PROMPT", **{
+                f"specialist-{i}": f"PARTITION_REQUIRED:{i}" for i in range(1, self.n + 1)
             }}
         elif sid is StrategyId.S12:
             preliminary_views = {**{
-                f"expert-{i}": prompt.text for i in range(1, self.n + 1)
-            }, "integrator": prompt.text}
-        else:
-            preliminary_views = None
+                f"expert-{i}": f"FACET_REQUIRED:{i}" for i in range(1, self.n + 1)
+            }, "integrator": "FULL_PROMPT"}
         preliminary = build_strategy_blueprint(
             sid, model_ids=self.model_ids, prompt_views=preliminary_views,
             agent_contexts=self.agent_contexts, n=self.n, k=self.k, T=self.T,
@@ -159,6 +166,18 @@ class ConcreteStrategyAdapter:
             if self.prompt_view_factory is not None else
             {agent_id: prompt.text for agent_id in agent_ids}
         )
+        if partitioned:
+            if set(views) != set(agent_ids):
+                raise ValueError(f"{sid.value} prompt_view_factory must return exactly the declared agent views")
+            restricted_ids = (
+                tuple(f"specialist-{i}" for i in range(1, self.n + 1))
+                if sid is StrategyId.S1 else
+                tuple(f"expert-{i}" for i in range(1, self.n + 1))
+            )
+            if any(views.get(agent_id) == prompt.text for agent_id in restricted_ids):
+                raise ValueError(
+                    f"{sid.value} specialist/expert views must not equal the full prompt"
+                )
         blueprint = build_strategy_blueprint(
             sid, model_ids=self.model_ids, prompt_views=views,
             agent_contexts=self.agent_contexts,
@@ -170,7 +189,6 @@ class ConcreteStrategyAdapter:
             if step.action.value == "draft" and step.round == 1
         ]
         seeds: dict[str, str] = {}
-        partitioned = sid in {StrategyId.S1, StrategyId.S12}
         if not partitioned and draft_agents:
             if chain_seed is not None:
                 seeds[draft_agents[0]] = _decomposition_seed_text(chain_seed)
