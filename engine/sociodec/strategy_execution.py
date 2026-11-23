@@ -5,7 +5,7 @@ strategy protocols, roles, visibility relations, or decision outcomes.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Mapping
 
 from sociodec.models.strategy import ProtocolStep, SocialStrategy
@@ -25,6 +25,8 @@ class StepContext:
 
 @dataclass(frozen=True, slots=True)
 class StepRecord:
+    # Audit identifiers are deliberately internal and are never passed to an
+    # anonymous agent through StepContext.
     output_id: str
     agent_id: str
     action: str
@@ -94,10 +96,11 @@ def execute_strategy(
     """Execute a formal protocol in deterministic stage barriers.
 
     All steps in a stage observe only outputs committed by earlier stages.
-    Thus one step cannot observe a peer's output from the same parallel stage.
     Visibility is checked against the observer's relation for that round.
-    Non-model steps require an explicit local executor and do not increment
-    the model-call count.
+    For anonymous strategies, every identity crossing the executor boundary
+    is replaced by a deterministic opaque alias. Real identities remain only
+    in the internal result trace. Non-model steps require an explicit local
+    executor and do not increment the model-call count.
     """
     if not prompt_text.strip():
         raise ValueError("prompt_text must not be empty")
@@ -110,8 +113,14 @@ def execute_strategy(
         item.round: frozenset(item.visible_pairs) for item in strategy.visibility
     }
     assignments = {(item.agent_id, item.round): item.role for item in strategy.assignments}
+    agent_aliases = {
+        agent.identifier: f"agent-{index + 1}"
+        for index, agent in enumerate(strategy.agents)
+    }
     records: list[StepRecord] = []
     committed: dict[str, StepRecord] = {}
+    output_aliases: dict[str, str] = {}
+    anonymous_output_counter = 0
 
     stages = sorted({(step.round, step.stage) for step in strategy.protocol})
     for round_number, stage_number in stages:
@@ -119,7 +128,6 @@ def execute_strategy(
             step for step in strategy.protocol
             if step.round == round_number and step.stage == stage_number
         ]
-        # Snapshot before executing this stage: same-stage outputs are hidden.
         stage_snapshot = dict(committed)
         pending: list[StepRecord] = []
 
@@ -131,19 +139,46 @@ def execute_strategy(
                 author for observer, author in visibility_by_round[round_number]
                 if observer == step.agent_id
             )
-            visible_records = {
-                output_id: record.output_text
+            visible_internal = {
+                output_id: record
                 for output_id, record in stage_snapshot.items()
                 if record.agent_id in visible_authors
             }
             input_text = _resolve_input(
                 step.input_ref, prompt_text, stage_snapshot, visible_authors,
             )
+
+            if strategy.anonymous:
+                visible_records = {
+                    output_aliases[output_id]: record.output_text
+                    for output_id, record in visible_internal.items()
+                }
+                visible_author_ids = frozenset(
+                    agent_aliases[author] for author in visible_authors
+                )
+                if step.input_ref.startswith("output:"):
+                    internal_ref = step.input_ref.removeprefix("output:")
+                    exposed_input_ref = "output:" + output_aliases[internal_ref]
+                else:
+                    exposed_input_ref = step.input_ref
+                exposed_step = replace(
+                    step,
+                    agent_id=agent_aliases[step.agent_id],
+                    input_ref=exposed_input_ref,
+                )
+            else:
+                visible_records = {
+                    output_id: record.output_text
+                    for output_id, record in visible_internal.items()
+                }
+                visible_author_ids = visible_authors
+                exposed_step = step
+
             context = StepContext(
-                step=step,
+                step=exposed_step,
                 input_text=input_text,
                 visible_outputs=visible_records,
-                visible_author_ids=visible_authors,
+                visible_author_ids=visible_author_ids,
             )
             if step.invokes_model:
                 output_text = model_executor(context)
@@ -155,9 +190,17 @@ def execute_strategy(
                 output_text = local_executor(context)
             if not isinstance(output_text, str) or not output_text.strip():
                 raise StrategyExecutionError("step executor must return non-empty text")
+
             output_id = _output_id(step)
             if output_id in stage_snapshot or any(x.output_id == output_id for x in pending):
                 raise StrategyExecutionError(f"duplicate protocol output identity: {output_id}")
+            if strategy.anonymous:
+                anonymous_output_counter += 1
+                output_aliases[output_id] = (
+                    f"r{step.round}:s{step.stage}:o{anonymous_output_counter}"
+                )
+            else:
+                output_aliases[output_id] = output_id
             pending.append(StepRecord(
                 output_id=output_id,
                 agent_id=step.agent_id,
@@ -166,7 +209,7 @@ def execute_strategy(
                 stage=step.stage,
                 input_ref=step.input_ref,
                 invokes_model=step.invokes_model,
-                visible_output_ids=tuple(sorted(visible_records)),
+                visible_output_ids=tuple(sorted(visible_internal)),
                 output_text=output_text,
             ))
 
