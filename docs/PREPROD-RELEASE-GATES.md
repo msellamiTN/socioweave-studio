@@ -144,13 +144,13 @@ A pre-production candidate is **NO-GO** if any of these are missing:
 
 A T4 infrastructure pass does not unlock E1. The complete E1 grid remains blocked until the author-curated smart-administration dataset, human review/audit evidence, approved source selection/licensing, exact model-family provenance, dataset-specific reference adapters and paired statistical analysis are all ready.
 
-## 7. Current known blockers at baseline SHA
+## 7. Current known blockers and implementation status
 
 - The existing T4 notebook is a preflight, not a direct E1 execution notebook; its pinned code SHA is older than the current baseline and must be refreshed only after CI acceptance.
 - The Core 19 notebook explicitly leaves the provider-backed trial adapter unimplemented.
-- No Web Studio application/API/worker exists in the repository tree at this baseline; only brand assets and engine/notebooks are present.
-- Current preflight can validate configuration with zero live calls. It is not a connectivity smoke.
-- Full E1 is blocked by the smart-administration source/annotations and other source/annotation/statistical obligations documented in the E1 protocol.
+- Historical baseline note: no Web Studio application/API/worker existed at the baseline SHA. Since then PR #66 delivered the API/configuration slice, PR #68 delivered dataset/grid preflight, and PR #69 delivered the researcher-facing preflight workflow.
+- Current Studio preflight validates dataset snapshots and the complete condition grid only. It is not the full `DirectE1Runtime.preflight_campaign`, does not validate the 38 provider/model-mode rosters, MA/MB/MC provenance, judge-family separation, fixed executor or S12 prompt-view factory, and is not a connectivity smoke.
+- Full E1 remains blocked by smart-administration source/annotations, provider/model provenance, fixed executor configuration, S12 prompt-view configuration, source/annotation/statistical obligations and actual runtime acceptance. A dataset/grid pass is not `E1_READY`.
 
 These are release blockers, not reasons to weaken the scientific gate.
 

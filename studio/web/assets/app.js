@@ -89,7 +89,7 @@ function showPreflight(report) {
   $("preflight-title").textContent = "E1 snapshot and condition-grid validation";
   $("preflight-summary").textContent = report.note;
   $("preflight-state").textContent = report.readiness;
-  $("preflight-state").className = "pill success";
+  $("preflight-state").className = "pill warning";
   $("frozen-datasets").textContent = Object.keys(report.dataset_prompt_counts).length;
   $("preflight-conditions").textContent = report.condition_count.toLocaleString();
   $("preflight-strategies").textContent = report.strategy_count;
@@ -97,7 +97,7 @@ function showPreflight(report) {
   $("dataset-counts").innerHTML = Object.entries(report.dataset_prompt_counts)
     .map(([name, count]) => `<li><b>${name}</b> — ${count} frozen prompts</li>`).join("");
   $("preflight-blockers").innerHTML = report.blocking_requirements.map(item => `<li>${item}</li>`).join("");
-  $("preflight-caveat").textContent = "A successful configuration preflight does not verify the truth of licensing or provider-family declarations, annotation quality, model connectivity, executor identity or cost ceilings. It does not authorize or launch experiments.";
+  $("preflight-caveat").textContent = "This dataset/grid preflight does not validate provider rosters, model-family provenance, fixed executor identity, S12 prompt-view configuration, annotation quality, model connectivity or cost ceilings. It does not authorize or launch experiments.";
   $("preflight-results").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -118,7 +118,7 @@ $("run-preflight").addEventListener("click", async () => {
       }),
     });
     showPreflight(report);
-    $("preflight-status").textContent = "Preflight passed · no model or provider calls made";
+    $("preflight-status").textContent = "Dataset/grid validation passed · full campaign preflight still pending";
   } catch (error) {
     $("preflight-status").textContent = error.message;
     $("preflight-status").style.color = "#e8bd72";

@@ -9,7 +9,8 @@ def test_health_and_capabilities_keep_execution_disabled():
     assert client.get("/api/v1/health").json()["status"] == "ok"
     capabilities = client.get("/api/v1/capabilities").json()
     assert capabilities["configuration_preview"] is True
-    assert capabilities["full_e1_preflight"] is True
+    assert capabilities["full_e1_preflight"] is False
+    assert capabilities["e1_dataset_grid_preflight"] is True
     assert capabilities["run_launch"] is False
     assert capabilities["provider_execution"] is False
 
@@ -130,7 +131,9 @@ def test_e1_preflight_validates_complete_grid_without_live_calls(tmp_path):
     })
     assert response.status_code == 200, response.text
     report = response.json()
-    assert report["readiness"] == "CONFIG_PREFLIGHT_PASS"
+    assert report["readiness"] == "DATASET_GRID_PREFLIGHT_PASS"
+    assert report["evidence_state"] == "DATASET_GRID_PREFLIGHT_PASS"
+    assert report["preflight_scope"] == "dataset_snapshot_and_condition_grid_only"
     assert report["condition_count"] == 4550
     assert report["method_condition_count"] == 650
     assert report["matched_baseline_condition_count"] == 3900

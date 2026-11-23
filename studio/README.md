@@ -12,7 +12,7 @@ This directory contains the first executable Web Studio backend slice.
 
 ## Deliberate limitations
 
-The E1 preflight UI submits operator-supplied local dataset paths and declarations to the API. The engine validates dataset counts, declared provenance/license approval, row splits, reference-data presence, frozen snapshot hashes and the complete matched-baseline condition grid. The browser can export the returned preflight report. It does not upload files, validate provider/model family truth, executor identity, token/cost ceiling, extractor audit quality or runtime connectivity. It does not launch experiments.
+The E1 dataset/grid preflight UI submits operator-supplied local dataset paths and declarations to the API. The engine validates dataset counts, declared source metadata/license approval, row splits, reference-data presence, frozen snapshot hashes and the complete matched-baseline condition grid. The browser can export the returned report. This is not the complete `DirectE1Runtime.preflight_campaign`: provider rosters, MA/MB/MC family provenance, fixed executor identity, S12 prompt-view configuration, extractor audit quality, token/cost ceiling and runtime connectivity remain separate gates. It does not launch experiments.
 
 No run-launch, worker, provider execution, arbitrary code execution, uploads or secret management endpoint is exposed. Capability metadata reports these as disabled. Both configuration preview and E1 preflight make zero live provider calls and cannot create a scientific run.
 
