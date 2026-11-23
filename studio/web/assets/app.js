@@ -18,12 +18,15 @@ async function api(path, options) {
 }
 
 async function loadCatalogue() {
-  const [strategies, datasets] = await Promise.all([
+  const [strategies, datasets, jigsawPolicy] = await Promise.all([
     api("/api/v1/strategies"),
     api("/api/v1/datasets"),
+    api("/api/v1/jigsaw/policy"),
   ]);
   strategyRows = strategies.strategies;
   datasetRows = datasets.datasets;
+  $("s12-factory-id").value = jigsawPolicy.factory_id;
+  $("s12-factory-sha").value = jigsawPolicy.policy_sha256;
   $("strategy").innerHTML = strategyRows.map(row =>
     `<option value="${row.id}">${row.id} — ${row.name}</option>`
   ).join("");
