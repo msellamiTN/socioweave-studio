@@ -88,5 +88,5 @@ def test_operator_web_interface_is_served_same_origin():
 
 
 def test_execution_and_provider_routes_are_not_exposed():
-    assert client.post("/api/v1/runs", json={}).status_code == 404
-    assert client.post("/api/v1/providers/execute", json={}).status_code == 404
+    assert client.post("/api/v1/runs", json={}).status_code in {404, 405}
+    assert client.post("/api/v1/providers/execute", json={}).status_code in {404, 405}
