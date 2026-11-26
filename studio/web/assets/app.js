@@ -18,11 +18,13 @@ async function api(path, options) {
 }
 
 async function loadCatalogue() {
-  const [strategies, datasets, jigsawPolicy] = await Promise.all([
+  const [strategies, datasets, jigsawPolicy, capabilities] = await Promise.all([
     api("/api/v1/strategies"),
     api("/api/v1/datasets"),
     api("/api/v1/jigsaw/policy"),
+    api("/api/v1/capabilities"),
   ]);
+  renderOverview(strategies, datasets, capabilities);
   strategyRows = strategies.strategies;
   datasetRows = datasets.datasets;
   $("s12-factory-id").value = jigsawPolicy.factory_id;
@@ -231,6 +233,19 @@ $("export-campaign-preflight").addEventListener("click", () => {
   anchor.remove();
   URL.revokeObjectURL(url);
 });
+
+function renderOverview(strategies, datasets, capabilities) {
+  $("overview-datasets").textContent = datasets.datasets.length;
+  $("overview-strategies").textContent = strategies.strategies.length;
+  $("overview-run-launch").textContent = capabilities.run_launch ? "Enabled" : "Disabled";
+  $("overview-live-calls").textContent = capabilities.live_provider_calls_enabled ? "Enabled" : "0";
+  $("evidence-state").textContent = capabilities.evidence_state || "UNKNOWN";
+  $("evidence-state").className = "pill warning";
+  const mode = capabilities.run_launch ? "Execution enabled" : "Configuration-only mode";
+  document.querySelector(".sidebar-bottom b").textContent = mode;
+  document.querySelector(".sidebar-bottom small").textContent =
+    capabilities.live_provider_calls_enabled ? "Provider calls may be enabled" : "Provider execution disabled";
+}
 
 function renderStrategyHint() {
   const row = strategyRows.find(item => item.id === $("strategy").value);
