@@ -12,19 +12,52 @@
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark">S</div><div><strong>SOCIOWEAVE</strong><small>RESEARCH STUDIO</small></div></div>
       <div class="nav-label">WORKSPACE</div>
-      <a class="nav-item active" href="#configuration"><span>◫</span> Experiment setup</a>
-      <a class="nav-item" href="#e1-preflight"><span>✓</span> E1 preflight</a>
-      <a class="nav-item disabled" aria-disabled="true"><span>◷</span> Run monitor <em>soon</em></a>
-      <a class="nav-item disabled" aria-disabled="true"><span>⌘</span> Trace explorer <em>soon</em></a>
+      <a class="nav-item active" href="#overview"><span>⌂</span> Overview</a>
+      <a class="nav-item" href="#configuration"><span>◫</span> Experiment builder</a>
+      <a class="nav-item" href="#e1-preflight"><span>✓</span> Dataset & E1 gates</a>
+      <a class="nav-item disabled" aria-disabled="true"><span>◷</span> Runs <em>not enabled</em></a>
+      <a class="nav-item disabled" aria-disabled="true"><span>⌘</span> Traces <em>not enabled</em></a>
       <div class="sidebar-bottom"><div class="status-dot"></div><div><b>Local research mode</b><small>Provider execution disabled</small></div></div>
     </aside>
     <main class="main">
-      <header class="topbar"><div><span class="eyebrow">RESEARCH WORKSPACE / CONFIGURATION</span><h1>Experiment setup</h1></div><div class="top-meta"><span class="pill neutral">API v1</span><span class="pill warning">Preview only</span></div></header>
+      <header class="topbar"><div><span class="eyebrow">RESEARCH WORKSPACE / OVERVIEW</span><h1>Research workspace</h1></div><div class="top-meta"><span class="pill neutral">API v1</span><span class="pill warning">Preview only</span></div></header>
       <section class="hero">
         <div><div class="eyebrow accent">PAPER-ALIGNED CONFIGURATION</div><h2>Design your next<br>decomposition study.</h2><p>Configure a strategy, inspect its paper-defined call budget, and review the outstanding requirements before any execution is enabled.</p></div>
         <div class="hero-art"><div class="node n1">PROMPT</div><div class="node n2">AGENTS</div><div class="node n3">DECISION</div><div class="node n4">OUTPUT</div><div class="connector c1"></div><div class="connector c2"></div><div class="connector c3"></div></div>
       </section>
       <div class="notice"><span class="notice-icon">i</span><div><b>Safe research configuration environment</b><p>Configuration preview and E1 preflight do not launch models or contact providers. A successful dataset/grid preflight does not validate provider rosters, model-family provenance, fixed executor identity or S12 prompt-view configuration.</p></div><span class="pill warning">0 live calls</span></div>
+
+      <section class="workspace overview" id="overview">
+        <div class="section-heading"><div><span class="eyebrow">RESEARCH CONTROL PLANE</span><h3>Workspace overview</h3></div><span id="evidence-state" class="pill warning">CODE_CI_ONLY</span></div>
+        <p class="section-intro">A live view of the capabilities currently exposed by this Studio build. Counts come from the engine catalogue; evidence labels describe the implemented validation scope, not scientific findings.</p>
+        <div class="metrics overview-metrics">
+          <div class="metric"><span>Registered datasets</span><b id="overview-datasets">—</b></div>
+          <div class="metric"><span>Paper strategies</span><b id="overview-strategies">—</b></div>
+          <div class="metric"><span>Run launch</span><b id="overview-run-launch">—</b></div>
+          <div class="metric"><span>Live provider calls</span><b id="overview-live-calls">—</b></div>
+        </div>
+        <div class="overview-grid">
+          <div class="panel"><h4>Research workflow</h4>
+            <ol class="workflow-list">
+              <li><span class="workflow-step done">01</span><div><b>Configure study</b><small>Strategy, datasets, model mode and protocol parameters</small></div><span class="state-label">Available</span></li>
+              <li><span class="workflow-step done">02</span><div><b>Validate dataset and grid</b><small>Local snapshot structure, counts, hashes and condition grid</small></div><span class="state-label">Available</span></li>
+              <li><span class="workflow-step pending">03</span><div><b>Validate campaign configuration</b><small>Provider rosters, model provenance, executor and S12 policy</small></div><span class="state-label">Operator input</span></li>
+              <li><span class="workflow-step locked">04</span><div><b>Execute experiments</b><small>Persistent runs and controlled provider workers</small></div><span class="state-label">Disabled</span></li>
+              <li><span class="workflow-step locked">05</span><div><b>Analyse and export evidence</b><small>Validated observations, metrics, paired tests and reports</small></div><span class="state-label">Not yet wired</span></li>
+            </ol>
+          </div>
+          <div class="panel"><h4>Current evidence gates</h4>
+            <ul class="gate-list">
+              <li><span class="gate-mark pending">!</span><span><b>Dataset rights and provenance</b><small>Source revisions, terms and deterministic selection remain to be resolved.</small></span></li>
+              <li><span class="gate-mark pending">!</span><span><b>Reference annotations</b><small>Human review and the author-curated smart-administration release are required.</small></span></li>
+              <li><span class="gate-mark pending">!</span><span><b>Protocol conformance</b><small>Complete source-to-runtime audit and outstanding semantic obligations.</small></span></li>
+              <li><span class="gate-mark locked">×</span><span><b>Run execution</b><small>No run-launch API or worker is exposed in this build.</small></span></li>
+            </ul>
+            <p class="overview-footnote">A preflight pass is not E1_READY. No benchmark campaign is represented as completed.</p>
+          </div>
+        </div>
+      </section>
+
       <section class="workspace" id="configuration">
         <div class="section-heading"><div><span class="eyebrow">01 / CONFIGURATION</span><h3>Study parameters</h3></div><span class="subtle">All fields required unless marked optional</span></div>
         <div class="form-grid">
