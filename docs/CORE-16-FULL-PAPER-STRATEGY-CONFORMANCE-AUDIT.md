@@ -7,88 +7,68 @@
 
 ## 1. Executive result
 
-The repository does contain concrete protocol blueprints and decision assembly for all thirteen atomic strategies. The earlier statement that only S12 was implemented was wrong.
+The initial audit correctly identified F16-01 in the adapter path, but its F16-02 through F16-05 conclusions were based too narrowly on the static blueprint and did not account for runtime control flow. The runtime already implements conditional S8 revision, bounded/convergence-aware S11 mediation, S4 Delphi early stopping, and S10 consensus stability stopping. This correction supersedes the initial claims for those four findings.
 
-However, the existence of a blueprint and a passing unit suite does not establish exact execution fidelity. This audit identifies three concrete conformance risks and two known control-flow limitations that must be addressed before claiming end-to-end paper conformance.
-
-| Finding | Strategy | Severity | Evidence |
+| Finding | Strategy | Re-audit status | Evidence |
 |---|---|---|---|
-| F16-01: adapter can silently supply the full prompt to partitioned agents | S1, S12 | **Critical** | `strategy_adapter.py` creates full-prompt preliminary views and defaults to full prompt for every agent when no prompt-view factory is supplied; this bypasses the builder's explicit partition/facet requirement. |
-| F16-02: mediation extra round is unconditional and default configuration exceeds Table 4 base budget | S11 | **High** | `strategy_protocols.py` emits one mediator summary and two revisions for every configured T round. At T=2 it produces 8 model steps / 5 stages, while Table 4's base procedure is 5 / 3. |
-| F16-03: peer-review revision branch is compiled as unconditional | S8 | **High** | `strategy_protocols.py` always emits the author revision step. Paper Table 4 says revise only if editor decision is revise. |
-| F16-04: Delphi early-stop behavior is not executed | S4 | **Known limitation** | Current blueprint expands the maximum T-round schedule; a candidate-aware stability controller is still absent, as CORE 12 documents. |
-| F16-05: consensus deliberation early-stop behavior is not executed | S10 | **Known limitation** | Current blueprint emits all nT participant turns and moderator closure; the paper permits stopping after a stable full turn or moderator no-objection. |
+| F16-01: adapter can silently supply the full prompt to partitioned agents | S1, S12 | **Resolved in CORE 17** | PR #85 requires an explicit prompt-view factory and rejects a restricted agent view equal to the full prompt. Semantic correctness of arbitrary provider output remains an external validation obligation. |
+| F16-02: mediation additional rounds unconditional | S11 | **Not reproduced; initial finding withdrawn** | `runtime.py` evaluates agreement / optional ε-distance after each completed revision pair and suppresses later rounds on convergence. Runtime tests cover exact agreement, ε convergence, and continuing to T. |
+| F16-03: peer-review revision branch unconditional | S8 | **Not reproduced; initial finding withdrawn** | `runtime.py` parses the editor verdict and skips the revision step on `accept`; tests assert accept (k+2 calls/depth3) and revise (k+3 calls/depth4). The blueprint is a worst-case schedule, not the executed trace. |
+| F16-04: Delphi early-stop behavior absent | S4 | **Not reproduced; initial finding withdrawn** | Runtime compares each expert's successive drafts after facilitator completion and stops on exact stability or configured ε-distance. Tests cover exact stability, ε, continuation and missing distance evaluator. |
+| F16-05: consensus early-stop behavior absent | S10 | **Partially resolved; refine paper mapping** | Runtime compares the completed shared-draft state across turns and stops on exact stability or configured ε-distance, then runs moderator closure. Tests cover stability, ε and maximum T. Whether moderator no-objection is an independent stop trigger requires a separate source-to-runtime check. |
 
-## 2. Source-grounded findings
+**Corrected assessment:** the only confirmed F16 implementation defect from the original five is F16-01, now addressed by CORE 17. The other four were false positives caused by treating a maximum static blueprint as the actual executed trace. This audit still does not prove complete conformance across all strategy semantics.
 
-### F16-01 — Partitioned strategies can receive an unpartitioned prompt
+## 2. Re-audit evidence and source-to-runtime interpretation
 
-**Paper semantics**
+### F16-01 — Partitioned strategies can receive an unpartitioned prompt (confirmed; now fixed)
 
-- S1: coordinator splits the prompt by domain; each specialist receives and refines its assigned part (Section 5.1.1; Fig. 3a; Table 4).
-- S12: each expert receives one facet only; the integrator receives the partial lists and assembles them (Section 5.1.2; Fig. 3b; Table 4).
-- Algorithm 1 states that the default prompt view is the whole prompt, but partitioned strategies use the assigned `Π_i` or `Φ_i`.
+The original implementation observation remains valid for the adapter on the audited base. CORE 17 now:
+- requires an explicit `prompt_view_factory` for S1 and S12;
+- removes the full-prompt fallback for those strategies;
+- rejects specialist/expert views exactly equal to the complete prompt;
+- tests missing provider and full-prompt equality rejection.
 
-**Implementation observation**
+**Residual limitation:** string inequality is only a fail-closed guard. It does not prove that a supplied S1 view is exactly the coordinator-assigned domain partition or that an S12 view is a valid paper-defined facet. The provider must still be checked against the frozen extraction and the source's facet construction rules.
 
-`strategy_protocols.py` correctly rejects a missing explicit S12 `prompt_views` mapping and has a partition placeholder for direct S1 blueprint construction. However, `ConcreteStrategyAdapter.__call__` creates preliminary S1/S12 views using the full prompt and, absent `prompt_view_factory`, constructs a mapping that gives `prompt.text` to every agent. It then passes that mapping into the blueprint builder.
+### F16-02 — S11 mediation (withdrawn)
 
-Therefore, the adapter's default execution path does not enforce the partition/facet semantics. A caller may believe it is running S1/S12 while all agents actually receive the complete prompt.
+The protocol blueprint intentionally contains up to T mediation rounds. The runtime is the execution controller: after each complete mediator-summary plus two-revision round, it compares the two revised candidates. Exact equality stops; when a distance function and ε are explicitly supplied, distance ≤ ε stops. Otherwise the protocol continues up to T.
 
-**Required correction**
+Existing regression tests in `engine/tests/test_runtime.py` cover:
+- ε convergence after the first round (five calls, three executed stages);
+- exact round-trace behavior and stage barriers;
+- continued execution through T when parties remain different;
+- required distance callback when ε is configured.
 
-- Require an explicit partition/facet provider for S1 and S12.
-- Validate that the specialist/expert views are proper declared subsets or structured facet objects derived from the frozen extraction.
-- Ensure the integrator receives the full prompt plus all expert outputs only where the paper's protocol allows it.
-- Add negative tests proving the adapter refuses S1/S12 execution without partition/facet inputs.
-- Add leakage tests proving no specialist/expert receives another partition/facet.
+Thus a T-round blueprint is a maximum schedule, not evidence that every round executes unconditionally. Realized calls must be read from `StrategyRun`, not inferred from the blueprint count.
 
-### F16-02 — S11 mediation rounds are not conditionally controlled
+### F16-03 — S8 peer-review branch (withdrawn)
 
-**Paper semantics**
+The blueprint represents the worst-case revise path. At execution, the runtime parses the editor JSON verdict and skips the author revision on `accept`. Existing tests assert both branches:
+- accept: k+2 calls and depth 3;
+- revise: k+3 calls and depth 4.
 
-Table 4 gives S11 as two parallel drafts, one mediator summary, two parallel revisions: five calls, three stages. Section 5.4.2 says one additional round is used if the revisions still differ, and a maximum number of rounds must be set because the dialogue may fail to terminate.
+Malformed or missing editor verdicts fail closed. The catalogue's k+3 is correctly interpreted as the maximum/revise-path budget.
 
-**Implementation observation**
+### F16-04 — S4 Delphi (withdrawn)
 
-The blueprint creates the two initial drafts and then loops from 1 through T, unconditionally adding a mediator summary and two revisions per iteration. It exempts S11 from the Table 4 call-count assertion. At the default T=2, the resulting blueprint has eight calls and five stages, even if the first revisions have already converged.
+After each facilitator summary, the runtime compares every expert's current draft with that same expert's previous-round draft. It stops if all are exactly unchanged, or if the maximum supplied per-expert distance is at most ε. Otherwise it continues up to T. Tests cover exact stability, ε stopping, non-convergence through T, and rejection of ε without a distance callback.
 
-**Required correction**
+### F16-05 — S10 consensus (partially resolved)
 
-- Represent the Table 4 five-call/three-stage procedure as the base protocol.
-- Treat any further negotiation as a conditional bounded extension, not an unconditional repeat.
-- Require structured convergence evidence (the paper's distance condition) before scheduling another round.
-- Record base calls, extension calls and actual calls separately.
-- Add tests for immediate convergence (5 calls), one additional round (8 calls), and maximum-round exhaustion.
-- Do not change the catalogue's Table 4 base formula.
+The runtime executes sequential participant turns and compares the final shared-draft state of adjacent completed rounds. It stops on exact equality or configured ε-distance and retains moderator closure at the actual stop round. Tests cover exact stability, ε stopping, and continuation through T.
 
-### F16-03 — S8 peer-review branch is unconditional
+**Remaining source question:** the paper also describes moderator no-objection as a stopping condition. The current runtime's stop controller uses shared-draft stability; the moderator is invoked for closure after that decision. Do not claim that an independently returned moderator no-objection can terminate an otherwise changing shared draft until that behavior is implemented and tested (if required by the paper's exact semantics).
 
-**Paper semantics**
+## 3. Updated remediation order
 
-Table 4: the editor judges the draft and reviews; **if** the editor returns `revise`, the author revises. The paper's call formula k+3 is the revise-path budget.
-
-**Implementation observation**
-
-The current blueprint always appends an author revision step. The editor's typed decision is decoded later, but the protocol schedule itself does not branch on it. This means an accept outcome cannot terminate after the editor decision; the schedule still expects a revision call.
-
-**Required correction**
-
-- Introduce an explicit conditional protocol controller for the editor's typed `accept` / `revise` result.
-- For `accept`, terminate with the original draft and account for k+2 calls / depth 3.
-- For `revise`, execute the revision and account for k+3 calls / depth 4.
-- Verify that the paper's formula is documented as the maximum revise-path budget rather than a mandatory call count.
-- Add tests for both branches and ensure no hidden extra call.
-
-## 3. Known early-stop limitations
-
-### S4 — Delphi
-
-The paper says rounds stop when drafts no longer change. Current code builds a bounded T-round maximum schedule, but does not stop early based on candidate-aware stability. This is already disclosed in CORE 12 and must remain a visible limitation until a structured controller is implemented.
-
-### S10 — Consensus deliberation
-
-The paper stops after a full turn leaves the shared draft stable, or at T. Current code builds all nT sequential participant revisions followed by moderator judgement. A structured full-turn stability/no-objection controller is required to reproduce early stopping. This is already disclosed in CORE 12.
+1. Keep CORE 17's S1/S12 fail-closed adapter change; add source-aware validation of generated domain partitions and Jigsaw facets.
+2. Reconcile S10's moderator no-objection wording with the precise source section and decide whether it is an independent stop condition.
+3. Audit the runtime's actual S1/S12 partition and facet data path end-to-end, including prompt-view and input-content channels.
+4. Continue a full source-to-runtime audit for all thirteen strategies; static blueprint conformance alone is insufficient.
+5. Run the full suite on one exact commit and report static maximum schedule, executed trace, model calls and depth separately.
+6. Keep scientific evaluation and empirical effectiveness as separate gates.
 
 ## 4. Existing evidence and its limits
 
