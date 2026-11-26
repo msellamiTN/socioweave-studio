@@ -321,3 +321,15 @@ def test_registered_jigsaw_policy_endpoint_is_versioned_and_hash_addressed():
     assert result["factory_id"] == PAPER_S12_POLICY_ID
     assert result["policy_sha256"] == PAPER_S12_POLICY_SHA256
     assert result["policy_manifest"]["policy_id"] == PAPER_S12_POLICY_ID
+
+
+def test_studio_research_overview_exposes_only_current_capabilities():
+    page = client.get("/")
+    assert page.status_code == 200
+    for section_id in ("overview", "configuration", "e1-preflight"):
+        assert f'id="{section_id}"' in page.text
+    assert "Run launch" in page.text
+    assert "Current evidence gates" in page.text
+    script = client.get("/assets/app.js")
+    assert "renderOverview" in script.text
+    assert 'capabilities.evidence_state' in script.text

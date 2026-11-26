@@ -42,3 +42,24 @@
 #campaign-preflight-state{white-space:normal;max-width:260px;text-align:center}
 
 #s12-factory-id,#s12-factory-sha{opacity:.8;cursor:not-allowed}
+
+
+/* Studio-1 research workspace overview */
+.overview-metrics{margin:16px 0}
+.overview-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:14px}
+.workflow-list,.gate-list{list-style:none;padding:0;margin:0}
+.workflow-list li{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid #26364b}
+.workflow-list li:last-child,.gate-list li:last-child{border-bottom:0}
+.workflow-step{width:27px;height:27px;border-radius:8px;display:grid;place-items:center;font-size:10px;font-weight:700;flex-shrink:0}
+.workflow-step.done{background:#193b39;color:#83d8cb}
+.workflow-step.pending{background:#3b3222;color:#e8bd72}
+.workflow-step.locked{background:#252f3d;color:#8798ae}
+.workflow-list b,.gate-list b{display:block;font-size:11px;color:#e3ebf5}
+.workflow-list small,.gate-list small{display:block;color:#899bb1;font-size:10px;line-height:1.5;margin-top:4px}
+.state-label{margin-left:auto;color:#91a0b5;font-size:9px;white-space:nowrap}
+.gate-list li{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #26364b}
+.gate-mark{width:20px;height:20px;display:grid;place-items:center;border-radius:50%;font-size:11px;font-weight:700;flex-shrink:0}
+.gate-mark.pending{background:#3b3222;color:#e8bd72}
+.gate-mark.locked{background:#252f3d;color:#91a0b5}
+.overview-footnote{font-size:10px;line-height:1.6;color:#c4a979;margin:12px 0 0}
+@media(max-width:900px){.overview-grid{grid-template-columns:1fr}}
