@@ -108,6 +108,34 @@ function showPreflight(report) {
   $("preflight-results").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+$("verify-snapshot-manifest").addEventListener("click", async () => {
+  const button = $("verify-snapshot-manifest");
+  const resultBox = $("snapshot-verify-result");
+  button.disabled = true;
+  resultBox.classList.add("hidden");
+  $("snapshot-verify-status").textContent = "Checking manifest structure and digest…";
+  try {
+    const parsed = JSON.parse($("snapshot-manifest-input").value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Snapshot manifest must be a JSON object.");
+    }
+    const report = await api("/api/v1/snapshots/verify", {
+      method: "POST",
+      body: JSON.stringify({ snapshot_manifest: parsed }),
+    });
+    $("snapshot-verify-title").textContent = report.verification;
+    $("snapshot-verify-detail").textContent =
+      `${report.dataset_count} datasets · ${report.total_prompt_count} prompts · ${report.evidence_state}. Source files rechecked: no. E1_READY: false.`;
+    $("snapshot-verify-hash").textContent = report.snapshot_sha256;
+    resultBox.classList.remove("hidden");
+    $("snapshot-verify-status").textContent = "Manifest integrity check passed; scientific and source claims remain unverified.";
+  } catch (error) {
+    $("snapshot-verify-status").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
 $("run-preflight").addEventListener("click", async () => {
   const button = $("run-preflight");
   button.disabled = true;
