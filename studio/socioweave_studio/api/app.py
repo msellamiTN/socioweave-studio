@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from typing import Any, Literal
 import re
+import os
+import secrets
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel, ConfigDict, Field
 
 from sociodec.catalogue import STRATEGIES, get_strategy
@@ -585,6 +587,111 @@ def create_e1_campaign_preflight(request: E1CampaignPreflightRequest) -> dict[st
             "run a model, authorize a campaign, or establish E1_READY."
         ),
     }
+
+
+class EvidenceAttestationRequest(BaseModel):
+    """A self-reported operator claim; not an approval or authenticated identity."""
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    actor_claim: str = Field(min_length=1, max_length=200)
+    subject: str = Field(min_length=1, max_length=500)
+    payload: dict[str, Any]
+
+
+def _require_evidence_write_token(authorization: str | None) -> None:
+    configured = os.environ.get("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN")
+    if not configured:
+        raise HTTPException(status_code=503, detail="Evidence writes are disabled: configure a per-instance write token before use")
+    supplied = authorization.removeprefix("Bearer ").strip() if authorization else ""
+    if not secrets.compare_digest(supplied, configured):
+        raise HTTPException(status_code=401, detail="Evidence write authorization failed")
+
+
+def _reject_evidence_secrets(value: object, path: str = "payload") -> None:
+    forbidden = {"api_key", "secret", "password", "credential", "access_token", "token"}
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).lower() in forbidden:
+                raise HTTPException(status_code=422, detail=f"{path}.{key} is not accepted")
+            _reject_evidence_secrets(item, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _reject_evidence_secrets(item, f"{path}[{index}]")
+
+
+@app.get("/api/v1/evidence/status")
+def evidence_status() -> dict[str, object]:
+    return {
+        "schema_version": "studio-evidence-capabilities-v1",
+        "ledger": "local_sqlite_hash_chain",
+        "blob_archive": "local_content_addressed_sha256",
+        "write_enabled": bool(os.environ.get("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN")),
+        "authentication": "single_shared_bearer_token" if os.environ.get("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN") else "not_configured",
+        "multi_user_authorization": False,
+        "external_trusted_checkpoint": False,
+        "operator_attestations": "self_reported_not_independently_verified",
+        "source_blob_max_bytes": 10485760,
+        "execution_enabled": False,
+    }
+
+
+@app.post("/api/v1/evidence/events")
+def append_evidence_event(
+    request: EvidenceAttestationRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    _require_evidence_write_token(authorization)
+    _reject_evidence_secrets(request.payload)
+    from socioweave_studio.api.evidence_store import append_event
+    try:
+        event = append_event(
+            actor_claim=request.actor_claim,
+            event_type="operator_attestation",
+            subject=request.subject,
+            payload=request.payload,
+        )
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "event": event,
+        "interpretation": "self-reported operator attestation; identity and truth were not independently verified",
+    }
+
+
+@app.get("/api/v1/evidence/ledger/verify")
+def verify_evidence_ledger() -> dict[str, object]:
+    from socioweave_studio.api.evidence_store import verify_ledger
+    return verify_ledger()
+
+
+@app.put("/api/v1/evidence/blobs/{expected_sha256}")
+async def archive_evidence_blob(
+    expected_sha256: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    _require_evidence_write_token(authorization)
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="source blob exceeds 10 MiB limit")
+        chunks.append(chunk)
+    content = b"".join(chunks)
+    from socioweave_studio.api.evidence_store import store_blob
+    try:
+        return store_blob(expected_sha256, content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/evidence/blobs/{expected_sha256}/verify")
+def verify_evidence_blob(expected_sha256: str) -> dict[str, object]:
+    from socioweave_studio.api.evidence_store import verify_blob
+    try:
+        return verify_blob(expected_sha256)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 # Serve the operator interface from the same-origin API process. API routes

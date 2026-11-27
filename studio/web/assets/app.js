@@ -376,3 +376,51 @@ $("preview").addEventListener("click", async () => {
 loadCatalogue().catch(error => {
   $("form-status").textContent = `Could not load API catalogue: ${error.message}`;
 });
+
+
+async function loadEvidenceStatus() {
+  const status = await api("/api/v1/evidence/status");
+  $("evidence-write-state").textContent = status.write_enabled ? "Writes token-configured" : "Writes disabled by default";
+  $("evidence-write-state").className = "pill warning";
+}
+
+$("verify-evidence-ledger").addEventListener("click", async () => {
+  const button = $("verify-evidence-ledger");
+  button.disabled = true;
+  $("evidence-ledger-status").textContent = "Verifying append-only hash chain…";
+  try {
+    const result = await api("/api/v1/evidence/ledger/verify");
+    $("ledger-event-count").textContent = result.event_count.toLocaleString();
+    $("ledger-chain-state").textContent = result.verification === "LEDGER_CHAIN_VALID" ? "Valid" : "Invalid";
+    $("evidence-ledger-status").textContent =
+      result.verification + " · head " + result.head_hash.slice(0, 16) + "… · " + result.errors.length + " integrity errors";
+  } catch (error) {
+    $("evidence-ledger-status").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("verify-evidence-blob").addEventListener("click", async () => {
+  const digest = $("evidence-blob-digest").value.trim();
+  if (!/^[0-9a-f]{64}$/.test(digest)) {
+    $("evidence-blob-status").textContent = "Enter a lowercase 64-character SHA-256 digest.";
+    return;
+  }
+  const button = $("verify-evidence-blob");
+  button.disabled = true;
+  $("evidence-blob-status").textContent = "Recomputing SHA-256 from archived bytes…";
+  try {
+    const result = await api("/api/v1/evidence/blobs/" + digest + "/verify");
+    $("evidence-blob-status").textContent =
+      result.verification + " · source bytes rechecked: " + result.source_file_rechecked;
+  } catch (error) {
+    $("evidence-blob-status").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+loadEvidenceStatus().catch(error => {
+  $("evidence-write-state").textContent = "Status unavailable: " + error.message;
+});
