@@ -90,3 +90,8 @@
 /* Studio-3 manifest verification panel */
 #snapshot-verify-result{margin-top:14px}
 #snapshot-verify-result code{display:block;color:var(--cyan);font-size:10px;overflow-wrap:anywhere;margin-top:10px}
+
+/* Studio-4 evidence ledger workspace */
+#evidence-ledger .metrics{margin-top:14px}
+#evidence-ledger .report-caveat{max-width:1000px}
+#evidence-write-state{white-space:normal;text-align:center}
