@@ -402,3 +402,85 @@ def test_studio_research_overview_exposes_only_current_capabilities():
     script = client.get("/assets/app.js")
     assert "renderOverview" in script.text
     assert 'capabilities.evidence_state' in script.text
+
+
+def test_evidence_writes_are_disabled_without_instance_token(monkeypatch, tmp_path):
+    monkeypatch.delenv("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN", raising=False)
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_DIR", str(tmp_path))
+    response = client.post("/api/v1/evidence/events", json={
+        "actor_claim": "operator-a", "subject": "BREAK", "payload": {"claim": "license reviewed"}
+    })
+    assert response.status_code == 503
+    status = client.get("/api/v1/evidence/status").json()
+    assert status["write_enabled"] is False
+    assert status["multi_user_authorization"] is False
+    assert status["execution_enabled"] is False
+
+
+def test_evidence_attestation_requires_token_and_is_explicitly_self_reported(monkeypatch, tmp_path):
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN", "test-instance-token")
+    payload = {"actor_claim": "operator-a", "subject": "BREAK@release-1", "payload": {"claim": "reviewed"}}
+    assert client.post("/api/v1/evidence/events", json=payload).status_code == 401
+    response = client.post(
+        "/api/v1/evidence/events", json=payload,
+        headers={"Authorization": "Bearer test-instance-token"},
+    )
+    assert response.status_code == 200, response.text
+    assert "self-reported" in response.json()["interpretation"]
+    report = client.get("/api/v1/evidence/ledger/verify").json()
+    assert report["verification"] == "LEDGER_CHAIN_VALID"
+    assert report["event_count"] == 1
+    assert report["actor_identity"] == "self_asserted_claim_not_authenticated_identity"
+
+
+def test_evidence_ledger_detects_payload_tampering(monkeypatch, tmp_path):
+    import sqlite3
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN", "test-instance-token")
+    headers = {"Authorization": "Bearer test-instance-token"}
+    for index in range(2):
+        response = client.post("/api/v1/evidence/events", headers=headers, json={
+            "actor_claim": "operator-a", "subject": f"dataset-{index}",
+            "payload": {"claim": "reviewed", "index": index},
+        })
+        assert response.status_code == 200
+    database = tmp_path / "ledger.sqlite3"
+    connection = sqlite3.connect(database)
+    connection.execute("UPDATE evidence_events SET payload_json = ? WHERE sequence = 1", ('{"claim":"altered"}',))
+    connection.commit()
+    connection.close()
+    report = client.get("/api/v1/evidence/ledger/verify").json()
+    assert report["verification"] == "LEDGER_CHAIN_INVALID"
+    assert any("event hash mismatch" in item for item in report["errors"])
+
+
+def test_content_addressed_blob_archive_rechecks_uploaded_bytes(monkeypatch, tmp_path):
+    import hashlib
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN", "test-instance-token")
+    headers = {"Authorization": "Bearer test-instance-token"}
+    content = b"immutable source fixture; not benchmark evidence"
+    digest = hashlib.sha256(content).hexdigest()
+    stored = client.put(f"/api/v1/evidence/blobs/{digest}", content=content, headers=headers)
+    assert stored.status_code == 200, stored.text
+    assert stored.json()["stored"] is True
+    repeated = client.put(f"/api/v1/evidence/blobs/{digest}", content=content, headers=headers)
+    assert repeated.status_code == 200
+    assert repeated.json()["idempotent"] is True
+    verified = client.get(f"/api/v1/evidence/blobs/{digest}/verify")
+    assert verified.status_code == 200
+    assert verified.json()["verification"] == "SOURCE_BLOB_HASH_VALID"
+    mismatch = client.put(f"/api/v1/evidence/blobs/{'0' * 64}", content=content, headers=headers)
+    assert mismatch.status_code == 422
+
+
+def test_evidence_payload_rejects_secret_fields(monkeypatch, tmp_path):
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setenv("SOCIOWEAVE_EVIDENCE_WRITE_TOKEN", "test-instance-token")
+    response = client.post(
+        "/api/v1/evidence/events",
+        headers={"Authorization": "Bearer test-instance-token"},
+        json={"actor_claim": "operator-a", "subject": "BREAK", "payload": {"api_key": "never-store"}},
+    )
+    assert response.status_code == 422
