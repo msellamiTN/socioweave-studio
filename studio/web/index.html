@@ -99,6 +99,13 @@
           <p class="report-caveat" id="preflight-caveat"></p>
         </div>
         <details class="manifest-panel">
+          <summary>Verify an exported frozen snapshot manifest</summary>
+          <p class="section-intro">Paste the <code>snapshot_manifest</code> object from a preflight JSON export. Verification checks schema structure, selected-ID/hash key consistency and the declared manifest digest. It does not re-read source files or validate legal/semantic claims.</p>
+          <label class="source-field full"><span>Frozen snapshot manifest (JSON)</span><textarea id="snapshot-manifest-input" rows="12" spellcheck="false" placeholder='{"schema_version":"e1-frozen-benchmark-snapshot-v1", ...}'></textarea></label>
+          <div class="preflight-actions"><button id="verify-snapshot-manifest" class="secondary">Verify manifest integrity</button><span id="snapshot-verify-status" class="subtle" role="status">No manifest verification performed</span></div>
+          <div id="snapshot-verify-result" class="panel hidden" aria-live="polite"><h4 id="snapshot-verify-title">—</h4><p id="snapshot-verify-detail" class="muted"></p><code id="snapshot-verify-hash"></code></div>
+        </details>
+        <details class="manifest-panel">
           <summary>Full E1 campaign configuration — provider manifest</summary>
           <p class="section-intro">Paste the canonical non-secret JSON returned by <code>E1ProviderRegistry.campaign_manifest()</code>. It must contain both model modes, the MA/MB/MC family catalogue, exact model revisions, non-secret connection settings and fixed executor identity. Never paste API keys or credentials. The S12 policy identity below is loaded from the registered engine implementation; it is not user-defined.</p>
           <label class="source-field full"><span>Provider campaign manifest (JSON)</span><textarea id="provider-manifest-json" rows="14" spellcheck="false" placeholder='{"schema_version":"e1-provider-manifest-v1", ...}'></textarea></label>

@@ -86,3 +86,7 @@
 .registry-source a:hover{text-decoration:underline}
 .registry-footnote{font-size:9px;color:#c4a979;line-height:1.5;margin:12px 0 0}
 @media(max-width:900px){.registry-grid{grid-template-columns:1fr}}
+
+/* Studio-3 manifest verification panel */
+#snapshot-verify-result{margin-top:14px}
+#snapshot-verify-result code{display:block;color:var(--cyan);font-size:10px;overflow-wrap:anywhere;margin-top:10px}
