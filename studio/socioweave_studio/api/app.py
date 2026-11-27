@@ -670,7 +670,14 @@ async def archive_evidence_blob(
     authorization: str | None = Header(default=None),
 ) -> dict[str, object]:
     _require_evidence_write_token(authorization)
-    content = await request.body()
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="source blob exceeds 10 MiB limit")
+        chunks.append(chunk)
+    content = b"".join(chunks)
     from socioweave_studio.api.evidence_store import store_blob
     try:
         return store_blob(expected_sha256, content)
