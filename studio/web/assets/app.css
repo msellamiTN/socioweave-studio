@@ -63,3 +63,26 @@
 .gate-mark.locked{background:#252f3d;color:#91a0b5}
 .overview-footnote{font-size:10px;line-height:1.6;color:#c4a979;margin:12px 0 0}
 @media(max-width:900px){.overview-grid{grid-template-columns:1fr}}
+
+
+/* Studio-2: read-only dataset contracts and explicit evidence boundary */
+.registry-boundary{border:1px solid #594a2e;background:#211f1a;color:#d7c49b;border-radius:9px;padding:13px 15px;font-size:11px;line-height:1.65;margin:0 0 16px}
+.registry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.registry-card{min-width:0;border:1px solid var(--line);border-radius:10px;background:#101a28;padding:17px}
+.registry-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.registry-card h4{font:600 16px 'Space Grotesk';margin:5px 0}
+.registry-count{display:flex;align-items:baseline;gap:8px;margin:12px 0}
+.registry-count b{font:600 25px 'Space Grotesk';color:var(--cyan)}
+.registry-count span,.registry-description{font-size:11px;color:#9aabc0}
+.registry-description{line-height:1.6;min-height:34px}
+.registry-facts{margin:12px 0;display:grid;gap:9px}
+.registry-facts div{border-top:1px solid #26364b;padding-top:8px}
+.registry-facts dt{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#8294aa;margin-bottom:4px}
+.registry-facts dd{margin:0;color:#d0dbe8;font-size:10px;line-height:1.55;overflow-wrap:anywhere}
+.registry-metrics{border-top:1px solid #26364b;padding-top:10px;color:#b8c7d8;font-size:10px}
+.registry-metrics ul{padding-left:16px;margin:6px 0;line-height:1.7}
+.registry-source{margin-top:10px;font-size:10px}
+.registry-source a{color:var(--cyan);text-decoration:none}
+.registry-source a:hover{text-decoration:underline}
+.registry-footnote{font-size:9px;color:#c4a979;line-height:1.5;margin:12px 0 0}
+@media(max-width:900px){.registry-grid{grid-template-columns:1fr}}

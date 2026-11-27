@@ -211,21 +211,42 @@ def capabilities() -> dict[str, object]:
 
 @app.get("/api/v1/datasets")
 def datasets() -> dict[str, object]:
+    """Return the engine-owned dataset contracts and the Studio evidence boundary.
+
+    This is a catalogue, not a persisted dataset registry: source declarations
+    are supplied to preflight requests and are not retained by this service.
+    """
+    rows = []
+    for dataset_id, expected in (
+        ("BREAK", 100),
+        ("StrategyQA", 100),
+        ("TaskBench", 100),
+        ("TravelPlanner", 100),
+        ("smart-administration", 60),
+    ):
+        metadata = DATASET_REGISTRY[dataset_id]
+        rows.append({
+            "id": dataset_id,
+            "expected_prompts": expected,
+            "metadata": metadata,
+            "evidence_contract": {
+                "source_identity_required": True,
+                "immutable_revision_required": True,
+                "split_and_selection_required": True,
+                "license_review_required": bool(metadata["license_review_required"]),
+                "reference_data_required": bool(metadata["reference_provided"]),
+                "evidence_state": "NOT_PERSISTED",
+            },
+        })
     return {
-        "datasets": [
-            {
-                "id": dataset_id,
-                "expected_prompts": expected,
-                "metadata": DATASET_REGISTRY[dataset_id],
-            }
-            for dataset_id, expected in (
-                ("BREAK", 100),
-                ("StrategyQA", 100),
-                ("TaskBench", 100),
-                ("TravelPlanner", 100),
-                ("smart-administration", 60),
-            )
-        ]
+        "datasets": rows,
+        "registry_mode": "engine_catalogue_read_only",
+        "evidence_persistence": False,
+        "evidence_boundary": (
+            "Source declarations are submitted per preflight request and are not persisted "
+            "as registry records by Studio. Catalogue metadata is not evidence of source "
+            "availability, legal approval, annotation quality or snapshot freeze."
+        ),
     }
 
 
