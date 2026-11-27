@@ -131,6 +131,23 @@
         </details>
       </section>
 
+      <section id="evidence-ledger" class="workspace">
+        <div class="section-heading"><div><span class="eyebrow">04 / PROVENANCE</span><h3>Evidence ledger & source archive</h3></div><span id="evidence-write-state" class="pill warning">Checking configuration…</span></div>
+        <p class="section-intro">Studio-4 provides a local hash-chained attestation ledger and content-addressed source blob archive. Writes require a server-side instance token. Operator names are self-asserted claims, not authenticated identities; this is not multi-user authorization or independently trusted storage.</p>
+        <div class="metrics">
+          <div class="metric"><span>Ledger events</span><b id="ledger-event-count">—</b></div>
+          <div class="metric"><span>Ledger chain</span><b id="ledger-chain-state">—</b></div>
+          <div class="metric"><span>Source archive</span><b>SHA-256</b></div>
+          <div class="metric"><span>Experiment execution</span><b>Disabled</b></div>
+        </div>
+        <div class="preflight-actions"><button id="verify-evidence-ledger" class="secondary">Verify ledger chain</button><span id="evidence-ledger-status" class="subtle" role="status">No ledger verification performed</span></div>
+        <div class="source-fields campaign-declaration">
+          <label class="source-field full"><span>Archived source SHA-256</span><input id="evidence-blob-digest" inputmode="text" maxlength="64" placeholder="64-character lowercase SHA-256"></label>
+        </div>
+        <div class="preflight-actions"><button id="verify-evidence-blob" class="secondary">Recheck archived source bytes</button><span id="evidence-blob-status" class="subtle" role="status">No source blob verification performed</span></div>
+        <p class="report-caveat">Hash chaining detects modification relative to a trusted checkpoint; it does not prevent a local administrator from rewriting the database and recomputing the chain. Export checkpoints to an independently controlled system before claiming stronger tamper evidence. Source rechecking applies only to bytes explicitly uploaded to this archive.</p>
+      </section>
+
       <section id="results" class="results hidden" aria-live="polite">
         <div class="section-heading"><div><span class="eyebrow">03 / ESTIMATE</span><h3>Configuration preview</h3></div><span class="pill warning">Not validated for execution</span></div>
         <div class="metrics">
