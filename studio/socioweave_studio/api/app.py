@@ -7,6 +7,7 @@ experiments, and neither establishes E1_READY.
 from __future__ import annotations
 
 from typing import Any, Literal
+import re
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -47,6 +48,13 @@ class E1PreflightRequest(BaseModel):
     n: int = Field(default=3, ge=1, le=12)
     k: int = Field(default=3, ge=1, le=12)
     T: int = Field(default=2, ge=1, le=10)
+
+
+class SnapshotManifestVerificationRequest(BaseModel):
+    """Verify an exported snapshot manifest's internal hash and structural consistency."""
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    snapshot_manifest: dict[str, Any]
 
 
 class E1CampaignPreflightRequest(BaseModel):
@@ -333,6 +341,88 @@ def create_config_preview(request: ConfigPreviewRequest) -> dict[str, object]:
         "live_provider_calls": 0,
         "run_launch_enabled": False,
     }
+
+
+def _verify_snapshot_manifest(manifest: dict[str, Any]) -> dict[str, object]:
+    """Check manifest structure and its content-addressed dataset-entry digest.
+
+    This does not access source files or establish source authenticity, rights,
+    selection correctness, annotation quality or scientific readiness.
+    """
+    required_top = {
+        "schema_version", "dataset_order", "datasets",
+        "total_prompt_count", "snapshot_sha256",
+    }
+    if set(manifest) != required_top:
+        raise ValueError("snapshot manifest must contain exactly the required top-level fields")
+    if manifest["schema_version"] != "e1-frozen-benchmark-snapshot-v1":
+        raise ValueError("unsupported snapshot manifest schema_version")
+    if manifest["dataset_order"] != list(ALL_DATASETS):
+        raise ValueError("dataset_order must match the registered E1 dataset order")
+    entries = manifest["datasets"]
+    if not isinstance(entries, dict) or set(entries) != set(ALL_DATASETS):
+        raise ValueError("datasets must contain exactly the five registered E1 datasets")
+
+    total = 0
+    for dataset_id in ALL_DATASETS:
+        entry = entries[dataset_id]
+        if not isinstance(entry, dict):
+            raise ValueError(f"{dataset_id} manifest entry must be an object")
+        ids = entry.get("prompt_ids")
+        prompt_hashes = entry.get("prompt_sha256")
+        reference_hashes = entry.get("reference_data_sha256")
+        expected = EXPECTED_PROMPTS[dataset_id]
+        if not isinstance(ids, list) or len(ids) != expected:
+            raise ValueError(f"{dataset_id} must contain exactly {expected} selected prompt IDs")
+        if any(not isinstance(item, str) or not item.strip() for item in ids):
+            raise ValueError(f"{dataset_id} prompt_ids must be non-empty strings")
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{dataset_id} prompt_ids must be unique")
+        if not isinstance(prompt_hashes, dict) or set(prompt_hashes) != set(ids):
+            raise ValueError(f"{dataset_id} prompt_sha256 keys must match prompt_ids")
+        if not isinstance(reference_hashes, dict) or set(reference_hashes) != set(ids):
+            raise ValueError(f"{dataset_id} reference_data_sha256 keys must match prompt_ids")
+        for label, values in (("prompt_sha256", prompt_hashes), ("reference_data_sha256", reference_hashes)):
+            if any(not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None for value in values.values()):
+                raise ValueError(f"{dataset_id} {label} values must be lowercase SHA-256 digests")
+        if re.fullmatch(r"[0-9a-f]{64}", str(entry.get("source_sha256", ""))) is None:
+            raise ValueError(f"{dataset_id} source_sha256 must be a lowercase SHA-256 digest")
+        total += len(ids)
+
+    if type(manifest["total_prompt_count"]) is not int or manifest["total_prompt_count"] != total:
+        raise ValueError("total_prompt_count does not match the selected prompt IDs")
+    declared = manifest["snapshot_sha256"]
+    if not isinstance(declared, str) or re.fullmatch(r"[0-9a-f]{64}", declared) is None:
+        raise ValueError("snapshot_sha256 must be a lowercase SHA-256 digest")
+    computed = content_hash({"datasets": entries})
+    if declared != computed:
+        raise ValueError("snapshot_sha256 does not match the manifest dataset entries")
+
+    return {
+        "schema_version": "studio-snapshot-manifest-verification-v1",
+        "verification": "MANIFEST_INTEGRITY_VALID",
+        "evidence_state": "HASH_CONSISTENCY_ONLY",
+        "snapshot_sha256": computed,
+        "dataset_count": len(ALL_DATASETS),
+        "total_prompt_count": total,
+        "source_files_rechecked": False,
+        "live_provider_calls": 0,
+        "e1_ready": False,
+        "limitations": [
+            "This verifies internal manifest structure and its declared content hash only.",
+            "It does not re-read source files or independently verify their SHA-256 values.",
+            "It does not verify source authenticity, legal permission, selection correctness or annotation quality.",
+            "It does not establish E1 readiness or authorize experiment execution.",
+        ],
+    }
+
+
+@app.post("/api/v1/snapshots/verify")
+def verify_snapshot_manifest(request: SnapshotManifestVerificationRequest) -> dict[str, object]:
+    try:
+        return _verify_snapshot_manifest(request.snapshot_manifest)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/api/v1/preflights/e1")
