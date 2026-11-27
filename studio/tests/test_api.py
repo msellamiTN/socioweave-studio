@@ -226,6 +226,59 @@ def _provider_manifest_fixture():
     return registry.campaign_manifest(executor_id="fixed-me")
 
 
+def test_snapshot_manifest_verifier_accepts_exact_preflight_manifest(tmp_path):
+    response = client.post("/api/v1/preflights/e1", json={
+        "sources": _write_fake_dataset_bundle(tmp_path),
+    })
+    assert response.status_code == 200, response.text
+    manifest = response.json()["snapshot_manifest"]
+    verified = client.post("/api/v1/snapshots/verify", json={
+        "snapshot_manifest": manifest,
+    })
+    assert verified.status_code == 200, verified.text
+    report = verified.json()
+    assert report["verification"] == "MANIFEST_INTEGRITY_VALID"
+    assert report["evidence_state"] == "HASH_CONSISTENCY_ONLY"
+    assert report["snapshot_sha256"] == manifest["snapshot_sha256"]
+    assert report["dataset_count"] == 5
+    assert report["total_prompt_count"] == 460
+    assert report["source_files_rechecked"] is False
+    assert report["live_provider_calls"] == 0
+    assert report["e1_ready"] is False
+
+
+def test_snapshot_manifest_verifier_rejects_tampered_digest_and_duplicate_ids(tmp_path):
+    import copy
+    response = client.post("/api/v1/preflights/e1", json={
+        "sources": _write_fake_dataset_bundle(tmp_path),
+    })
+    manifest = response.json()["snapshot_manifest"]
+    tampered = copy.deepcopy(manifest)
+    tampered["snapshot_sha256"] = "0" * 64
+    result = client.post("/api/v1/snapshots/verify", json={"snapshot_manifest": tampered})
+    assert result.status_code == 422
+    assert "does not match" in result.json()["detail"]
+
+    tampered = copy.deepcopy(manifest)
+    tampered["datasets"]["BREAK"]["prompt_ids"][1] = tampered["datasets"]["BREAK"]["prompt_ids"][0]
+    result = client.post("/api/v1/snapshots/verify", json={"snapshot_manifest": tampered})
+    assert result.status_code == 422
+    assert "must be unique" in result.json()["detail"]
+
+
+def test_snapshot_manifest_verifier_rejects_missing_dataset_or_hash_keys(tmp_path):
+    import copy
+    response = client.post("/api/v1/preflights/e1", json={
+        "sources": _write_fake_dataset_bundle(tmp_path),
+    })
+    manifest = response.json()["snapshot_manifest"]
+    tampered = copy.deepcopy(manifest)
+    del tampered["datasets"]["BREAK"]["reference_data_sha256"]
+    result = client.post("/api/v1/snapshots/verify", json={"snapshot_manifest": tampered})
+    assert result.status_code == 422
+    assert "reference_data_sha256 keys" in result.json()["detail"]
+
+
 def test_e1_preflight_validates_complete_grid_without_live_calls(tmp_path):
     response = client.post("/api/v1/preflights/e1", json={
         "sources": _write_fake_dataset_bundle(tmp_path),
