@@ -31,6 +31,22 @@ def test_dataset_catalogue_exposes_exact_registered_counts():
     }
 
 
+def test_dataset_registry_exposes_engine_contract_and_non_persistent_evidence_boundary():
+    response = client.get("/api/v1/datasets")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["registry_mode"] == "engine_catalogue_read_only"
+    assert payload["evidence_persistence"] is False
+    assert "not persisted" in payload["evidence_boundary"].lower()
+    rows = {row["id"]: row for row in payload["datasets"]}
+    assert set(rows) == {"BREAK", "StrategyQA", "TaskBench", "TravelPlanner", "smart-administration"}
+    assert rows["BREAK"]["evidence_contract"]["evidence_state"] == "NOT_PERSISTED"
+    assert rows["BREAK"]["evidence_contract"]["license_review_required"] is True
+    assert rows["TravelPlanner"]["metadata"]["coverage_applicable"] == "annotated_constraints_only"
+    assert rows["smart-administration"]["expected_prompts"] == 60
+    assert rows["smart-administration"]["metadata"]["source_release_status"] == "to_be_released_with_code"
+
+
 def test_config_preview_uses_engine_call_formula_and_never_launches():
     response = client.post("/api/v1/config-previews", json={
         "strategy_id": "S1",
