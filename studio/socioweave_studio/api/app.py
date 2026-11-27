@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sociodec.catalogue import STRATEGIES, get_strategy
 from sociodec.datasets import DATASET_REGISTRY
 from sociodec.e1_protocol import (
-    ALL_DATASETS, BASELINES, MODEL_MODES, build_e1_conditions,
+    ALL_DATASETS, BASELINES, EXPECTED_PROMPTS, MODEL_MODES, build_e1_conditions,
     e1_metric_obligations, validate_e1_manifest,
 )
 from sociodec.datasets import E1DatasetSource, freeze_e1_benchmark_snapshot
