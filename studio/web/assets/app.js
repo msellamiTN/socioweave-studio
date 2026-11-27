@@ -25,6 +25,7 @@ async function loadCatalogue() {
     api("/api/v1/capabilities"),
   ]);
   renderOverview(strategies, datasets, capabilities);
+  renderDatasetRegistry(datasets);
   strategyRows = strategies.strategies;
   datasetRows = datasets.datasets;
   $("s12-factory-id").value = jigsawPolicy.factory_id;
@@ -233,6 +234,43 @@ $("export-campaign-preflight").addEventListener("click", () => {
   anchor.remove();
   URL.revokeObjectURL(url);
 });
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[char]);
+}
+
+function renderDatasetRegistry(payload) {
+  const boundary = payload.evidence_boundary || "Dataset evidence persistence is not reported by this API.";
+  $("dataset-registry-summary").textContent =
+    `Registry mode: ${payload.registry_mode || "unspecified"} · Evidence persistence: ${payload.evidence_persistence ? "enabled" : "not enabled"}. ${boundary}`;
+  $("dataset-registry-list").innerHTML = payload.datasets.map(row => {
+    const meta = row.metadata || {};
+    const contract = row.evidence_contract || {};
+    const metrics = (meta.metrics || []).map(item => `<li>${escapeHTML(item)}</li>`).join("");
+    const source = meta.paper_source_url
+      ? `<a href="${escapeHTML(meta.paper_source_url)}" target="_blank" rel="noopener noreferrer">Paper/source reference ↗</a>`
+      : "<span class='subtle'>No public source URL registered</span>";
+    const reference = meta.reference_provided || "Reference requirement not specified in catalogue";
+    return `
+      <article class="registry-card">
+        <div class="registry-card-head"><div><span class="eyebrow">ENGINE DATASET</span><h4>${escapeHTML(row.id)}</h4></div><span class="pill warning">${escapeHTML(contract.evidence_state || "UNKNOWN")}</span></div>
+        <div class="registry-count"><b>${escapeHTML(row.expected_prompts)}</b><span>paper prompts expected</span></div>
+        <p class="registry-description">${escapeHTML(meta.prompt_case || "No prompt case description registered")}</p>
+        <dl class="registry-facts">
+          <div><dt>Reference structure</dt><dd>${escapeHTML(reference)}</dd></div>
+          <div><dt>Source release status</dt><dd>${escapeHTML(meta.source_release_status || "Not specified")}</dd></div>
+          <div><dt>Selection requirement</dt><dd>${escapeHTML(meta.selection_protocol || "Explicit selection protocol required")}</dd></div>
+          <div><dt>License review</dt><dd>${contract.license_review_required ? "Required · operator evidence not persisted" : "Not marked required in catalogue"}</dd></div>
+          <div><dt>Coverage applicability</dt><dd>${escapeHTML(meta.coverage_applicable === false ? "Not applicable" : meta.coverage_applicable || "Not specified")}</dd></div>
+        </dl>
+        <div class="registry-metrics"><b>Registered metric scope</b><ul>${metrics}</ul></div>
+        <div class="registry-source">${source}</div>
+        <p class="registry-footnote">Catalogue contract only. No source revision, selected IDs, approval or annotation evidence is stored in this Studio view.</p>
+      </article>`;
+  }).join("");
+}
 
 function renderOverview(strategies, datasets, capabilities) {
   $("overview-datasets").textContent = datasets.datasets.length;
